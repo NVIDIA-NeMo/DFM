@@ -25,7 +25,7 @@ __shortversion__ = ".".join(map(str, VERSION[:3]))
 __version__ = ".".join(map(str, VERSION[:3])) + "".join(VERSION[3:])
 
 __package_name__ = "nemo_vfm"
-__contact_names__ = "NeMo VFM"
+__contact_names__ = "NVIDIA"
 __contact_emails__ = "nemo-toolkit@nvidia.com"
 __homepage__ = "https://github.com/NVIDIA-NeMo/NeMo-VFM"
 __repository_url__ = "https://github.com/NVIDIA-NeMo/NeMo-VFM"
