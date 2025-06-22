@@ -1,4 +1,4 @@
-# Contributing To VFM
+# Contributing To NeMo VFM
 
 ## Signing Your Work
 

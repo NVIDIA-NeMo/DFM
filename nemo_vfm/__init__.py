@@ -11,8 +11,16 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
-
-
-def test_placeholder():
-    """Should be True"""
-    assert True is True
+from nemo_vfm.package_info import (
+    __contact_emails__,
+    __contact_names__,
+    __description__,
+    __download_url__,
+    __homepage__,
+    __keywords__,
+    __license__,
+    __package_name__,
+    __repository_url__,
+    __shortversion__,
+    __version__,
+)
