@@ -13,12 +13,12 @@
 # limitations under the License.
 
 [project]
-name = "vfm"
+name = "nemo-vfm"
 dynamic = [
     "version",
     "readme",
 ]
-description = "Video Foundation Models"
+description = "NeMo VFM"
 license = {file = "LICENSE"}
 requires-python = ">=3.10"
 authors = [{ name = "NVIDIA", email = "nemo-toolkit@nvidia.com" }]
@@ -84,15 +84,15 @@ dev = [
 ]
 
 [tool.setuptools]
-packages = ["vfm"]
+packages = ["nemo_vfm"]
 
 [tool.setuptools.dynamic]
-version = {attr = "vfm.__version__"}
+version = {attr = "nemo_vfm.__version__"}
 readme = {file = "README.md", content-type = "text/markdown"}
 
 [project.urls]
-Download = "https://github.com/NVIDIA-NeMo/VFM/releases"
-Homepage = "https://github.com/NVIDIA-NeMo/VFM"
+Download = "https://github.com/NVIDIA-NeMo/NeMo-VFM/releases"
+Homepage = "https://github.com/NVIDIA-NeMo/NeMo-VFM"
 
 [tool.pytest.ini_options]
 # durations=0 will display all tests execution time, sorted in ascending order starting from from the slowest one.
@@ -101,7 +101,7 @@ addopts = "--verbose --pyargs --durations=0 --strict-markers"  # always add thes
 testpaths = ["tests"]
 # directories to ignore when discovering tests
 norecursedirs = [
-    "vfm",
+    "nemo_vfm",
     "external",
     "examples",
     "docs",
@@ -172,7 +172,7 @@ ignore = [
     "E501",  # Line too long - handled by formatter
 ]
 [tool.ruff.lint.isort]
-known-first-party = ["vfm"]
+known-first-party = ["nemo_vfm"]
 known-third-party = ["examples", "scripts"]
 section-order = ["future", "standard-library", "third-party", "first-party", "local-folder"]
 lines-after-imports = 2
@@ -196,4 +196,4 @@ concurrency = ["thread", "multiprocessing"]
 omit = ["/tmp/*"]
 
 [tool.coverage.paths]
-source = ["vfm/", "/workspace/vfm"]
+source = ["nemo_vfm/", "/workspace/nemo_vfm"]
