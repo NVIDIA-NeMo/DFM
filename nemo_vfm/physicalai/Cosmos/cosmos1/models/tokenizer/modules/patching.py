@@ -32,6 +32,7 @@ import torch
 import torch.nn.functional as F
 from einops import rearrange
 
+
 _WAVELETS = {
     "haar": torch.tensor([0.7071067811865476, 0.7071067811865476]),
     "rearrange": torch.tensor([1.0, 1.0]),

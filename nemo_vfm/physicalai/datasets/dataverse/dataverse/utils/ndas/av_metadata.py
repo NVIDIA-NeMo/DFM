@@ -343,7 +343,7 @@ def parse_obstacle_data(info, check_sensor):
         )
 
         # make sure sensor coordinate frame is the same as ego pose
-        assert row["sensor_name"] == check_sensor, f'{row["sensor_name"]} {check_sensor}'
+        assert row["sensor_name"] == check_sensor, f"{row['sensor_name']} {check_sensor}"
 
     return processed
 

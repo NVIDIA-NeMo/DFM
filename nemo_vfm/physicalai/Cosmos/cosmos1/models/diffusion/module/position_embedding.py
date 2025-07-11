@@ -136,12 +136,12 @@ class VideoRopePosition3DEmb(VideoPositionEmb):
 
         B, T, H, W, _ = B_T_H_W_C
         uniform_fps = (fps is None) or (fps.min() == fps.max())
-        assert (
-            uniform_fps or B == 1 or T == 1
-        ), "For video batch, batch size should be 1 for non-uniform fps. For image batch, T should be 1"
-        assert (
-            H <= self.max_h and W <= self.max_w
-        ), f"Input dimensions (H={H}, W={W}) exceed the maximum dimensions (max_h={self.max_h}, max_w={self.max_w})"
+        assert uniform_fps or B == 1 or T == 1, (
+            "For video batch, batch size should be 1 for non-uniform fps. For image batch, T should be 1"
+        )
+        assert H <= self.max_h and W <= self.max_w, (
+            f"Input dimensions (H={H}, W={W}) exceed the maximum dimensions (max_h={self.max_h}, max_w={self.max_w})"
+        )
         half_emb_h = torch.outer(self.seq[:H], h_spatial_freqs)
         half_emb_w = torch.outer(self.seq[:W], w_spatial_freqs)
 
@@ -311,12 +311,12 @@ class MultiCameraVideoRopePosition3DEmb(MultiCameraVideoPositionEmb):
         uniform_fps = (fps is None) or (fps.min() == fps.max())
         assert uniform_fps  # only support uniform fps now
 
-        assert (
-            uniform_fps or B == 1 or T == 1
-        ), "For video batch, batch size should be 1 for non-uniform fps. For image batch, T should be 1"
-        assert (
-            H <= self.max_h and W <= self.max_w
-        ), f"Input dimensions (H={H}, W={W}) exceed the maximum dimensions (max_h={self.max_h}, max_w={self.max_w}) configured for positional embedding. Please adjust the input size or increase the maximum dimensions in the model configuration."
+        assert uniform_fps or B == 1 or T == 1, (
+            "For video batch, batch size should be 1 for non-uniform fps. For image batch, T should be 1"
+        )
+        assert H <= self.max_h and W <= self.max_w, (
+            f"Input dimensions (H={H}, W={W}) exceed the maximum dimensions (max_h={self.max_h}, max_w={self.max_w}) configured for positional embedding. Please adjust the input size or increase the maximum dimensions in the model configuration."
+        )
         half_emb_h = torch.outer(self.seq[:H], h_spatial_freqs)
         half_emb_w = torch.outer(self.seq[:W], w_spatial_freqs)
 

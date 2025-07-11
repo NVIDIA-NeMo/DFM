@@ -20,6 +20,7 @@ import os
 from argparse import ArgumentParser
 
 import imageio
+import nemo.lightning as nl
 import numpy as np
 import torch
 from cosmos1.models.autoregressive.nemo.inference.general import MockMCoreTokenizer
@@ -34,11 +35,10 @@ from einops import rearrange
 from huggingface_hub import snapshot_download
 from megatron.core.inference.common_inference_params import CommonInferenceParams
 from megatron.core.inference.engines.mcore_engine import MCoreEngine
-
-import nemo.lightning as nl
 from nemo.collections.llm.inference.base import _setup_trainer_and_restore_model
 from nemo.lightning import io
 from nemo.lightning.ckpt_utils import ckpt_to_context_subdir
+
 
 torch._C._jit_set_texpr_fuser_enabled(False)
 

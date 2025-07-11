@@ -16,7 +16,6 @@
 from typing import Callable, Tuple
 
 import torch
-
 from cosmos1.models.diffusion.diffusion.functional.batch_ops import batch_mul
 
 

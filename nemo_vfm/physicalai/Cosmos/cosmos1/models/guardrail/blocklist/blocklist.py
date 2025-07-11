@@ -28,6 +28,7 @@ from cosmos1.models.guardrail.blocklist.utils import read_keyword_list_from_dir,
 from cosmos1.models.guardrail.common.core import ContentSafetyGuardrail, GuardrailRunner
 from cosmos1.utils import log, misc
 
+
 DEFAULT_CHECKPOINT_DIR = "checkpoints/Cosmos-1.0-Guardrail/blocklist"
 CENSOR = misc.Color.red("*")
 

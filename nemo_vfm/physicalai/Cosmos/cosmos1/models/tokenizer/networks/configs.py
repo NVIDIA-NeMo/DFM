@@ -24,6 +24,7 @@ from cosmos1.models.tokenizer.modules import (
     EncoderType,
 )
 
+
 continuous_image = dict(
     # The attention resolution for res blocks.
     attn_resolutions=[32],

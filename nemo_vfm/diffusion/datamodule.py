@@ -20,9 +20,8 @@ import random
 from typing import Dict, Literal
 
 import torch
-from torch.utils.data import Dataset
-
 from nemo.collections.llm.gpt.data.mock import MockDataModule
+from torch.utils.data import Dataset
 
 
 class PosEmb3D:
@@ -35,9 +34,9 @@ class PosEmb3D:
     def generate_pos_id(self):
         self.grid = torch.stack(
             torch.meshgrid(
-                torch.arange(self.max_t, device='cpu'),
-                torch.arange(self.max_h, device='cpu'),
-                torch.arange(self.max_w, device='cpu'),
+                torch.arange(self.max_t, device="cpu"),
+                torch.arange(self.max_h, device="cpu"),
+                torch.arange(self.max_w, device="cpu"),
             ),
             dim=-1,
         )
@@ -118,11 +117,11 @@ class ActionControlDiffusionDataset(Dataset):
         """
         data = self.dataset[i]
         # Current frame is of shape (<latent_dim>, <timestamp_dim>, height, width)
-        current_frame = data['current_frame'].to(self.dtype)
+        current_frame = data["current_frame"].to(self.dtype)
         # Action is of shape (<action_emb_dim>), which is (7) for Bridge.
-        action = data['action'].to(self.dtype)
+        action = data["action"].to(self.dtype)
         # Next frame is of shape (<latent_dim>, <timestamp_dim>, height, width)
-        next_frame = data['next_frame'].to(self.dtype)
+        next_frame = data["next_frame"].to(self.dtype)
 
         # video_latent is the input to the DiT V2W model, and it accepts a tensor of shape (B, L, T=2, H, W).
         # The first frame of the tensor is associated with the current video frame, i.e. the video conditioning latent,
@@ -153,12 +152,12 @@ class ActionControlDiffusionDataset(Dataset):
         padding_mask = torch.zeros((1, 1, self.original_video_height, self.original_video_width), dtype=self.dtype)
 
         sample = {
-            'video': video_latent,  # tokens. We may not flatten it in the same way. AR model flattens it then
+            "video": video_latent,  # tokens. We may not flatten it in the same way. AR model flattens it then
             # offsets by 1 token. We may not wanna do that.
-            'noise_latent': noise_latent,
-            'timesteps': timesteps,
-            't5_text_embeddings': t5_text_embedding,
-            't5_text_mask': t5_text_mask,
+            "noise_latent": noise_latent,
+            "timesteps": timesteps,
+            "t5_text_embeddings": t5_text_embedding,
+            "t5_text_mask": t5_text_mask,
             "image_size": image_size,
             "fps": self.fps,
             "num_frames": self.num_frames,
@@ -180,7 +179,7 @@ class ActionControlDiffusionDataset(Dataset):
 
 
 class VideoFolderDataset(Dataset):
-    def __init__(self, root_dir='', cache=True):
+    def __init__(self, root_dir="", cache=True):
         self.root_dir = root_dir
         self.sample_prefixes = self._get_sample_prefixes()
         # if cache:
@@ -192,7 +191,7 @@ class VideoFolderDataset(Dataset):
         all_files = os.listdir(self.root_dir)
         prefixes = set()
         for file in all_files:
-            prefix = file.split('.')[0]
+            prefix = file.split(".")[0]
             prefixes.add(prefix)
         return sorted(list(prefixes))
 
@@ -205,7 +204,7 @@ class VideoFolderDataset(Dataset):
         prefix = self.sample_prefixes[idx]
 
         # Load JSON info
-        with open(os.path.join(self.root_dir, f"{prefix}.info.json"), 'r') as f:
+        with open(os.path.join(self.root_dir, f"{prefix}.info.json"), "r") as f:
             info = json.load(f)
 
         # Load text embeddings
@@ -220,13 +219,13 @@ class VideoFolderDataset(Dataset):
         # Load conditioning latent
         conditioning_latent_path = os.path.join(self.root_dir, f"{prefix}.conditioning_latent.pth")
         if os.path.exists(conditioning_latent_path):
-            conditioning_latent = torch.load(conditioning_latent_path, map_location='cpu')
+            conditioning_latent = torch.load(conditioning_latent_path, map_location="cpu")
         else:
             conditioning_latent = None
 
-        t = info['num_frames']
-        h = info['height']
-        w = info['width']
+        t = info["num_frames"]
+        h = info["height"]
+        w = info["width"]
 
         seq_len = video_latent.shape[-1] * video_latent.shape[-2] * video_latent.shape[-3]
         loss_mask = torch.ones(seq_len, dtype=torch.bfloat16)
@@ -235,14 +234,14 @@ class VideoFolderDataset(Dataset):
         # pos_emb = self.pos_emb_3d.get_pos_id_3d(t=t, h=h//p, w=w//p)
 
         sample = {
-            'video': video_latent,
-            'noise_latent': noise_latent,
-            'timesteps': timesteps,
-            't5_text_embeddings': text_embedding,
-            't5_text_mask': text_mask,
+            "video": video_latent,
+            "noise_latent": noise_latent,
+            "timesteps": timesteps,
+            "t5_text_embeddings": text_embedding,
+            "t5_text_mask": text_mask,
             # 'pos_ids': pos_emb,
             "image_size": torch.tensor([[h, w, h, w]] * 1, dtype=torch.bfloat16),
-            "fps": torch.tensor([info['fps']] * 1, dtype=torch.bfloat16),
+            "fps": torch.tensor([info["fps"]] * 1, dtype=torch.bfloat16),
             "num_frames": torch.tensor([t] * 1, dtype=torch.bfloat16),
             "padding_mask": torch.zeros((1, 1, h, w), dtype=torch.bfloat16),
             "loss_mask": loss_mask,
@@ -281,7 +280,7 @@ class VideoFolderDataset(Dataset):
 
 
 class VideoFolderCameraCtrlDataset(Dataset):
-    def __init__(self, root_dir='', cache=True):
+    def __init__(self, root_dir="", cache=True):
         self.root_dir = root_dir
         self.sample_prefixes = self._get_sample_prefixes()
 
@@ -289,7 +288,7 @@ class VideoFolderCameraCtrlDataset(Dataset):
         all_files = os.listdir(self.root_dir)
         prefixes = set()
         for file in all_files:
-            prefix = file.split('.')[0]
+            prefix = file.split(".")[0]
             prefixes.add(prefix)
         return sorted(list(prefixes))
 
@@ -302,7 +301,7 @@ class VideoFolderCameraCtrlDataset(Dataset):
         prefix = self.sample_prefixes[idx]
 
         # Load JSON info
-        with open(os.path.join(self.root_dir, f"{prefix}.info.json"), 'r') as f:
+        with open(os.path.join(self.root_dir, f"{prefix}.info.json"), "r") as f:
             info = json.load(f)
 
         # Load text embeddings
@@ -316,21 +315,21 @@ class VideoFolderCameraCtrlDataset(Dataset):
 
         # Load conditioning latent
         conditioning_latent_path = os.path.join(self.root_dir, f"{prefix}.conditioning_latent.pth")
-        conditioning_latent = torch.load(conditioning_latent_path, map_location='cpu')
+        conditioning_latent = torch.load(conditioning_latent_path, map_location="cpu")
 
         # Load plucker embeddings
         plucker_embeddings_path = os.path.join(self.root_dir, f"{prefix}.plucker_embeddings.pth")
-        plucker_embeddings = torch.load(plucker_embeddings_path, map_location='cpu')
+        plucker_embeddings = torch.load(plucker_embeddings_path, map_location="cpu")
 
         # Load image size
         image_size_path = os.path.join(self.root_dir, f"{prefix}.image_size.pth")
-        image_size = torch.load(image_size_path, map_location='cpu')
+        image_size = torch.load(image_size_path, map_location="cpu")
 
         # Load padding mask
         padding_mask_path = os.path.join(self.root_dir, f"{prefix}.padding_mask.pth")
-        padding_mask = torch.load(padding_mask_path, map_location='cpu')
+        padding_mask = torch.load(padding_mask_path, map_location="cpu")
 
-        t = info['num_frames']
+        t = info["num_frames"]
 
         seq_len = video_latent.shape[-1] * video_latent.shape[-2] * video_latent.shape[-3]
         loss_mask = torch.ones(seq_len, dtype=torch.bfloat16)
@@ -339,14 +338,14 @@ class VideoFolderCameraCtrlDataset(Dataset):
         # pos_emb = self.pos_emb_3d.get_pos_id_3d(t=t, h=h//p, w=w//p)
 
         sample = {
-            'video': video_latent,
-            'noise_latent': noise_latent,
-            'timesteps': timesteps,
-            't5_text_embeddings': text_embedding,
-            't5_text_mask': text_mask,
+            "video": video_latent,
+            "noise_latent": noise_latent,
+            "timesteps": timesteps,
+            "t5_text_embeddings": text_embedding,
+            "t5_text_mask": text_mask,
             # 'pos_ids': pos_emb,
             "image_size": image_size,
-            "fps": torch.tensor([info['fps']] * 1, dtype=torch.bfloat16),
+            "fps": torch.tensor([info["fps"]] * 1, dtype=torch.bfloat16),
             "num_frames": torch.tensor([t] * 1, dtype=torch.bfloat16),
             "padding_mask": padding_mask,
             "loss_mask": loss_mask,
@@ -408,12 +407,12 @@ class DiTVideoLatentMockDataset(torch.utils.data.Dataset):
         pos_emb = self.pos_emb_3d.get_pos_id_3d(t=t, h=h // p, w=w // p)
 
         return {
-            'video': video_latent,
-            'noise_latent': noise_latent,
-            'timesteps': timesteps,
-            't5_text_embeddings': text_embedding,
-            't5_text_mask': torch.ones(512, dtype=torch.bfloat16),
-            'pos_ids': pos_emb,
+            "video": video_latent,
+            "noise_latent": noise_latent,
+            "timesteps": timesteps,
+            "t5_text_embeddings": text_embedding,
+            "t5_text_mask": torch.ones(512, dtype=torch.bfloat16),
+            "pos_ids": pos_emb,
             "image_size": torch.tensor([[34, 40, 34, 40]] * 1, dtype=torch.bfloat16),
             "fps": torch.tensor([30] * 1, dtype=torch.bfloat16),
             "num_frames": torch.tensor([16] * 1, dtype=torch.bfloat16),
@@ -491,23 +490,23 @@ class DiTActionDataModule(MockDataModule):
         """
         # Params.
         params = {
-            'data_path': self.path,
-            'subfolder': self.subfolder,
-            'dtype': self.dtype,
-            'context_seq_len': self.context_seq_len,
-            'crossattn_embedding_size': self.crossattn_embedding_size,
-            'original_video_height': self.original_video_height,
-            'original_video_width': self.original_video_width,
-            'fps': self.fps,
-            'num_frames': self.num_frames,
+            "data_path": self.path,
+            "subfolder": self.subfolder,
+            "dtype": self.dtype,
+            "context_seq_len": self.context_seq_len,
+            "crossattn_embedding_size": self.crossattn_embedding_size,
+            "original_video_height": self.original_video_height,
+            "original_video_width": self.original_video_width,
+            "fps": self.fps,
+            "num_frames": self.num_frames,
         }
         self._train_ds = self.dataset(split="train", **params)
-        self._validation_ds = self.dataset(split='val', **params)
-        self._test_ds = self.dataset(split='test', **params)
+        self._validation_ds = self.dataset(split="val", **params)
+        self._test_ds = self.dataset(split="test", **params)
 
 
 class DiTDataModule(MockDataModule):
-    def __init__(self, *args, path='', dataset=VideoFolderDataset, **kwargs):
+    def __init__(self, *args, path="", dataset=VideoFolderDataset, **kwargs):
         super().__init__(*args, **kwargs)
         self.path = path
         self.dataset = dataset
@@ -519,7 +518,7 @@ class DiTDataModule(MockDataModule):
 
 
 class DiTCameraCtrlDataModule(MockDataModule):
-    def __init__(self, *args, path='', dataset=VideoFolderCameraCtrlDataset, **kwargs):
+    def __init__(self, *args, path="", dataset=VideoFolderCameraCtrlDataset, **kwargs):
         super().__init__(*args, **kwargs)
         self.path = path
         self.dataset = dataset

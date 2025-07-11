@@ -284,9 +284,9 @@ class Transformer(nn.Module):
             The output tensor after applying the transformer layers.
         """
         # Token embeddings
-        assert (
-            tokens is None or token_embeddings is None
-        ), "Either tokens or token_embeddings should be provided, not both."
+        assert tokens is None or token_embeddings is None, (
+            "Either tokens or token_embeddings should be provided, not both."
+        )
 
         if token_embeddings is None:
             h = self.tok_embeddings(tokens)
@@ -399,7 +399,7 @@ class Transformer(nn.Module):
         """
         if new_vocab_size <= self.vocab_size:
             raise ValueError(
-                f"New vocabulary size ({new_vocab_size}) must be " f"larger than current size ({self.vocab_size})"
+                f"New vocabulary size ({new_vocab_size}) must be larger than current size ({self.vocab_size})"
             )
         if new_vocab_size % multiple_of != 0:
             log.debug(f"New vocabulary size must be a multiple of {multiple_of}. Obtained {new_vocab_size}.")

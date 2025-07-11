@@ -14,9 +14,9 @@ import numpy as np
 import torch
 from einops import reduce
 from einops.layers.torch import Rearrange
+from nemo.collections.diffusion.sampler.batch_ops import batch_mul
 from torch import nn
 
-from nemo.collections.diffusion.sampler.batch_ops import batch_mul
 
 # Utils
 
@@ -24,7 +24,7 @@ from nemo.collections.diffusion.sampler.batch_ops import batch_mul
 def count_params(model, verbose=False):
     total_params = sum(p.numel() for p in model.parameters())
     if verbose:
-        print(f"{model.__class__.__name__} has {total_params * 1.e-6:.2f} M params.")
+        print(f"{model.__class__.__name__} has {total_params * 1.0e-6:.2f} M params.")
     return total_params
 
 
@@ -284,9 +284,9 @@ class ScalarEmb(AbstractEmbModel):
 
     def forward(self, element: torch.Tensor) -> Dict[str, torch.Tensor]:
         batch_size = element.shape[0]
-        assert (
-            torch.numel(element) == batch_size * self.num_scalar_condition
-        ), f"element shape {element.shape} does not match with {batch_size}x{self.num_scalar_condition}"
+        assert torch.numel(element) == batch_size * self.num_scalar_condition, (
+            f"element shape {element.shape} does not match with {batch_size}x{self.num_scalar_condition}"
+        )
         key = self.output_key if self.output_key else self.input_key
         return {key: self.feature_proj(element.flatten())}
 
@@ -470,9 +470,9 @@ class GeneralConditioner(nn.Module, ABC):
         self.embedders = nn.ModuleDict()
         for n, (emb_name, embconfig) in enumerate(emb_models.items()):
             embedder = embconfig.obj
-            assert isinstance(
-                embedder, AbstractEmbModel
-            ), f"embedder model {embedder.__class__.__name__} has to inherit from AbstractEmbModel"
+            assert isinstance(embedder, AbstractEmbModel), (
+                f"embedder model {embedder.__class__.__name__} has to inherit from AbstractEmbModel"
+            )
             embedder.is_trainable = getattr(embconfig, "is_trainable", True)
             embedder.dropout_rate = getattr(embconfig, "dropout_rate", 0.0)
             if not embedder.is_trainable:
@@ -690,22 +690,14 @@ class VideoExtendCondition(BaseVideoCondition):
     # How to sample condition region during training. "first_random_n" set the first n frames to be condition region, n is random, "random" set the condition region to be random,
     condition_location: str = "first_n"
     random_conditon_rate: float = 0.5  # The rate to sample the condition region randomly
-    first_random_n_num_condition_t_max: int = (
-        4  # The maximum number of frames to sample as condition region, used when condition_location is "first_random_n"
-    )
-    first_random_n_num_condition_t_min: int = (
-        0  # The minimum number of frames to sample as condition region, used when condition_location is "first_random_n"
-    )
+    first_random_n_num_condition_t_max: int = 4  # The maximum number of frames to sample as condition region, used when condition_location is "first_random_n"
+    first_random_n_num_condition_t_min: int = 0  # The minimum number of frames to sample as condition region, used when condition_location is "first_random_n"
 
     # How to dropout value of the conditional input frames
-    cfg_unconditional_type: str = (
-        "zero_condition_region_condition_mask"  # Unconditional type. "zero_condition_region_condition_mask" set the input to zero for condition region, "noise_x_condition_region" set the input to x_t, same as the base model
-    )
+    cfg_unconditional_type: str = "zero_condition_region_condition_mask"  # Unconditional type. "zero_condition_region_condition_mask" set the input to zero for condition region, "noise_x_condition_region" set the input to x_t, same as the base model
 
     # How to corrupt the condition region
-    apply_corruption_to_condition_region: str = (
-        "noise_with_sigma_fixed"  # Apply corruption to condition region, option: "gaussian_blur", "noise_with_sigma", "clean" (inference), "noise_with_sigma_fixed" (inference)
-    )
+    apply_corruption_to_condition_region: str = "noise_with_sigma_fixed"  # Apply corruption to condition region, option: "gaussian_blur", "noise_with_sigma", "clean" (inference), "noise_with_sigma_fixed" (inference)
     # Inference only option: list of sigma value for the corruption at different chunk id, used when apply_corruption_to_condition_region is "noise_with_sigma" or "noise_with_sigma_fixed"
     # apply_corruption_to_condition_region_sigma_value: [float] = [0.001, 0.2] + [
     #    0.5

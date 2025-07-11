@@ -35,6 +35,7 @@ from cosmos1.models.diffusion.datasets.augmentors.control_input import (
 from cosmos1.utils.lazy_config import LazyCall as L
 from cosmos1.utils.lazy_config import LazyDict
 
+
 CTRL_HINT_KEYS_SINGLE = [
     "control_input_canny",
     "control_input_blur",

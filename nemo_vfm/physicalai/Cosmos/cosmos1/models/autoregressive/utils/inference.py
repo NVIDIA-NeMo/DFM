@@ -25,9 +25,11 @@ from typing import List
 import numpy as np
 import torch
 import torchvision
+from PIL import Image
+
 from cosmos1.models.autoregressive.configs.inference.inference_config import SamplingConfig
 from cosmos1.utils import log
-from PIL import Image
+
 
 _IMAGE_EXTENSIONS = [".png", ".jpg", ".jpeg", "webp"]
 _VIDEO_EXTENSIONS = [".mp4"]
@@ -115,9 +117,9 @@ def validate_args(args: argparse.Namespace, inference_type: str):
             )
 
     # Validate prompt/image/video args for single or batch generation
-    assert (
-        args.input_image_or_video_path or args.batch_input_path
-    ), "--input_image_or_video_path or --batch_input_path must be provided."
+    assert args.input_image_or_video_path or args.batch_input_path, (
+        "--input_image_or_video_path or --batch_input_path must be provided."
+    )
     if inference_type == "video2world" and (not args.batch_input_path):
         assert args.prompt, "--prompt is required for single video generation."
     args.data_resolution = [640, 1024]

@@ -28,7 +28,6 @@ import uuid
 from typing import Any, List
 
 import av
-import dataverse.utils.alpamayo.egomotion_decoder as egomotion_decoder
 import numpy as np
 import pandas as pd
 import torch
@@ -37,6 +36,8 @@ from einops import rearrange
 from lru import LRU
 from omegaconf import DictConfig
 from platformdirs import user_cache_path
+
+import dataverse.utils.alpamayo.egomotion_decoder as egomotion_decoder
 
 from .alpamayo_v2 import AlpamayoV2
 from .base import DataField
@@ -108,7 +109,7 @@ class CosmosAV(AlpamayoV2):
             for i, row in df.iterrows():
                 if row.partner == "mb":
                     continue
-                keep.add(row['id'])
+                keep.add(row["id"])
 
             with clip_id_filtering_path.open("w") as f:
                 json.dump(list(keep), f)
@@ -197,7 +198,6 @@ class CosmosAV(AlpamayoV2):
         frame_idxs: list[int],
         sync_to_original: dict,
     ):
-
         # rank = distributed.get_rank()
 
         clip_name = self.clip_names[video_idx]
@@ -289,7 +289,7 @@ class CosmosAV(AlpamayoV2):
                 for view_idx in view_idxs:
                     if str(view_idx) in meta_data[clip_name]:
                         data[int(view_idx)] = {}
-                        data[int(view_idx)]['meta_data'] = meta_data[clip_name][str(view_idx)]
+                        data[int(view_idx)]["meta_data"] = meta_data[clip_name][str(view_idx)]
 
                         tar_file_path = os.path.join(self.t5_dirs, item)
                         retries = 3
@@ -319,7 +319,7 @@ class CosmosAV(AlpamayoV2):
                                     )
 
                                 with io.BytesIO(file_buf.read()) as fp:
-                                    data[int(view_idx)]['T5'] = pickle.load(fp)
+                                    data[int(view_idx)]["T5"] = pickle.load(fp)
 
                                 file_buf.close()
 
@@ -422,7 +422,6 @@ class CosmosAV(AlpamayoV2):
         view_idxs: List[int],
         data_fields: List[DataField],
     ) -> dict[DataField, Any]:
-
         video_info, sync_to_original = self._get_basic_meta_data(video_idx)
         video_frames, frame_idx_to_batch_idx, repeat_happend = self._get_video_frames(
             video_idx, view_idxs, frame_idxs, sync_to_original
@@ -441,14 +440,14 @@ class CosmosAV(AlpamayoV2):
                         num_repeated_frames.append(repeat_happend[cam_key])
                         cur_view_idx = view_idx
                 output_dict[data_field] = torch.stack(rgb_list)
-                output_dict['num_repeated_frames'] = torch.FloatTensor(num_repeated_frames)
+                output_dict["num_repeated_frames"] = torch.FloatTensor(num_repeated_frames)
             elif self.decode_traj and data_field == DataField.TRAJECTORY:
                 unique_view_idxs = list(set(view_idxs))
                 view_count = view_idxs.count(unique_view_idxs[0])
                 for view_idx in unique_view_idxs[1:]:
-                    assert view_count == view_idxs.count(
-                        view_idx
-                    ), "trajectory datafield expects equal number of frames per view"
+                    assert view_count == view_idxs.count(view_idx), (
+                        "trajectory datafield expects equal number of frames per view"
+                    )
 
                 # choose one camera timestamps to compute trajectory
                 if self.trajectory_base_camera_index in view_idxs:
@@ -469,8 +468,8 @@ class CosmosAV(AlpamayoV2):
                 traj, rig_info = self.egomotion_alpamayo_parser_initial_frame(video_idx, timestamps)
 
                 traj = traj[0][..., :3]  # use xyz
-                output_dict[data_field] = rearrange(traj, 't c -> (t c)')
-                output_dict['rig_info'] = rig_info
+                output_dict[data_field] = rearrange(traj, "t c -> (t c)")
+                output_dict["rig_info"] = rig_info
             else:
                 raise NotImplementedError(f"Can't handle data field {data_field}")
         return output_dict

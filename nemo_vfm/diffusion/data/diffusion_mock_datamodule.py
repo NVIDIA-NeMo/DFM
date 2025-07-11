@@ -19,9 +19,8 @@ from typing import List, Optional
 import lightning.pytorch as pl
 import torch
 from lightning.pytorch.utilities.types import EVAL_DATALOADERS, TRAIN_DATALOADERS
-from torch.utils.data import DataLoader, Dataset
-
 from nemo.lightning.pytorch.plugins import MegatronDataSampler
+from torch.utils.data import DataLoader, Dataset
 
 
 class MockDataModule(pl.LightningDataModule):
@@ -60,7 +59,6 @@ class MockDataModule(pl.LightningDataModule):
         image_precached=False,
         text_precached=False,
     ):
-
         super().__init__()
         self.image_h = image_h
         self.image_w = image_w
@@ -202,9 +200,9 @@ class _MockT2IDataset(Dataset):
         image_H,
         image_W,
         length=100000,
-        image_key='images',
-        txt_key='txt',
-        hint_key='hint',
+        image_key="images",
+        txt_key="txt",
+        hint_key="hint",
         image_precached=False,
         text_precached=False,
         prompt_seq_len=256,
@@ -254,16 +252,16 @@ class _MockT2IDataset(Dataset):
         """
         item = {}
         if self.image_precached:
-            item['latents'] = torch.randn(self.latent_shape)
-            item['control_latents'] = torch.randn(self.latent_shape)
+            item["latents"] = torch.randn(self.latent_shape)
+            item["control_latents"] = torch.randn(self.latent_shape)
         else:
             item[self.image_key] = torch.randn(3, self.H, self.W)
             item[self.hint_key] = torch.randn(3, self.H, self.W)
 
         if self.text_precached:
-            item['prompt_embeds'] = torch.randn(self.prompt_embeds_shape)
-            item['pooled_prompt_embeds'] = torch.randn(self.pooped_prompt_embeds_shape)
-            item['text_ids'] = torch.randn(self.text_ids_shape)
+            item["prompt_embeds"] = torch.randn(self.prompt_embeds_shape)
+            item["pooled_prompt_embeds"] = torch.randn(self.pooped_prompt_embeds_shape)
+            item["text_ids"] = torch.randn(self.text_ids_shape)
         else:
             item[self.txt_key] = "This is a sample caption input"
 

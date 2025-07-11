@@ -18,7 +18,6 @@
 from typing import Any, List
 
 import attrs
-
 from cosmos1.models.autoregressive.diffusion_decoder.config.registry import register_configs as register_dd_configs
 from cosmos1.models.diffusion.config.base.model import LatentDiffusionDecoderModelConfig
 from cosmos1.models.diffusion.config.registry import register_configs

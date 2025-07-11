@@ -18,12 +18,13 @@ import torch
 from einops import rearrange
 from torch import Tensor, nn
 
+
 try:
     from apex.contrib.group_norm import GroupNorm
 
     OPT_GROUP_NORM = True
 except Exception:
-    print('Fused optimized group norm has not been installed.')
+    print("Fused optimized group norm has not been installed.")
     OPT_GROUP_NORM = False
 
 
@@ -280,11 +281,11 @@ class LinearAttention(nn.Module):
         """
         b, c, h, w = x.shape
         qkv = self.to_qkv(x)
-        q, k, v = rearrange(qkv, 'b (qkv heads c) h w -> qkv b heads c (h w)', heads=self.heads, qkv=3)
+        q, k, v = rearrange(qkv, "b (qkv heads c) h w -> qkv b heads c (h w)", heads=self.heads, qkv=3)
         k = k.softmax(dim=-1)
-        context = torch.einsum('bhdn,bhen->bhde', k, v)
-        out = torch.einsum('bhde,bhdn->bhen', context, q)
-        out = rearrange(out, 'b heads c (h w) -> b (heads c) h w', heads=self.heads, h=h, w=w)
+        context = torch.einsum("bhdn,bhen->bhde", k, v)
+        out = torch.einsum("bhde,bhdn->bhen", context, q)
+        out = rearrange(out, "b heads c (h w) -> b (heads c) h w", heads=self.heads, h=h, w=w)
         return self.to_out(out)
 
 
@@ -310,7 +311,7 @@ def make_attn(in_channels, attn_type="vanilla"):
     Returns:
         nn.Module: An instance of the requested attention block.
     """
-    assert attn_type in ["vanilla", "linear", "none"], f'attn_type {attn_type} unknown'
+    assert attn_type in ["vanilla", "linear", "none"], f"attn_type {attn_type} unknown"
     print(f"making attention of type '{attn_type}' with {in_channels} in_channels")
     if attn_type == "vanilla":
         return AttnBlock(in_channels)

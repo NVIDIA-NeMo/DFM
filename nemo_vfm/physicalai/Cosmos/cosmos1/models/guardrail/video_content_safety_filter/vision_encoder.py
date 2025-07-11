@@ -19,6 +19,7 @@ import torch
 from PIL import Image
 from transformers import SiglipModel, SiglipProcessor
 
+
 DEFAULT_CHECKPOINT_DIR = "checkpoints/Cosmos-1.0-Guardrail/video_content_safety_filter"
 
 

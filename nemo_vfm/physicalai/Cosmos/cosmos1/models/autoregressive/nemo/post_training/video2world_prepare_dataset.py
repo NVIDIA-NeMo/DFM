@@ -23,11 +23,13 @@ import shutil
 from pathlib import Path
 
 import torch
+from einops import rearrange
+from huggingface_hub import snapshot_download
+
 from cosmos1.models.autoregressive.nemo.utils import read_input_videos
 from cosmos1.models.autoregressive.tokenizer.discrete_video import DiscreteVideoFSQJITTokenizer
 from cosmos1.models.common.t5_text_encoder import CosmosT5TextEncoder
-from einops import rearrange
-from huggingface_hub import snapshot_download
+
 
 BOV_TOKEN = 64000
 PAD_ID = 64002
@@ -77,15 +79,15 @@ def main(args):
     ).cuda()
 
     def save_tensors(jsonl_contents, split):
-        assert (
-            len(jsonl_contents) > 0
-        ), f"Ensure length of the {split} split is atleast 1. Modify split string accordingly or add more data points"
+        assert len(jsonl_contents) > 0, (
+            f"Ensure length of the {split} split is atleast 1. Modify split string accordingly or add more data points"
+        )
         for idx, jsonl_content in enumerate(jsonl_contents):
             json_data = json.loads(jsonl_content)
             assert "prompt" in json_data, "Expected key prompt with text prompt in the input jsonl file"
-            assert (
-                "visual_input" in json_data
-            ), "Expected key visual_input with path to video/image in the input jsonl file"
+            assert "visual_input" in json_data, (
+                "Expected key visual_input with path to video/image in the input jsonl file"
+            )
 
             video_filename = json_data["visual_input"]
             prompt = json_data["prompt"]

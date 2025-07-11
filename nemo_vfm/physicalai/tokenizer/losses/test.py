@@ -16,6 +16,7 @@ import torch
 from config import ColorConfig, FlowConfig, PerceptualConfig, VideoLoss
 from loss import ColorLoss, FlowLoss, PerceptualLoss, TokenizerLoss
 
+
 VIDEO_KEY = "video"
 RECON_KEY = "reconstructions"
 LATENT_KEY = "latent"
@@ -47,11 +48,11 @@ print("color loss shape:", cLoss["color"].shape)
 
 # Test LPIPS loss
 pLoss = perceptualLoss(inputs, output_batch, 0)
-print("LPIPS loss:", pLoss.keys(), pLoss['lpips'].shape)
+print("LPIPS loss:", pLoss.keys(), pLoss["lpips"].shape)
 
 # Test flow loss
 fLoss = flowLoss(inputs, output_batch, 250001)
-print("Flow loss:", fLoss.keys(), fLoss['flow'].shape)
+print("Flow loss:", fLoss.keys(), fLoss["flow"].shape)
 
 # Test video loss
 vLoss, total_vLoss = videoLoss(inputs, output_batch, 250001)

@@ -31,16 +31,15 @@ from megatron.core.packed_seq_params import PackedSeqParams
 from megatron.core.transformer.transformer_block import TransformerBlock
 from megatron.core.transformer.transformer_config import TransformerConfig
 from megatron.core.utils import make_sharded_tensor_for_checkpoint
-from torch import Tensor
-from torch.autograd import Function
-from torch.distributed import ProcessGroup, all_gather, get_process_group_ranks, get_world_size
-from torchvision import transforms
-
 from nemo.collections.diffusion.models.dit.action_control.action_control_layers import ActionControlTorchMlp
 from nemo.collections.diffusion.models.dit.cosmos_layer_spec import (
     get_dit_adaln_block_with_transformer_engine_spec as DiTLayerWithAdaLNspec,
 )
 from nemo.collections.diffusion.sampler.conditioner import DataType
+from torch import Tensor
+from torch.autograd import Function
+from torch.distributed import ProcessGroup, all_gather, get_process_group_ranks, get_world_size
+from torchvision import transforms
 
 
 def gather_along_first_dim(tensor, process_group):
@@ -600,12 +599,12 @@ class VideoRopePosition3DEmb(VideoPositionEmb):
         temporal_freqs = 1.0 / (t_theta**self.dim_temporal_range)
 
         B, T, H, W, _ = B_T_H_W_C
-        assert (
-            B == 1 or T == 1
-        ), "Batch size should be 1 or T should be 1. Image batch should have T=1, while video batch should have B=1."
-        assert (
-            H <= self.max_h and W <= self.max_w
-        ), f"Input dimensions (H={H}, W={W}) exceed the maximum dimensions (max_h={self.max_h}, max_w={self.max_w}) configured for positional embedding. Please adjust the input size or increase the maximum dimensions in the model configuration."
+        assert B == 1 or T == 1, (
+            "Batch size should be 1 or T should be 1. Image batch should have T=1, while video batch should have B=1."
+        )
+        assert H <= self.max_h and W <= self.max_w, (
+            f"Input dimensions (H={H}, W={W}) exceed the maximum dimensions (max_h={self.max_h}, max_w={self.max_w}) configured for positional embedding. Please adjust the input size or increase the maximum dimensions in the model configuration."
+        )
         self.seq = self.seq.cuda()
         half_emb_h = torch.outer(self.seq[:H], h_spatial_freqs)
         half_emb_w = torch.outer(self.seq[:W], w_spatial_freqs)
@@ -721,7 +720,6 @@ class DiTCrossAttentionModel7B(VisionModule):
         rotary_percent: float = 1.0,
         seq_len_interpolation_factor: Optional[float] = None,
     ):
-
         super(DiTCrossAttentionModel7B, self).__init__(config=config)
 
         self.config: TransformerConfig = config
@@ -740,7 +738,7 @@ class DiTCrossAttentionModel7B(VisionModule):
         self.share_embeddings_and_output_weights = False
         self.additional_timestamp_channels = False
         self.concat_padding_mask = True
-        self.pos_emb_cls = 'rope3d'
+        self.pos_emb_cls = "rope3d"
         self.use_adaln_lora = True
         self.patch_spatial = 2
         self.patch_temporal = 1
@@ -787,7 +785,7 @@ class DiTCrossAttentionModel7B(VisionModule):
             self.min_fps = 1
             self.max_fps = 30
             self.pos_emb_learnable = False
-            self.pos_emb_interpolation = 'crop'
+            self.pos_emb_interpolation = "crop"
             self.rope_h_extrp_ratio = 1.0
             self.rope_w_extrp_ratio = 1.0
             self.rope_t_extrp_ratio = 2.0
@@ -809,7 +807,6 @@ class DiTCrossAttentionModel7B(VisionModule):
             )
 
             if self.extra_per_block_abs_pos_emb:
-
                 self.extra_pos_embedder = SinCosPosEmbAxis(
                     h_extrapolation_ratio=1,
                     w_extrapolation_ratio=1,
@@ -887,7 +884,7 @@ class DiTCrossAttentionModel7B(VisionModule):
 
         if "rope" in self.pos_emb_cls.lower():
             if extra_pos_emb is not None:
-                extra_pos_emb = rearrange(extra_pos_emb, 'B T H W D -> (T H W) B D')
+                extra_pos_emb = rearrange(extra_pos_emb, "B T H W D -> (T H W) B D")
                 return x_B_T_H_W_D, [self.pos_embedder(x_B_T_H_W_D, fps=fps), extra_pos_emb]
             else:
                 return x_B_T_H_W_D, self.pos_embedder(x_B_T_H_W_D, fps=fps)
@@ -958,11 +955,11 @@ class DiTCrossAttentionModel7B(VisionModule):
         original_shape = x.shape
         B, C, T, H, W = original_shape
 
-        fps = kwargs.get('fps', None)
+        fps = kwargs.get("fps", None)
         if len(fps.shape) > 1:
             fps = fps.squeeze(0)
-        padding_mask = kwargs.get('padding_mask', None)
-        image_size = kwargs.get('image_size', None)
+        padding_mask = kwargs.get("padding_mask", None)
+        image_size = kwargs.get("image_size", None)
 
         rope_emb_L_1_1_D = None
         if self.pre_process:
@@ -1004,7 +1001,7 @@ class DiTCrossAttentionModel7B(VisionModule):
         affline_scale_log_info["affline_emb_B_D"] = affline_emb_B_D.detach()
         affline_emb_B_D = self.affline_norm(affline_emb_B_D)
 
-        crossattn_emb = rearrange(crossattn_emb, 'B S D -> S B D')
+        crossattn_emb = rearrange(crossattn_emb, "B S D -> S B D")
 
         # [Parth] Enable Sequence Parallelism
         if self.config.sequence_parallel:
@@ -1023,8 +1020,8 @@ class DiTCrossAttentionModel7B(VisionModule):
                 crossattn_emb = crossattn_emb.clone()
 
         packed_seq_params = {
-            'adaln_lora_B_3D': adaln_lora_B_3D.detach(),
-            'extra_pos_emb': rope_emb_L_1_1_D[1].detach(),
+            "adaln_lora_B_3D": adaln_lora_B_3D.detach(),
+            "extra_pos_emb": rope_emb_L_1_1_D[1].detach(),
         }
 
         x_S_B_D = self.decoder(
@@ -1060,11 +1057,11 @@ class DiTCrossAttentionModel7B(VisionModule):
         if not isinstance(input_tensor, list):
             input_tensor = [input_tensor]
 
-        assert len(input_tensor) == 1, 'input_tensor should only be length 1 for gpt/bert'
+        assert len(input_tensor) == 1, "input_tensor should only be length 1 for gpt/bert"
         self.decoder.set_input_tensor(input_tensor[0])
 
     def sharded_state_dict(
-        self, prefix: str = '', sharded_offsets: tuple = (), metadata: Optional[Dict] = None
+        self, prefix: str = "", sharded_offsets: tuple = (), metadata: Optional[Dict] = None
     ) -> ShardedStateDict:
         """Sharded state dict implementation for GPTModel backward-compatibility (removing extra state).
 
@@ -1079,7 +1076,7 @@ class DiTCrossAttentionModel7B(VisionModule):
         sharded_state_dict = super().sharded_state_dict(prefix, sharded_offsets, metadata)
 
         for param_name, param in self.t_embedder.named_parameters():
-            weight_key = f'{prefix}t_embedder.{param_name}'
+            weight_key = f"{prefix}t_embedder.{param_name}"
             self.tie_embeddings_weights_state_dict(param, sharded_state_dict, weight_key, weight_key)
 
         # for cond_name, embedder in self.additional_timestamp_embedder.items():
@@ -1168,7 +1165,6 @@ class DiTCrossAttentionExtendModel7B(VisionModule):
         rotary_percent: float = 1.0,
         seq_len_interpolation_factor: Optional[float] = None,
     ):
-
         super().__init__(config=config)
 
         self.config: TransformerConfig = config
@@ -1187,7 +1183,7 @@ class DiTCrossAttentionExtendModel7B(VisionModule):
         self.share_embeddings_and_output_weights = False
         self.additional_timestamp_channels = False
         self.concat_padding_mask = True
-        self.pos_emb_cls = 'rope3d'
+        self.pos_emb_cls = "rope3d"
         self.use_adaln_lora = True
         self.patch_spatial = 2
         self.patch_temporal = 1
@@ -1234,7 +1230,7 @@ class DiTCrossAttentionExtendModel7B(VisionModule):
             self.min_fps = 1
             self.max_fps = 30
             self.pos_emb_learnable = False
-            self.pos_emb_interpolation = 'crop'
+            self.pos_emb_interpolation = "crop"
             self.rope_h_extrp_ratio = 1.0
             self.rope_w_extrp_ratio = 1.0
             self.rope_t_extrp_ratio = 2.0
@@ -1256,7 +1252,6 @@ class DiTCrossAttentionExtendModel7B(VisionModule):
             )
 
             if self.extra_per_block_abs_pos_emb:
-
                 self.extra_pos_embedder = SinCosPosEmbAxis(
                     h_extrapolation_ratio=1,
                     w_extrapolation_ratio=1,
@@ -1334,7 +1329,7 @@ class DiTCrossAttentionExtendModel7B(VisionModule):
 
         if "rope" in self.pos_emb_cls.lower():
             if extra_pos_emb is not None:
-                extra_pos_emb = rearrange(extra_pos_emb, 'B T H W D -> (T H W) B D')
+                extra_pos_emb = rearrange(extra_pos_emb, "B T H W D -> (T H W) B D")
                 return x_B_T_H_W_D, [self.pos_embedder(x_B_T_H_W_D, fps=fps), extra_pos_emb]
             else:
                 return x_B_T_H_W_D, self.pos_embedder(x_B_T_H_W_D, fps=fps)
@@ -1408,11 +1403,11 @@ class DiTCrossAttentionExtendModel7B(VisionModule):
         original_shape = x.shape
         B, C, T, H, W = original_shape
 
-        fps = kwargs.get('fps', None)
+        fps = kwargs.get("fps", None)
         if len(fps.shape) > 1:
             fps = fps.squeeze(0)
-        padding_mask = kwargs.get('padding_mask', None)
-        image_size = kwargs.get('image_size', None)
+        padding_mask = kwargs.get("padding_mask", None)
+        image_size = kwargs.get("image_size", None)
 
         input_list = [x, condition_video_input_mask]
         if condition_video_pose is not None:
@@ -1464,7 +1459,7 @@ class DiTCrossAttentionExtendModel7B(VisionModule):
         affline_scale_log_info["affline_emb_B_D"] = affline_emb_B_D.detach()
         affline_emb_B_D = self.affline_norm(affline_emb_B_D)
 
-        crossattn_emb = rearrange(crossattn_emb, 'B S D -> S B D')
+        crossattn_emb = rearrange(crossattn_emb, "B S D -> S B D")
 
         # [Parth] Enable Sequence Parallelism
         if self.config.sequence_parallel:
@@ -1483,8 +1478,8 @@ class DiTCrossAttentionExtendModel7B(VisionModule):
                 crossattn_emb = crossattn_emb.clone()
 
         packed_seq_params = {
-            'adaln_lora_B_3D': adaln_lora_B_3D.detach(),
-            'extra_pos_emb': rope_emb_L_1_1_D[1].detach(),
+            "adaln_lora_B_3D": adaln_lora_B_3D.detach(),
+            "extra_pos_emb": rope_emb_L_1_1_D[1].detach(),
         }
         for idx, block in enumerate(self.decoder.layers):
             name = f"block{idx}"
@@ -1525,11 +1520,11 @@ class DiTCrossAttentionExtendModel7B(VisionModule):
         if not isinstance(input_tensor, list):
             input_tensor = [input_tensor]
 
-        assert len(input_tensor) == 1, 'input_tensor should only be length 1 for gpt/bert'
+        assert len(input_tensor) == 1, "input_tensor should only be length 1 for gpt/bert"
         self.decoder.set_input_tensor(input_tensor[0])
 
     def sharded_state_dict(
-        self, prefix: str = '', sharded_offsets: tuple = (), metadata: Optional[Dict] = None
+        self, prefix: str = "", sharded_offsets: tuple = (), metadata: Optional[Dict] = None
     ) -> ShardedStateDict:
         """Sharded state dict implementation for GPTModel backward-compatibility (removing extra state).
 
@@ -1544,18 +1539,18 @@ class DiTCrossAttentionExtendModel7B(VisionModule):
         sharded_state_dict = super().sharded_state_dict(prefix, sharded_offsets, metadata)
 
         # Allow for shape mismatch in camera control spatial embedder for fine-tuning
-        if hasattr(self.config, 'model_name'):
-            if 'camera_ctrl' in self.config.model_name:
-                sharded_state_dict['module.x_embedder.proj.1.weight'].allow_shape_mismatch = True
+        if hasattr(self.config, "model_name"):
+            if "camera_ctrl" in self.config.model_name:
+                sharded_state_dict["module.x_embedder.proj.1.weight"].allow_shape_mismatch = True
 
         for param_name, param in self.t_embedder.named_parameters():
-            weight_key = f'{prefix}t_embedder.{param_name}'
+            weight_key = f"{prefix}t_embedder.{param_name}"
             self.tie_embeddings_weights_state_dict(param, sharded_state_dict, weight_key, weight_key)
 
         if self.additional_timestamp_channels:
             for cond_name, embedder in self.additional_timestamp_embedder.items():
                 for param_name, param in embedder.named_parameters():
-                    weight_key = f'{prefix}additional_t_embedder_{cond_name}.{param_name}'
+                    weight_key = f"{prefix}additional_t_embedder_{cond_name}.{param_name}"
                     self.tie_embeddings_weights_state_dict(param, sharded_state_dict, weight_key, weight_key)
 
         return sharded_state_dict
@@ -1601,7 +1596,6 @@ class DiTCrossAttentionExtendModel7B(VisionModule):
 
 
 class DiTCrossAttentionActionExtendModel7B(DiTCrossAttentionExtendModel7B):
-
     def __init__(
         self,
         config: TransformerConfig,
@@ -1662,11 +1656,11 @@ class DiTCrossAttentionActionExtendModel7B(DiTCrossAttentionExtendModel7B):
         original_shape = x.shape
         B, C, T, H, W = original_shape
 
-        fps = kwargs.get('fps', None)
+        fps = kwargs.get("fps", None)
         if len(fps.shape) > 1:
             fps = fps.squeeze(0)
-        padding_mask = kwargs.get('padding_mask', None)
-        image_size = kwargs.get('image_size', None)
+        padding_mask = kwargs.get("padding_mask", None)
+        image_size = kwargs.get("image_size", None)
 
         input_list = [x, condition_video_input_mask]
         x = torch.cat(
@@ -1722,7 +1716,7 @@ class DiTCrossAttentionActionExtendModel7B(DiTCrossAttentionExtendModel7B):
         affline_scale_log_info["affline_emb_B_D"] = affline_emb_B_D.detach()
         affline_emb_B_D = self.affline_norm(affline_emb_B_D)
 
-        crossattn_emb = rearrange(crossattn_emb, 'B S D -> S B D')
+        crossattn_emb = rearrange(crossattn_emb, "B S D -> S B D")
 
         # [Parth] Enable Sequence Parallelism
         if self.config.sequence_parallel:
@@ -1741,8 +1735,8 @@ class DiTCrossAttentionActionExtendModel7B(DiTCrossAttentionExtendModel7B):
                 crossattn_emb = crossattn_emb.clone()
 
         packed_seq_params = {
-            'adaln_lora_B_3D': adaln_lora_B_3D.detach(),
-            'extra_pos_emb': rope_emb_L_1_1_D[1].detach(),
+            "adaln_lora_B_3D": adaln_lora_B_3D.detach(),
+            "extra_pos_emb": rope_emb_L_1_1_D[1].detach(),
         }
 
         # Run the TransformerBlock cross-attention decoder. attention_mask is re-purposed to pass in the affine embedding.
@@ -1865,16 +1859,16 @@ class DiTControl7B(DiTCrossAttentionExtendModel7B):
         padding_mask: Optional[torch.Tensor] = None,
         data_type: Optional[DataType] = DataType.VIDEO,
     ) -> torch.Tensor:
-        assert (
-            hint.size(1) <= self.hint_channels
-        ), f"Expected hint channels <= {self.hint_channels}, got {hint.size(1)}"
+        assert hint.size(1) <= self.hint_channels, (
+            f"Expected hint channels <= {self.hint_channels}, got {hint.size(1)}"
+        )
         if hint.size(1) < self.hint_channels:
             padding_shape = list(hint.shape)
             padding_shape[1] = self.hint_channels - hint.size(1)
             hint = torch.cat([hint, torch.zeros(*padding_shape, dtype=hint.dtype, device=hint.device)], dim=1)
-        assert isinstance(
-            data_type, DataType
-        ), f"Expected DataType, got {type(data_type)}. We need discuss this flag later."
+        assert isinstance(data_type, DataType), (
+            f"Expected DataType, got {type(data_type)}. We need discuss this flag later."
+        )
 
         hint_B_T_H_W_D, _ = self.prepare_hint_embedded_sequence(hint, fps=fps, padding_mask=padding_mask)
 
@@ -1953,9 +1947,9 @@ class DiTControl7B(DiTCrossAttentionExtendModel7B):
         guided_hints = self.encode_hint(hint, fps=fps, padding_mask=padding_mask, data_type=data_type)
 
         guided_hints = torch.chunk(guided_hints, hint.shape[0] // x.shape[0], dim=3)
-        assert isinstance(
-            data_type, DataType
-        ), f"Expected DataType, got {type(data_type)}. We need discuss this flag later."
+        assert isinstance(data_type, DataType), (
+            f"Expected DataType, got {type(data_type)}. We need discuss this flag later."
+        )
         B, C, T, H, W = x_input.shape
         if data_type == DataType.VIDEO:
             if condition_video_input_mask is not None:
@@ -1997,7 +1991,7 @@ class DiTControl7B(DiTCrossAttentionExtendModel7B):
 
         x_S_B_D = rearrange(x_B_T_H_W_D, "B T H W D -> (T H W) B D")
         x = x_S_B_D
-        crossattn_emb = rearrange(crossattn_emb, 'B S D -> S B D')
+        crossattn_emb = rearrange(crossattn_emb, "B S D -> S B D")
         outs = {}
 
         # If also training base model, sometimes drop the controlnet branch to only train base branch.
@@ -2027,8 +2021,8 @@ class DiTControl7B(DiTCrossAttentionExtendModel7B):
             control_weight = [control_weight] * len(guided_hints)
 
         packed_seq_params = {
-            'adaln_lora_B_3D': adaln_lora_B_3D.detach(),
-            'extra_pos_emb': rope_emb_L_1_1_D[1].detach(),
+            "adaln_lora_B_3D": adaln_lora_B_3D.detach(),
+            "extra_pos_emb": rope_emb_L_1_1_D[1].detach(),
         }
         for i, guided_hint in enumerate(guided_hints):
             for idx, block in enumerate(self.decoder.layers):
@@ -2042,7 +2036,7 @@ class DiTControl7B(DiTCrossAttentionExtendModel7B):
                     packed_seq_params=packed_seq_params,
                 )
                 if guided_hint is not None:
-                    gh_S_B_D = rearrange(guided_hint, 'B T H W D -> (T H W) B D')
+                    gh_S_B_D = rearrange(guided_hint, "B T H W D -> (T H W) B D")
                     x = x + gh_S_B_D
                     gh_S_B_D = None
                     guided_hint = None

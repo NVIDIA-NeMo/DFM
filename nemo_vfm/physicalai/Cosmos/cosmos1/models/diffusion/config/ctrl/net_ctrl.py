@@ -18,6 +18,7 @@ import copy
 from cosmos1.models.diffusion.config.base.net import FADITV2_14B_Config, FADITV2Config
 from cosmos1.models.diffusion.networks.general_dit_ctrl_enc import GeneralDITEncoder
 
+
 num_blocks = FADITV2Config["num_blocks"]
 FADITV2EncoderConfig = copy.deepcopy(FADITV2Config)
 FADITV2EncoderConfig["_target_"] = GeneralDITEncoder

@@ -22,7 +22,6 @@ Impl of multistep methods to solve the ODE in the diffusion model.
 from typing import Callable, List, Tuple
 
 import torch
-
 from cosmos1.models.diffusion.diffusion.functional.runge_kutta import reg_x0_euler_step, res_x0_rk2_step
 
 

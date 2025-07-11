@@ -15,10 +15,9 @@
 # pylint: disable=C0115,C0116,C0301
 
 import nemo_run as run
-from tqdm import tqdm
-
 from nemo.collections.diffusion.data.diffusion_energon_datamodule import DiffusionDataModule
 from nemo.collections.physicalai.tokenizer.train_tokenizer import ImageTaskEncoder
+from tqdm import tqdm
 
 
 @run.cli.entrypoint

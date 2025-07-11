@@ -175,12 +175,12 @@ class VAEGenerator:
             data (List[Dict]): A list of dictionaries representing design configurations.
             mode (str): The sorting criterion. Can be 'abs_param_diff', 'abs_cuda_mem_diff', or 'mse'.
         """
-        if mode == 'abs_param_diff':
-            data.sort(key=lambda x: abs(x['param_diff']))
-        elif mode == 'abs_cuda_mem_diff':
-            data.sort(key=lambda x: abs(x['cuda_mem_diff']))
-        elif mode == 'mse':
-            data.sort(key=lambda x: (x['param_diff'] ** 2 + x['cuda_mem_diff'] ** 2) / 2)
+        if mode == "abs_param_diff":
+            data.sort(key=lambda x: abs(x["param_diff"]))
+        elif mode == "abs_cuda_mem_diff":
+            data.sort(key=lambda x: abs(x["cuda_mem_diff"]))
+        elif mode == "mse":
+            data.sort(key=lambda x: (x["param_diff"] ** 2 + x["cuda_mem_diff"] ** 2) / 2)
         else:
             raise ValueError("Invalid mode. Choose from 'abs_param_diff', 'abs_cuda_mem_diff', 'mse'.")
 

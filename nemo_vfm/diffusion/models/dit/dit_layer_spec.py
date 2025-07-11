@@ -43,7 +43,6 @@ from megatron.core.transformer.transformer_block import TransformerConfig
 from megatron.core.transformer.transformer_config import TransformerConfig
 from megatron.core.transformer.transformer_layer import TransformerLayer, TransformerLayerSubmodules
 from megatron.core.utils import make_viewless_tensor
-
 from nemo.collections.diffusion.models.dit.dit_attention import (
     FluxSingleAttention,
     JointSelfAttention,
@@ -134,9 +133,9 @@ class AdaLN(MegatronModule):
 
 
 class AdaLNContinuous(MegatronModule):
-    '''
+    """
     A variant of AdaLN used for flux models.
-    '''
+    """
 
     def __init__(
         self,
@@ -413,7 +412,7 @@ class DiTLayerWithAdaLN(TransformerLayer):
         attention_output, _ = self.full_self_attention(
             pre_full_attn_layernorm_output_ada,
             attention_mask=None,
-            packed_seq_params=None if packed_seq_params is None else packed_seq_params['self_attention'],
+            packed_seq_params=None if packed_seq_params is None else packed_seq_params["self_attention"],
         )
 
         if self.cross_attention:
@@ -431,7 +430,7 @@ class DiTLayerWithAdaLN(TransformerLayer):
                 pre_cross_attn_layernorm_output_ada,
                 attention_mask=context_mask,
                 key_value_states=context,
-                packed_seq_params=None if packed_seq_params is None else packed_seq_params['cross_attention'],
+                packed_seq_params=None if packed_seq_params is None else packed_seq_params["cross_attention"],
             )
 
         # ******************************************** mlp ******************************************************
@@ -535,7 +534,6 @@ class MMDiTLayer(TransformerLayer):
         layer_number: int = 1,
         context_pre_only: bool = False,
     ):
-
         hidden_size = config.hidden_size
         super().__init__(config=config, submodules=submodules, layer_number=layer_number)
 
@@ -629,7 +627,7 @@ class MMDiTLayer(TransformerLayer):
         return hidden_states, encoder_hidden_states
 
     def __call__(self, *args, **kwargs):
-        if hasattr(self, 'cudagraph_manager'):
+        if hasattr(self, "cudagraph_manager"):
             return self.cudagraph_manager(self, args, kwargs)
         return super(MegatronModule, self).__call__(*args, **kwargs)
 
@@ -682,7 +680,7 @@ class FluxSingleTransformerBlock(TransformerLayer):
         return hidden_states, None
 
     def __call__(self, *args, **kwargs):
-        if hasattr(self, 'cudagraph_manager'):
+        if hasattr(self, "cudagraph_manager"):
             return self.cudagraph_manager(self, args, kwargs)
         return super(MegatronModule, self).__call__(*args, **kwargs)
 
@@ -813,7 +811,6 @@ def get_official_dit_adaln_block_with_transformer_engine_spec() -> ModuleSpec:
 
 
 def get_mm_dit_block_with_transformer_engine_spec() -> ModuleSpec:
-
     return ModuleSpec(
         module=MMDiTLayer,
         submodules=TransformerLayerSubmodules(

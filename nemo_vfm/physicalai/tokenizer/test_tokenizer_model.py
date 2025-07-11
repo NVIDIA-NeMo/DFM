@@ -18,6 +18,7 @@ import torch
 import torch.distributed
 from tokenizer_model import TokenizerModel
 
+
 VIDEO_KEY = "video"
 RECON_KEY = "reconstructions"
 LATENT_KEY = "latent"
@@ -44,11 +45,13 @@ output = tm._training_step(inputs, 20000000)
 
 import wandb
 
+
 wandb.init()
 import torch
 import torch.distributed as dist
 
-torch.distributed.init_process_group(backend='nccl')
+
+torch.distributed.init_process_group(backend="nccl")
 rank = dist.get_rank()
 torch.cuda.set_device(rank)  # Assign each process to a GPU
 

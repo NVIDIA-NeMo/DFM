@@ -21,8 +21,6 @@ from functools import partial
 import nemo_run as run
 from huggingface_hub import snapshot_download
 from lightning.pytorch.utilities.types import EVAL_DATALOADERS, TRAIN_DATALOADERS
-from torch.utils.data import DataLoader
-
 from nemo import lightning as nl
 from nemo.collections import llm
 from nemo.collections.diffusion.train import pretrain
@@ -40,6 +38,7 @@ from nemo.collections.physicalai.diffusion.post_training.multicamera.dit_multi_c
 )
 from nemo.lightning.pytorch.callbacks import ModelCheckpoint, PreemptionCallback
 from nemo.lightning.pytorch.strategies.utils import RestoreConfig
+from torch.utils.data import DataLoader
 
 
 class SimpleDataModule(MockDataModule):
@@ -126,7 +125,7 @@ def cosmos_multicamera_diffusion_7b_text2world_finetune() -> run.Partial:
     recipe.trainer.strategy.tensor_model_parallel_size = 4
     recipe.trainer.strategy.sequence_parallel = True
     recipe.trainer.strategy.ckpt_async_save = False
-    recipe.trainer.strategy.save_ckpt_format = 'torch_dist'
+    recipe.trainer.strategy.save_ckpt_format = "torch_dist"
 
     # FSDP
     # recipe.trainer.strategy.ddp.with_megatron_fsdp_code_path = True
@@ -138,9 +137,9 @@ def cosmos_multicamera_diffusion_7b_text2world_finetune() -> run.Partial:
     recipe.trainer.callbacks = [
         run.Config(
             ModelCheckpoint,
-            monitor='reduced_train_loss',
-            dirpath='nemo_experiments/cosmos_multicamera_diffusion_7b_text2world_finetune/default/experiment_dir',
-            filename='{epoch}-{step}',
+            monitor="reduced_train_loss",
+            dirpath="nemo_experiments/cosmos_multicamera_diffusion_7b_text2world_finetune/default/experiment_dir",
+            filename="{epoch}-{step}",
             every_n_train_steps=100,
             save_top_k=5,
             always_save_context=True,

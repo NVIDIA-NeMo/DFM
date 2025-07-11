@@ -15,7 +15,6 @@
 from typing import Callable, Tuple
 
 import torch
-
 from nemo.collections.diffusion.sampler.batch_ops import batch_mul
 
 

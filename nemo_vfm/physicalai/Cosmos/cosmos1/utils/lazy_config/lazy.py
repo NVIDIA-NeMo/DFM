@@ -29,9 +29,11 @@ from typing import Any, Dict, List, Tuple, Union
 
 import attrs
 import yaml
+from omegaconf import DictConfig, ListConfig, OmegaConf
+
 from cosmos1.utils.lazy_config.file_io import PathManager
 from cosmos1.utils.lazy_config.registry import _convert_target_to_string
-from omegaconf import DictConfig, ListConfig, OmegaConf
+
 
 __all__ = ["LazyCall", "LazyConfig"]
 
@@ -166,9 +168,7 @@ def _patch_import():
         relative_import_err = """
 Relative import of directories is not allowed within config files.
 Within a config file, relative import can only import other config files.
-""".replace(
-            "\n", " "
-        )
+""".replace("\n", " ")
         if not len(relative_import_path):
             raise ImportError(relative_import_err)
 
@@ -186,16 +186,14 @@ Within a config file, relative import can only import other config files.
                 raise ImportError(f"Cannot import from {cur_file_no_suffix}." + relative_import_err)
             else:
                 raise ImportError(
-                    f"Cannot import name {relative_import_path} from " f"{original_file}: {cur_file} does not exist."
+                    f"Cannot import name {relative_import_path} from {original_file}: {cur_file} does not exist."
                 )
         return cur_file
 
     def new_import(name, globals=None, locals=None, fromlist=(), level=0):
         if (
             # Only deal with relative imports inside config files
-            level != 0
-            and globals is not None
-            and (globals.get("__package__", "") or "").startswith(_CFG_PACKAGE_NAME)
+            level != 0 and globals is not None and (globals.get("__package__", "") or "").startswith(_CFG_PACKAGE_NAME)
         ):
             cur_file = find_relative_file(globals["__file__"], name, level)
             _validate_py_syntax(cur_file)

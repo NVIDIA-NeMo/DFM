@@ -24,6 +24,7 @@ import attrs
 from cosmos1.utils.lazy_config import LazyDict
 from cosmos1.utils.misc import Color
 
+
 T = TypeVar("T")
 
 

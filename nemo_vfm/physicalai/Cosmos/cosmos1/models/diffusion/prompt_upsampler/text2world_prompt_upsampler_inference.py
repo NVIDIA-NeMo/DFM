@@ -21,6 +21,7 @@ Command:
     PYTHONPATH=$(pwd) python cosmos1/models/diffusion/prompt_upsampler/text2world_prompt_upsampler_inference.py
 
 """
+
 import argparse
 import os
 import re

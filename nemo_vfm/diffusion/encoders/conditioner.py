@@ -18,8 +18,8 @@ from typing import List, Optional, Union
 
 import torch
 import torch.nn as nn
-from transformers import CLIPTextModel, CLIPTokenizer, T5EncoderModel, T5Tokenizer
 from nemo.collections.multimodal.modules.stable_diffusion.encoders.modules import LoraWrapper
+from transformers import CLIPTextModel, CLIPTokenizer, T5EncoderModel, T5Tokenizer
 
 
 # pylint: disable=C0116
@@ -97,7 +97,7 @@ class AbstractEmbModel(nn.Module):
                         else:
                             print(f"Duplicate subnames are found in module {module_name}")
                 for sub_name, lora_layer in tmp.items():
-                    lora_name = f'{sub_name}_lora'
+                    lora_name = f"{sub_name}_lora"
                     module.add_module(lora_name, lora_layer)
 
 

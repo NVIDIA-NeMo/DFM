@@ -20,7 +20,6 @@ import os
 import imageio
 import numpy as np
 import torch
-
 from cosmos1.models.autoregressive.model import AutoRegressiveModel
 from cosmos1.models.diffusion.config.ctrl.augmentors import BilateralOnlyBlurAugmentorConfig
 from cosmos1.models.diffusion.datasets.augmentors.control_input import get_augmentor_for_eval

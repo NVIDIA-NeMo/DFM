@@ -24,6 +24,7 @@ from cosmos1.models.tokenizer.modules import ContinuousFormulation, DecoderType,
 from loguru import logger as logging
 from torch import nn
 
+
 NetworkEval = namedtuple("NetworkEval", ["reconstructions", "posteriors", "latent"])
 
 

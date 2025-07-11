@@ -26,12 +26,12 @@ from cosmos1.models.tokenizer.networks.configs import continuous_video, discrete
 from cosmos1.models.tokenizer.networks.continuous_video import CausalContinuousVideoTokenizer
 from cosmos1.models.tokenizer.networks.discrete_video import CausalDiscreteVideoTokenizer
 from einops import rearrange
-
 from nemo.collections.llm import fn
 from nemo.collections.physicalai.tokenizer.losses.config import VideoLoss
 from nemo.collections.physicalai.tokenizer.losses.loss import TokenizerLoss
 from nemo.lightning import io
 from nemo.lightning.pytorch.optim import OptimizerModule
+
 
 IMAGE_KEY = "images"
 INPUT_KEY = "INPUT"
@@ -114,9 +114,9 @@ class TokenizerModel(L.LightningModule, io.IOMixin, fn.FNMixin):
         # pass loss_mask to loss computation
         inputs = {INPUT_KEY: input_images, MASK_KEY: data_batch.get("loss_mask", torch.ones_like(input_images))}
         loss_dict, loss_value = self.loss(inputs, output_dict, iteration)
-        for k, v in loss_dict['loss'].items():
+        for k, v in loss_dict["loss"].items():
             self.log(k, v)
-        self.log('loss', loss_value, prog_bar=True)
+        self.log("loss", loss_value, prog_bar=True)
         self.log("global_step", self.global_step)
 
         return dict({PREDICTION: recon_images, **loss_dict}), loss_value
@@ -147,15 +147,14 @@ class TokenizerModel(L.LightningModule, io.IOMixin, fn.FNMixin):
         loss_dict, loss_value = self.loss(inputs, output_dict, iteration)
 
         if wandb.run is not None:
-
             visualization = torch.cat(
                 [
-                    rearrange(input_images[0], 'c t h w -> t c h w').cpu(),
-                    rearrange(recon_images[0], 'c t h w -> t c h w').cpu(),
+                    rearrange(input_images[0], "c t h w -> t c h w").cpu(),
+                    rearrange(recon_images[0], "c t h w -> t c h w").cpu(),
                 ],
                 axis=-1,
             )
-            visualization = ((visualization + 0.5).clamp(0, 1).cpu().float().numpy() * 255).astype('uint8')
+            visualization = ((visualization + 0.5).clamp(0, 1).cpu().float().numpy() * 255).astype("uint8")
 
             wandb.log(
                 {

@@ -15,6 +15,7 @@
 
 from models import ContinuousFormulation, Decoder3DType, DecoderType, DiscreteQuantizer, Encoder3DType, EncoderType
 
+
 continuous_image = dict(
     # The attention resolution for res blocks.
     attn_resolutions=[32],

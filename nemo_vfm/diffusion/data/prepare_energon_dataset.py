@@ -78,7 +78,7 @@ def dummy_process_func(input):
 
 @torch.no_grad()
 @run.cli.entrypoint
-def prepare(process_func: Callable, inputs: List[str], output_dir: str = 'output'):
+def prepare(process_func: Callable, inputs: List[str], output_dir: str = "output"):
     """
     distributed prepration webdataset using the provided processing function, and writes the processed samples to tar files.
 
@@ -105,13 +105,13 @@ def prepare_dummy_image_dataset() -> run.Partial:
     recipe = run.Partial(
         prepare,
         process_func=dummy_process_func,
-        inputs=list(str(i) + '.jpg' for i in range(10000)),
+        inputs=list(str(i) + ".jpg" for i in range(10000)),
     )
     return recipe
 
 
-if __name__ == '__main__':
+if __name__ == "__main__":
     dist.init_process_group("nccl")
-    local_rank = int(os.environ['LOCAL_RANK'])
+    local_rank = int(os.environ["LOCAL_RANK"])
     torch.cuda.set_device(local_rank)
     run.cli.main(prepare, default_factory=prepare_dummy_image_dataset)

@@ -21,7 +21,7 @@ def decode_intrinsic(rig_info: dict, camera_indices: list[int], raise_on_unsuppo
     outputs = {}
     for name, sensor in rig_info.items():
         # if load with RANDOM, we will load all camera intrins to make the batching happy
-        name = name.replace('.mp4', '')
+        name = name.replace(".mp4", "")
         if name in constants.CAMERA_NAMES:
             cam_id = constants.CAMERA_NAMES_TO_INDICES[name]
             if cam_id in camera_indices:

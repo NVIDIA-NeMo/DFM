@@ -18,21 +18,21 @@ import gc
 import logging
 import os
 
+import nemo.collections.physicalai.datasets.dataverse.dataverse.utils.alpamayo.rig_decoder as rig_decoder
+import nemo.collections.physicalai.datasets.dataverse.dataverse.utils.alpamayo.transformation as transformation
 import numpy as np
 import torch
 import torch.distributed as dist
 import torchvision.transforms as transforms
 from einops import rearrange
-from torch.utils.data import DataLoader
-
-import nemo.collections.physicalai.datasets.dataverse.dataverse.utils.alpamayo.rig_decoder as rig_decoder
-import nemo.collections.physicalai.datasets.dataverse.dataverse.utils.alpamayo.transformation as transformation
 from nemo.collections.physicalai.datasets.dataverse.dataverse.datasets.base import DataField
 from nemo.collections.physicalai.datasets.dataverse_dataset.driving_dataloader.config_dataverse import DATAVERSE_CONFIG
 from nemo.collections.physicalai.datasets.dataverse_dataset.driving_dataloader.dataloader_utils import (
     dict_collation_fn,
 )
 from nemo.collections.physicalai.datasets.dataverse_dataset.instantiate_utils import instantiate_from_config
+from torch.utils.data import DataLoader
+
 
 try:
     from megatron.core import parallel_state
@@ -162,8 +162,8 @@ class InfiniteDataVerse:
         return sample
 
     def convert_coordinate(self, xyz, rig_info):
-        cam_name = 'camera_front_wide_120fov'
-        xyz = rearrange(xyz, '(t c) -> t c', c=3)
+        cam_name = "camera_front_wide_120fov"
+        xyz = rearrange(xyz, "(t c) -> t c", c=3)
         rig_info = rig_decoder.decode_rig_info(rig_info)
         camera_extrinsics = torch.from_numpy(transformation.sensor_to_rig(rig_info[cam_name]))
 
@@ -315,13 +315,13 @@ class InfiniteDataVerse:
         sample["caption"] = caption
         sample["clip_id"] = clip_id
         if self.load_frame_repeat:
-            sample['frame_repeat'] = data['num_repeated_frames']
+            sample["frame_repeat"] = data["num_repeated_frames"]
 
         if self.load_trajectory:
             # with lvg, use rig coordinate
-            trajectory = rearrange(data[DataField.TRAJECTORY], '(t c) -> t c', c=3)
+            trajectory = rearrange(data[DataField.TRAJECTORY], "(t c) -> t c", c=3)
             trajectory = trajectory / torch.FloatTensor([[10.0, 4.0, 1.0]])
-            sample["trajectory"] = rearrange(trajectory, 't c -> (t c)')
+            sample["trajectory"] = rearrange(trajectory, "t c -> (t c)")
 
         gc.collect()
         return sample

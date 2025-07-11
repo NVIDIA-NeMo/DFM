@@ -22,12 +22,12 @@ designed for processing image inputs in vision-language models.
 This module follows Mistral's vision encoder implementation (for their Pistral-12B VLM):
 https://github.com/mistralai/mistral-inference/blob/main/src/mistral_inference/vision_encoder.py
 """
+
 from functools import partial
 from typing import Any, Callable, Mapping, Optional, Tuple
 
 import torch
 import torch.nn as nn
-
 from cosmos1.models.autoregressive.modules.normalization import create_norm
 from cosmos1.models.autoregressive.networks.transformer import TransformerBlock
 from cosmos1.utils import log
@@ -263,9 +263,9 @@ class VisionTransformer(nn.Module):
         This is useful when the input is non-standard, e.g. a 4-channel image with the last channel as the alpha channel.
         Note that you should only call this method after the weight is loaded.
         """
-        assert (
-            new_in_channels > self.patch_conv.in_channels
-        ), "Cannot expand the input channels of the patch convolution layer to be less than the original number of channels."
+        assert new_in_channels > self.patch_conv.in_channels, (
+            "Cannot expand the input channels of the patch convolution layer to be less than the original number of channels."
+        )
         log.debug(
             f"Vision encoder in_channels is {self.patch_conv.in_channels}. But you have specified to be {new_in_channels}. We will change it to {new_in_channels} channels with {new_in_channels - self.patch_conv.in_channels} channels of 0s."
         )

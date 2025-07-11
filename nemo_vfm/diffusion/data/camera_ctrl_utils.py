@@ -16,7 +16,6 @@
 
 import numpy as np
 import torch
-
 from nemo.collections.diffusion.data import camera
 from nemo.collections.diffusion.data.camera import get_center_and_ray
 

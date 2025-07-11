@@ -25,7 +25,6 @@ import numpy as np
 import pycocotools
 import torch
 import torchvision.transforms.functional as transforms_F
-
 from cosmos1.models.diffusion.config.ctrl.blurs import (
     AnisotropicDiffusionConfig,
     BilateralFilterConfig,
@@ -38,6 +37,7 @@ from cosmos1.models.diffusion.config.ctrl.blurs import (
 from cosmos1.models.diffusion.datasets.augmentors.guided_filter import FastGuidedFilter
 from cosmos1.models.diffusion.datasets.augmentors.human_keypoint_utils import coco_wholebody_133_skeleton
 from cosmos1.utils import log
+
 
 IMAGE_RES_SIZE_INFO: dict[str, tuple[int, int]] = {
     "1080": {  # the image format does not support 1080, but here we match it with video resolution
@@ -384,9 +384,9 @@ class Blur:
 
             self.blur_combinations_instances.append(cur_instances)
 
-        assert len(self.blur_combinations_instances) == len(
-            self.blur_combinations
-        ), "Number of blur_combinations_instances needs to match number of blur_combinations."
+        assert len(self.blur_combinations_instances) == len(self.blur_combinations), (
+            "Number of blur_combinations_instances needs to match number of blur_combinations."
+        )
 
     def __call__(self, frames: np.ndarray) -> np.ndarray:
         blur_instances = random.choices(self.blur_combinations_instances, weights=self.probabilities, k=1)[0]
@@ -953,9 +953,9 @@ class AddControlInputSeg(Augmentor):
         frame_start = data_dict["frame_start"]
         frame_end = data_dict["frame_end"]
         frame_indices = np.arange(frame_start, frame_end).tolist()
-        assert (
-            len(frame_indices) == T
-        ), f"frame_indices length {len(frame_indices)} != T {T}, likely due to video decoder using different fps, i.e. sample with stride. Need to return frame indices from video decoder."
+        assert len(frame_indices) == T, (
+            f"frame_indices length {len(frame_indices)} != T {T}, likely due to video decoder using different fps, i.e. sample with stride. Need to return frame indices from video decoder."
+        )
         all_masks = np.zeros((num_masks, T, H, W)).astype(np.uint8)
         for idx, mid in enumerate(mask_ids_select):
             mask = data_dict["segmentation"][mid]
@@ -1474,9 +1474,9 @@ class AddControlInputHumanKpts(Augmentor):
             """in-place update the pose image"""
             body_keypoints = self.denormalize_pose_kpts(person_dict.get("body-keypoints"), h, w)
             hand_keypoints = self.denormalize_pose_kpts(person_dict.get("hand-keypoints"), h, w)
-            assert (
-                body_keypoints is not None and hand_keypoints is not None
-            ), "Both body and hand keypoints must be present."
+            assert body_keypoints is not None and hand_keypoints is not None, (
+                "Both body and hand keypoints must be present."
+            )
             # all_keypoints: shape=(133, 3). following coco-fullbody skeleton config. 3 channels are x, y, confidence
             all_keypoints = np.vstack([body_keypoints, hand_keypoints])
             kpts, scores = all_keypoints[..., :2], all_keypoints[..., -1]

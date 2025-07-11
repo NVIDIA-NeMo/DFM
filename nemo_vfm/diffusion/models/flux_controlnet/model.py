@@ -22,8 +22,6 @@ import torch.nn as nn
 from megatron.core.models.common.vision_module.vision_module import VisionModule
 from megatron.core.tensor_parallel.layers import ColumnParallelLinear
 from megatron.core.transformer.transformer_config import TransformerConfig
-from torch.nn import functional as F
-
 from nemo.collections.diffusion.models.dit.dit_layer_spec import (
     FluxSingleTransformerBlock,
     MMDiTLayer,
@@ -35,6 +33,7 @@ from nemo.collections.diffusion.models.flux.model import FluxConfig, FluxModelPa
 from nemo.collections.diffusion.models.flux_controlnet.layers import ControlNetConditioningEmbedding
 from nemo.lightning import io
 from nemo.utils import logging
+from torch.nn import functional as F
 
 
 def zero_module(module):
@@ -68,15 +67,15 @@ def flux_controlnet_data_step(dataloader_iter):
     else:
         _batch = batch
 
-    _batch['loss_mask'] = torch.Tensor([1.0]).cuda(non_blocking=True)
+    _batch["loss_mask"] = torch.Tensor([1.0]).cuda(non_blocking=True)
     return _batch
 
 
 @dataclass
 class FluxControlNetConfig(TransformerConfig, io.IOMixin):
-    '''
+    """
     Flux config inherits from TransformerConfig class.
-    '''
+    """
 
     num_layers: int = 1  # dummy setting
     patch_size: int = 1
@@ -316,14 +315,14 @@ class FluxControlNet(VisionModule):
 
 
 class FluxControlnetForwardWrapper(VisionModule):
-    '''
+    """
     A wrapper combines flux and flux controlnet forward pass for easier initialization.
-    '''
+    """
 
     def __init__(self, flux_config: FluxConfig, flux_controlnet_config: FluxControlNetConfig):
-        '''
+        """
         Create flux and flux controlnet instances by their config.
-        '''
+        """
         super().__init__(flux_config)
 
         self.flux = self.config.configure_model()
@@ -366,9 +365,9 @@ class MegatronFluxControlNetModel(MegatronFluxModel):
         self.optim.connect(self)
 
     def configure_model(self):
-        '''
+        """
         Initialize flux and controlnet modules, vae, scheduler, and text encoders with given configs.
-        '''
+        """
         if not hasattr(self, "module"):
             self.module = FluxControlnetForwardWrapper(self.config, self.flux_controlnet_config)
 
@@ -379,37 +378,37 @@ class MegatronFluxControlNetModel(MegatronFluxModel):
             # when there is no single layer, encoder_hidden_states related params are not included in computation graph
             for name, param in self.module.named_parameters():
                 if self.flux_controlnet_config.num_single_layers == 0:
-                    if 'context' in name or 'added' in name:
+                    if "context" in name or "added" in name:
                         param.requires_grad = False
                 # When getting rid of concat, the projection bias in attention and mlp bias are identical
                 # So this bias is skipped and not included in the computation graph
-                if 'single_blocks' in name and 'self_attention.linear_proj.bias' in name:
+                if "single_blocks" in name and "self_attention.linear_proj.bias" in name:
                     param.requires_grad = False
 
     def data_step(self, dataloader_iter):
-        '''
+        """
         Retrive data batch from dataloader iterator and do necessary processing before feeding into train steps.
-        '''
+        """
         return self.flux_controlnet_config.data_step_fn(dataloader_iter)
 
     def forward(self, *args, **kwargs):
-        '''
+        """
         Calling the controlnet forward pass.
-        '''
+        """
         # FSDP module -> Bfloat16 module -> ForwardWrapper -> flux controlnet
         return self.module.module.module.flux_controlnet(*args, **kwargs)
 
     def training_step(self, batch, batch_idx=None) -> torch.Tensor:
-        '''
+        """
         A wrapper method takes data batch and returns the results of forward_step.
-        '''
+        """
         # In mcore the loss-function is part of the forward-pass (when labels are provided)
         return self.forward_step(batch)
 
     def forward_step(self, batch) -> torch.Tensor:
-        '''
+        """
         The main forward step function.
-        '''
+        """
         if self.optim.config.bf16:
             self.autocast_dtype = torch.bfloat16
         elif self.optim.config.fp16:
@@ -418,12 +417,12 @@ class MegatronFluxControlNetModel(MegatronFluxModel):
             self.autocast_dtype = torch.float32
 
         if self.image_precached:
-            latents = batch['latents'].cuda(non_blocking=True)
-            control_latents = batch['control_latents'].cuda(non_blocking=True)
+            latents = batch["latents"].cuda(non_blocking=True)
+            control_latents = batch["control_latents"].cuda(non_blocking=True)
         else:
-            img = batch['images'].cuda(non_blocking=True)
+            img = batch["images"].cuda(non_blocking=True)
             latents = self.vae.encode(img).to(dtype=self.autocast_dtype)
-            hint = batch['hint'].cuda(non_blocking=True)
+            hint = batch["hint"].cuda(non_blocking=True)
             control_latents = self.vae.encode(hint).to(dtype=self.autocast_dtype)
 
         latent_image_ids = self._prepare_latent_image_ids(
@@ -479,11 +478,11 @@ class MegatronFluxControlNetModel(MegatronFluxModel):
         else:
             guidance_vec = None
         if self.text_precached:
-            prompt_embeds = batch['prompt_embeds'].cuda(non_blocking=True).transpose(0, 1)
-            pooled_prompt_embeds = batch['pooled_prompt_embeds'].cuda(non_blocking=True)
-            text_ids = batch['text_ids'].cuda(non_blocking=True)
+            prompt_embeds = batch["prompt_embeds"].cuda(non_blocking=True).transpose(0, 1)
+            pooled_prompt_embeds = batch["pooled_prompt_embeds"].cuda(non_blocking=True)
+            text_ids = batch["text_ids"].cuda(non_blocking=True)
         else:
-            txt = batch['txt']
+            txt = batch["txt"]
             prompt_embeds, pooled_prompt_embeds, text_ids = self.encode_prompt(
                 txt, device=latents.device, dtype=latents.dtype
             )
@@ -519,11 +518,11 @@ class MegatronFluxControlNetModel(MegatronFluxModel):
             return loss
 
     def validation_step(self, batch, batch_idx=None):
-        '''
+        """
         Initialize flux controlnet pipeline with current model components.
 
         Saves the inference results together with the hint image to log folder.
-        '''
+        """
         logging.info("Start validation step")
         from nemo.collections.diffusion.models.flux.pipeline import FluxControlNetInferencePipeline
 
@@ -539,10 +538,10 @@ class MegatronFluxControlNetModel(MegatronFluxModel):
         )
 
         if self.image_precached and self.text_precached:
-            latents = batch['latents'].cuda(non_blocking=True)
-            control_latents = batch['control_latents'].cuda(non_blocking=True)
-            prompt_embeds = batch['prompt_embeds'].cuda(non_blocking=True).transpose(0, 1)
-            pooled_prompt_embeds = batch['pooled_prompt_embeds'].cuda(non_blocking=True)
+            latents = batch["latents"].cuda(non_blocking=True)
+            control_latents = batch["control_latents"].cuda(non_blocking=True)
+            prompt_embeds = batch["prompt_embeds"].cuda(non_blocking=True).transpose(0, 1)
+            pooled_prompt_embeds = batch["pooled_prompt_embeds"].cuda(non_blocking=True)
             log_images = pipe(
                 latents=latents,
                 control_image=control_latents,
@@ -558,9 +557,9 @@ class MegatronFluxControlNetModel(MegatronFluxModel):
             )
             log_images[0].save(f"{self.logger.log_dir}/step={self.global_step}_rank{self.local_rank}.png")
         else:
-            img = batch['images'].cuda(non_blocking=True)
-            hint = batch['hint'].cuda(non_blocking=True)
-            text = batch['txt']
+            img = batch["images"].cuda(non_blocking=True)
+            hint = batch["hint"].cuda(non_blocking=True)
+            text = batch["txt"]
             log_images = pipe(
                 text,
                 control_image=hint,

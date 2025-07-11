@@ -18,6 +18,7 @@ from cosmos1.utils.lazy_config import LazyCall as L
 from cosmos1.utils.lazy_config import LazyDict
 from hydra.core.config_store import ConfigStore
 
+
 num_frames = 57
 Cosmos_DiffusionDecoder_7B_INFERENCE_ONLY: LazyDict = LazyDict(
     dict(

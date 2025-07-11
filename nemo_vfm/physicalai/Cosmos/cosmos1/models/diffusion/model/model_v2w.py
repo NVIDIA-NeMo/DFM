@@ -68,9 +68,9 @@ class DiffusionV2WModel(DiffusionT2WModel):
         """
 
         # Inference only, use fixed sigma for the condition region
-        assert (
-            condition_video_augment_sigma_in_inference is not None
-        ), "condition_video_augment_sigma_in_inference should be provided"
+        assert condition_video_augment_sigma_in_inference is not None, (
+            "condition_video_augment_sigma_in_inference should be provided"
+        )
         augment_sigma = condition_video_augment_sigma_in_inference
 
         if augment_sigma >= sigma.flatten()[0]:
@@ -128,9 +128,9 @@ class DiffusionV2WModel(DiffusionT2WModel):
             - x0_pred_replaced: x0 prediction with condition regions replaced by ground truth
         """
 
-        assert (
-            condition.gt_latent is not None
-        ), f"find None gt_latent in condition, likely didn't call self.add_condition_video_indicator_and_video_input_mask when preparing the condition or this is a image batch but condition.data_type is wrong, get {noise_x.shape}"
+        assert condition.gt_latent is not None, (
+            f"find None gt_latent in condition, likely didn't call self.add_condition_video_indicator_and_video_input_mask when preparing the condition or this is a image batch but condition.data_type is wrong, get {noise_x.shape}"
+        )
         gt_latent = condition.gt_latent
         cfg_video_cond_bool: VideoCondBoolConfig = self.config.conditioner.video_cond_bool
 

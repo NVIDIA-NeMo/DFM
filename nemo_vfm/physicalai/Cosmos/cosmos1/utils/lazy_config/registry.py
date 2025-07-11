@@ -16,6 +16,7 @@
 import pydoc
 from typing import Any
 
+
 """
 `locate` provide ways to map a string (typically found
 in config files) to callable objects.

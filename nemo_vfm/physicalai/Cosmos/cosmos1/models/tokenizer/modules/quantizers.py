@@ -27,6 +27,7 @@ from cosmos1.models.tokenizer.modules.utils import default, entropy, pack_one, r
 from einops import reduce
 from loguru import logger as logging
 
+
 _PERSISTENT = True
 
 

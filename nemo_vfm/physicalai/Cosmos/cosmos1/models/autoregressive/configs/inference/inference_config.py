@@ -18,7 +18,6 @@
 from typing import Any, List, Union
 
 import attrs
-
 from cosmos1.models.autoregressive.configs.base.model import ModelConfig, TokenizerConfig
 
 

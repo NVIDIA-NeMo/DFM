@@ -21,8 +21,6 @@ import pytorch_lightning as pl
 import torch
 from megatron.core.distributed import DistributedDataParallelConfig
 from megatron.core.optimizer import OptimizerConfig
-from pytorch_lightning.loggers import WandbLogger
-
 from nemo import lightning as nl
 from nemo.collections import llm
 from nemo.collections.diffusion.data.diffusion_taskencoder import BasicDiffusionTaskEncoder
@@ -42,6 +40,7 @@ from nemo.lightning.pytorch.callbacks import ModelCheckpoint, PreemptionCallback
 from nemo.lightning.pytorch.callbacks.model_transform import ModelTransform
 from nemo.lightning.pytorch.optim import WarmupAnnealingScheduler
 from nemo.lightning.pytorch.strategies.utils import RestoreConfig
+from pytorch_lightning.loggers import WandbLogger
 
 
 @run.cli.factory
@@ -62,7 +61,7 @@ def videofolder_actiondatamodule() -> pl.LightningDataModule:
     data_module = DiTActionDataModule(
         seq_length=21760,
         micro_batch_size=1,
-        global_batch_size=int(os.getenv('GLOBAL_BATCH_SIZE', 1)),
+        global_batch_size=int(os.getenv("GLOBAL_BATCH_SIZE", 1)),
         num_val_samples=1,
         dtype=torch.bfloat16,
     )
@@ -94,7 +93,7 @@ def multimodal_datamodule() -> pl.LightningDataModule:
 @run.autoconvert
 def peft(args) -> ModelTransform:
     return llm.peft.LoRA(
-        target_modules=['linear_qkv', 'linear_proj'],  # , 'linear_fc1', 'linear_fc2'],
+        target_modules=["linear_qkv", "linear_proj"],  # , 'linear_fc1', 'linear_fc2'],
         dim=args.lora_dim,
     )
 
@@ -110,8 +109,8 @@ def pretrain() -> run.Partial:
         data=multimodal_datamodule(),
         trainer=run.Config(
             nl.Trainer,
-            devices='auto',
-            num_nodes=int(os.environ.get('SLURM_NNODES', 1)),
+            devices="auto",
+            num_nodes=int(os.environ.get("SLURM_NNODES", 1)),
             accelerator="gpu",
             strategy=run.Config(
                 nl.MegatronStrategy,
@@ -127,7 +126,7 @@ def pretrain() -> run.Partial:
                     overlap_grad_reduce=True,
                     overlap_param_gather=True,
                 ),
-                save_ckpt_format='zarr',
+                save_ckpt_format="zarr",
             ),
             plugins=nl.MegatronMixedPrecision(precision="bf16-mixed"),
             num_sanity_val_steps=0,
@@ -137,9 +136,9 @@ def pretrain() -> run.Partial:
             callbacks=[
                 run.Config(
                     ModelCheckpoint,
-                    monitor='reduced_train_loss',
+                    monitor="reduced_train_loss",
                     # Required filename format to support custom gather during training.
-                    filename='{epoch}-{step}',
+                    filename="{epoch}-{step}",
                     every_n_train_steps=200,
                     save_top_k=100,
                     save_weights_only=True,
@@ -195,7 +194,7 @@ def pretrain_7b() -> run.Partial:
     recipe.data.seq_length = 260
     recipe.data.task_encoder.seq_length = 260
     recipe.trainer.val_check_interval = 1000
-    recipe.log.log_dir = 'nemo_experiments/dit7b'
+    recipe.log.log_dir = "nemo_experiments/dit7b"
     recipe.optim.lr_scheduler = run.Config(nl.lr_scheduler.WarmupHoldPolicyScheduler, warmup_steps=100, hold_steps=1e9)
     recipe.optim.config.weight_decay = 0.1
     recipe.optim.config.adam_beta1 = 0.9
@@ -217,8 +216,8 @@ def finetune_7b_action_control() -> run.Partial:
         data=videofolder_actiondatamodule(),
         trainer=run.Config(
             nl.Trainer,
-            devices='auto',
-            num_nodes=int(os.environ.get('SLURM_NNODES', 1)),
+            devices="auto",
+            num_nodes=int(os.environ.get("SLURM_NNODES", 1)),
             accelerator="gpu",
             strategy=run.Config(
                 nl.MegatronStrategy,
@@ -234,7 +233,7 @@ def finetune_7b_action_control() -> run.Partial:
                     overlap_grad_reduce=False,
                     overlap_param_gather=False,
                 ),
-                save_ckpt_format='zarr',
+                save_ckpt_format="zarr",
                 ckpt_load_strictness=False,  # Need non-strict checkpoint loading, because the action model has more layers than the pre-trained checkpoint!
                 ckpt_async_save=False,
             ),
@@ -248,9 +247,9 @@ def finetune_7b_action_control() -> run.Partial:
                 run.Config(
                     ModelCheckpoint,
                     # Required filename format to support custom gather during training.
-                    filename='{epoch}-{step}',
+                    filename="{epoch}-{step}",
                     dirpath=experiment_dir,
-                    monitor='reduced_train_loss',
+                    monitor="reduced_train_loss",
                     every_n_train_steps=250,
                     save_top_k=5,
                     save_weights_only=True,
@@ -311,8 +310,8 @@ def finetune_14b_action_control() -> run.Partial:
         data=videofolder_actiondatamodule(),
         trainer=run.Config(
             nl.Trainer,
-            devices='auto',
-            num_nodes=int(os.environ.get('SLURM_NNODES', 1)),
+            devices="auto",
+            num_nodes=int(os.environ.get("SLURM_NNODES", 1)),
             accelerator="gpu",
             strategy=run.Config(
                 nl.MegatronStrategy,
@@ -328,7 +327,7 @@ def finetune_14b_action_control() -> run.Partial:
                     overlap_grad_reduce=False,
                     overlap_param_gather=False,
                 ),
-                save_ckpt_format='zarr',
+                save_ckpt_format="zarr",
                 ckpt_load_strictness=False,  # Need non-strict checkpoint loading, because the action model has more layers than the pre-trained checkpoint!
                 ckpt_async_save=False,
             ),
@@ -342,9 +341,9 @@ def finetune_14b_action_control() -> run.Partial:
                 run.Config(
                     ModelCheckpoint,
                     # Required filename format to support custom gather during training.
-                    filename='{epoch}-{step}',
+                    filename="{epoch}-{step}",
                     dirpath=experiment_dir,
-                    monitor='reduced_train_loss',
+                    monitor="reduced_train_loss",
                     every_n_train_steps=250,
                     save_top_k=5,
                     save_weights_only=True,
@@ -397,7 +396,7 @@ def pretrain_ditllama5b() -> run.Partial:
     recipe = pretrain_7b()
     recipe.data.micro_batch_size = 12
     recipe.model.config = run.Config(DiTLlama5BConfig)
-    recipe.log.log_dir = 'nemo_experiments/ditllama5b'
+    recipe.log.log_dir = "nemo_experiments/ditllama5b"
     return recipe
 
 
@@ -407,7 +406,7 @@ def pretrain_ditllama30b() -> run.Partial:
     recipe.model.config = run.Config(DiTLlama30BConfig)
     recipe.data.global_batch_size = 9216
     recipe.data.micro_batch_size = 6
-    recipe.log.log_dir = 'nemo_experiments/ditllama30b'
+    recipe.log.log_dir = "nemo_experiments/ditllama30b"
     return recipe
 
 

@@ -25,17 +25,18 @@ from pathlib import Path
 from typing import Any, List
 
 import av
-import dataverse.utils.alpamayo.egomotion_decoder as egomotion_decoder
 import numpy as np
 import torch
-from dataverse.utils.ndas.av_metadata import get_egopose_interp, get_rig_transform, parse_calibration_data
-from dataverse.utils.ndas.camera_model import FThetaCamera, IdealPinholeCamera
 from lru import LRU
 from omegaconf import DictConfig
 from platformdirs import user_cache_path
 from pyquaternion import Quaternion
 from scipy.spatial.transform import Rotation
 from torch.nn.functional import grid_sample
+
+import dataverse.utils.alpamayo.egomotion_decoder as egomotion_decoder
+from dataverse.utils.ndas.av_metadata import get_egopose_interp, get_rig_transform, parse_calibration_data
+from dataverse.utils.ndas.camera_model import FThetaCamera, IdealPinholeCamera
 
 from .base import BaseDataset, DataField
 
@@ -462,9 +463,9 @@ class AlpamayoV2(BaseDataset):
                 unique_view_idxs = list(set(view_idxs))
                 view_count = view_idxs.count(unique_view_idxs[0])
                 for view_idx in unique_view_idxs[1:]:
-                    assert view_count == view_idxs.count(
-                        view_idx
-                    ), "trajectory datafield expects equal number of frames per view"
+                    assert view_count == view_idxs.count(view_idx), (
+                        "trajectory datafield expects equal number of frames per view"
+                    )
 
                 # choose one camera timestamps to compute trajectory
                 if self.trajectory_base_camera_index in view_idxs:

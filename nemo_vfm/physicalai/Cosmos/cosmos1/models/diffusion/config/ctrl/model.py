@@ -16,7 +16,6 @@
 # pylint: disable=C0115,C0116,C0301
 
 import attrs
-
 from cosmos1.models.diffusion.config.base.model import DefaultModelConfig
 from cosmos1.utils.lazy_config import LazyDict
 

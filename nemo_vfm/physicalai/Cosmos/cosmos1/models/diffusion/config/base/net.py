@@ -20,6 +20,7 @@ from cosmos1.models.diffusion.networks.general_dit_multi_camera import MultiCame
 from cosmos1.utils.lazy_config import LazyCall as L
 from cosmos1.utils.lazy_config import LazyDict
 
+
 FADITV2Config: LazyDict = L(GeneralDIT)(
     max_img_h=240,
     max_img_w=240,
