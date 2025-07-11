@@ -157,19 +157,19 @@ extend-exclude = [
 # Configure imports sorting to match isort
 select = [
     "F541",  # f-string without any placeholders
-    "F841",  # local variable assigned but never used
     "F401",  # imported but unused
-    "E741",  # ambiguous variable name
-    "F821",  # undefined name
     "E266",  # too many leading '#' for block comment
     "I",     # isort
-    "D101",  # docstring
-    "D103",
 ]
 
 # Additional rules can be added here
 ignore = [
+    "F821",  # undefined name
+    "E741",  # ambiguous variable name
+    "F841",  # local variable assigned but never used
     "E501",  # Line too long - handled by formatter
+    "D101",  # docstring
+    "D103",  # Missing docstring in public function
 ]
 [tool.ruff.lint.isort]
 known-first-party = ["nemo_vfm"]
