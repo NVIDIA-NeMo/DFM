@@ -18,8 +18,10 @@
 from typing import Optional
 
 import torch
-from cosmos1.models.autoregressive.tokenizer.quantizers import FSQuantizer
 from einops import rearrange
+
+from cosmos1.models.autoregressive.tokenizer.quantizers import FSQuantizer
+
 
 # Make sure jit model output consistenly during consecutive calls
 # Check here: https://github.com/pytorch/pytorch/issues/74534
@@ -108,9 +110,9 @@ class BaseDiscreteVideoFSQTokenizer(torch.nn.Module):
             # Update the latent chunk duration based on the given pixel chunk duration
             latent_chunk_duration = 1 + (pixel_chunk_duration - 1) // self.compress_ratio[0]
 
-        assert (
-            T % pixel_chunk_duration == 0
-        ), f"Temporal dimension {T} is not divisible by chunk_length {pixel_chunk_duration}"
+        assert T % pixel_chunk_duration == 0, (
+            f"Temporal dimension {T} is not divisible by chunk_length {pixel_chunk_duration}"
+        )
         state = rearrange(state, "b c (n t) h w -> (b n) c t h w", t=pixel_chunk_duration)
 
         # use max_enc_batch_size to avoid OOM
@@ -138,9 +140,9 @@ class BaseDiscreteVideoFSQTokenizer(torch.nn.Module):
             latent_chunk_duration = self.latent_chunk_duration
         else:
             latent_chunk_duration = 1 + (pixel_chunk_duration - 1) // self.compress_ratio[0]
-        assert (
-            T % latent_chunk_duration == 0
-        ), f"Temporal dimension {T} is not divisible by chunk_length {latent_chunk_duration}"
+        assert T % latent_chunk_duration == 0, (
+            f"Temporal dimension {T} is not divisible by chunk_length {latent_chunk_duration}"
+        )
         indices = rearrange(indices, "b (n t) h w -> (b n) t h w", t=latent_chunk_duration)
 
         # use max_dec_batch_size to avoid OOM

@@ -23,6 +23,7 @@ from typing import Any, Optional
 import torch.distributed as dist
 from loguru._logger import Core, Logger
 
+
 RANK0_ONLY = True
 LEVEL = os.environ.get("LOGURU_LEVEL", "INFO")
 
@@ -58,7 +59,7 @@ def init_loguru_stdout() -> None:
     logger.add(
         sys.stdout,
         level=LEVEL,
-        format="[<green>{time:MM-DD HH:mm:ss}</green>|" f"{machine_format}" f"{message_format}",
+        format=f"[<green>{{time:MM-DD HH:mm:ss}}</green>|{machine_format}{message_format}",
         filter=_rank0_only_filter,
     )
 

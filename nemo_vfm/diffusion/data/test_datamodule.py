@@ -22,27 +22,26 @@ import numpy as np
 import pytest
 import torch
 from megatron.core import parallel_state
-from tqdm import tqdm
-
 from nemo.collections.diffusion.data.diffusion_taskencoder import BasicDiffusionTaskEncoder
 from nemo.collections.diffusion.train import multimodal_datamodule
+from tqdm import tqdm
 
 
 # Fixture to initialize distributed training only once
 @pytest.fixture(scope="session", autouse=True)
 def initialize_distributed():
     if not torch.distributed.is_initialized():
-        rank = int(os.environ['LOCAL_RANK'])
+        rank = int(os.environ["LOCAL_RANK"])
         world_size = torch.cuda.device_count()
         torch.cuda.set_device(rank)
-        torch.distributed.init_process_group(backend='nccl', world_size=world_size, rank=rank)
+        torch.distributed.init_process_group(backend="nccl", world_size=world_size, rank=rank)
         parallel_state.initialize_model_parallel()
 
 
 # Fixture to get the value of the custom command-line option
 @pytest.fixture
 def path():
-    return os.getenv('DATA_DIR')
+    return os.getenv("DATA_DIR")
 
 
 def test_datamodule(path):
@@ -64,14 +63,14 @@ def test_datamodule(path):
     # )
 
     for i, batch in enumerate(datamodule.train_dataloader()):
-        print(batch['seq_len_q'])
+        print(batch["seq_len_q"])
         if i == 1:
             start_time = time.time()
         if i > 100:
             break
 
     elapsed_time = time.time() - start_time
-    print(f"Elapsed time for loading 100 batches: {elapsed_time} seconds, {elapsed_time/100} seconds per batch")
+    print(f"Elapsed time for loading 100 batches: {elapsed_time} seconds, {elapsed_time / 100} seconds per batch")
 
 
 def test_taskencoder():
@@ -83,9 +82,9 @@ def test_taskencoder():
     start_time = time.time()
     for _ in tqdm(range(100)):
         sample = {
-            'pth': torch.randn(3, 1, 30, 30),
-            'pickle': np.random.randn(256, 1024),
-            'json': {'image_height': 1, 'image_width': 1},
+            "pth": torch.randn(3, 1, 30, 30),
+            "pickle": np.random.randn(256, 1024),
+            "json": {"image_height": 1, "image_width": 1},
         }
         taskencoder.encode_sample(sample)
 

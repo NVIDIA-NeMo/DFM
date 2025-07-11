@@ -22,9 +22,6 @@ import torch.distributed
 import torch.utils.checkpoint
 from einops import rearrange
 from megatron.energon import DefaultTaskEncoder
-from pytorch_lightning.loggers import WandbLogger
-from torch.utils.data import DataLoader
-
 from nemo import lightning as nl
 from nemo.collections import llm
 from nemo.collections.diffusion.data.diffusion_energon_datamodule import DiffusionDataModule
@@ -38,6 +35,8 @@ from nemo.lightning.pytorch.callbacks import ModelCheckpoint, PreemptionCallback
 from nemo.lightning.pytorch.optim.pytorch import PytorchOptimizerModule
 from nemo.lightning.pytorch.plugins import MegatronDataSampler
 from nemo.utils.exp_manager import TimingCallback
+from pytorch_lightning.loggers import WandbLogger
+from torch.utils.data import DataLoader
 
 
 class FakeDataset(torch.utils.data.Dataset):
@@ -48,8 +47,8 @@ class FakeDataset(torch.utils.data.Dataset):
         return 100000000
 
     def __getitem__(self, idx):
-        input_t = torch.randn([2, 3, 33, 256, 256], dtype=torch.bfloat16, device='cuda')
-        mask_t = torch.ones_like(input_t, requires_grad=False, dtype=torch.bfloat16, device='cuda')
+        input_t = torch.randn([2, 3, 33, 256, 256], dtype=torch.bfloat16, device="cuda")
+        mask_t = torch.ones_like(input_t, requires_grad=False, dtype=torch.bfloat16, device="cuda")
         return {VIDEO_KEY: input_t, MASK_KEY: mask_t}
 
     def _collate_fn(self, batch):
@@ -152,13 +151,13 @@ class ImageTaskEncoder(DefaultTaskEncoder, IOMixin):
             The transformed image sample.
         """
         sample = super().encode_sample(sample)
-        sample.image.frames = rearrange(sample.image.frames, 't c h w -> c t h w')
+        sample.image.frames = rearrange(sample.image.frames, "t c h w -> c t h w")
 
         mask_t = torch.ones_like(
             sample.image.frames, requires_grad=False, dtype=torch.bfloat16, device=sample.image.frames.device
         )
 
-        data = {VIDEO_KEY: sample.image.frames, MASK_KEY: mask_t, 'aspect_ratio': '1,1'}
+        data = {VIDEO_KEY: sample.image.frames, MASK_KEY: mask_t, "aspect_ratio": "1,1"}
         data = self.spatial_crop(data)
         begin_index, end_index = self.temporal_crop(data[VIDEO_KEY].shape[1])
         data[VIDEO_KEY] = data[VIDEO_KEY][:, begin_index:end_index]
@@ -186,26 +185,26 @@ def train_tokenizer() -> run.Partial:
         ),
         trainer=run.Config(
             nl.Trainer,
-            devices='auto',
-            num_nodes=int(os.environ.get('SLURM_NNODES', 1)),
+            devices="auto",
+            num_nodes=int(os.environ.get("SLURM_NNODES", 1)),
             accelerator="gpu",
             strategy="ddp_find_unused_parameters_true",
             num_sanity_val_steps=0,
             limit_val_batches=1,
             val_check_interval=100,
             max_epochs=10000,
-            precision='bf16',
-            logger=WandbLogger(project='cosmos-tokenizer') if "WANDB_API_KEY" in os.environ else None,
+            precision="bf16",
+            logger=WandbLogger(project="cosmos-tokenizer") if "WANDB_API_KEY" in os.environ else None,
             log_every_n_steps=1,
             use_distributed_sampler=False,
             callbacks=[
                 run.Config(
                     ModelCheckpoint,
-                    monitor='global_step',
-                    filename='{global_step}',
+                    monitor="global_step",
+                    filename="{global_step}",
                     every_n_train_steps=100,
                     save_top_k=3,
-                    mode='max',
+                    mode="max",
                     always_save_context=False,
                     save_context_on_train_end=False,
                 ),

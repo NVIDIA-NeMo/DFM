@@ -28,6 +28,7 @@ from megatron.core.tensor_parallel.random import model_parallel_cuda_manual_seed
 from nemo import lightning as nl
 from nemo.lightning.megatron_parallel import MegatronParallel
 
+
 MegatronParallel.init_ddp = lambda self: None
 from cosmos1.models.diffusion.nemo.inference.inference_utils import process_prompt, save_video
 from cosmos1.utils import log
@@ -43,6 +44,7 @@ from nemo.collections.diffusion.sampler.conditioner_configs import (
     TextConfig,
 )
 from nemo.collections.diffusion.sampler.cosmos.cosmos_diffusion_pipeline import CosmosDiffusionPipeline
+
 
 EXAMPLE_PROMPT = (
     "The teal robot is cooking food in a kitchen. Steam rises from a simmering pot "

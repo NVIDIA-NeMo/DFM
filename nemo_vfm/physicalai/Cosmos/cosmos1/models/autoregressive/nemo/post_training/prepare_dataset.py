@@ -21,13 +21,14 @@ from argparse import ArgumentParser
 from glob import glob
 
 import torch
+from einops import rearrange
+from huggingface_hub import snapshot_download
+from nemo.collections.nlp.data.language_modeling.megatron import indexed_dataset
+
 from cosmos1.models.autoregressive.nemo.utils import read_input_videos
 from cosmos1.models.autoregressive.tokenizer.discrete_video import DiscreteVideoFSQJITTokenizer
 from cosmos1.utils import log
-from einops import rearrange
-from huggingface_hub import snapshot_download
 
-from nemo.collections.nlp.data.language_modeling.megatron import indexed_dataset
 
 CHUNK_SIZE = 250  # Number of videos per chunk
 
@@ -80,7 +81,7 @@ def main(args):
 
     if rank == 0:
         log.info(f"Found {total_files} .mp4 files in {args.input_videos_dir}.")
-        log.info(f"Chunk size = {CHUNK_SIZE}, total chunks = {((total_files-1)//CHUNK_SIZE)+1}.")
+        log.info(f"Chunk size = {CHUNK_SIZE}, total chunks = {((total_files - 1) // CHUNK_SIZE) + 1}.")
 
     # --------------------------------------------------------------------------
     # Loop over chunks, but only process the chunks that match our rank

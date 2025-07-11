@@ -228,9 +228,9 @@ class MultiCameraGeneralDIT(GeneralDIT):
         frame_repeat = kwargs.get("frame_repeat", None)
 
         del kwargs
-        assert isinstance(
-            data_type, DataType
-        ), f"Expected DataType, got {type(data_type)}. We need discuss this flag later."
+        assert isinstance(data_type, DataType), (
+            f"Expected DataType, got {type(data_type)}. We need discuss this flag later."
+        )
         original_shape = x.shape
         x_B_T_H_W_D, rope_emb_L_1_1_D, extra_pos_emb_B_T_H_W_D_or_T_H_W_B_D = self.prepare_embedded_sequence(
             x,
@@ -427,9 +427,9 @@ class MultiCameraVideoExtendGeneralDIT(MultiCameraGeneralDIT):
         B, C, T, H, W = x.shape
 
         if data_type == DataType.VIDEO:
-            assert (
-                condition_video_input_mask is not None
-            ), "condition_video_input_mask is required for video data type; check if your model_obj is extend_model.FSDPDiffusionModel or the base DiffusionModel"
+            assert condition_video_input_mask is not None, (
+                "condition_video_input_mask is required for video data type; check if your model_obj is extend_model.FSDPDiffusionModel or the base DiffusionModel"
+            )
             input_list = [x, condition_video_input_mask]
             if condition_video_pose is not None:
                 if condition_video_pose.shape[2] > T:

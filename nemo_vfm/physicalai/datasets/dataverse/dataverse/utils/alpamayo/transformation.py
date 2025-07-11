@@ -25,6 +25,7 @@ import numpy as np
 import yaml
 from pyquaternion import Quaternion
 
+
 if TYPE_CHECKING:
     from alpamayo.data import ndas_camera_model
 

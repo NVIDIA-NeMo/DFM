@@ -18,17 +18,15 @@
 Refined Exponential Solver (RES) in https://arxiv.org/pdf/2308.02157
 """
 
-
 import math
 from dataclasses import dataclass
 from typing import Any, Callable, List, Literal, Optional, Tuple, Union
 
 import attrs
 import torch
-from tqdm import tqdm
-
 from nemo.collections.diffusion.sampler.res.multi_step import get_multi_step_fn, is_multi_step_fn_supported
 from nemo.collections.diffusion.sampler.res.runge_kutta import get_runge_kutta_fn, is_runge_kutta_fn_supported
+from tqdm import tqdm
 
 
 COMMON_SOLVER_OPTIONS = Literal["2ab", "2mid", "1euler"]

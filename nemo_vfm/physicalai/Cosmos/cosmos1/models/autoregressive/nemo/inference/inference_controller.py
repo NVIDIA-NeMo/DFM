@@ -31,7 +31,10 @@ from megatron.core.models.gpt.gpt_model import GPTModel as MCoreGPTModel
 
 class CosmosInferenceWrapper(GPTInferenceWrapper):
     def __init__(
-        self, model: GPTModel, inference_wrapper_config: InferenceWrapperConfig, config  #: CosmosVideo2WorldConfig
+        self,
+        model: GPTModel,
+        inference_wrapper_config: InferenceWrapperConfig,
+        config,  #: CosmosVideo2WorldConfig
     ):
         super().__init__(model, inference_wrapper_config)
         self.config = config
@@ -69,9 +72,9 @@ class CosmosInferenceWrapper(GPTInferenceWrapper):
         attention_mask = inference_input["attention_mask"]
         abs_pos_embed = inference_input["extra_positional_embeddings"]
 
-        assert hasattr(
-            self, "context_tokens"
-        ), "Expected to have context tokens. Not present. Call set_context_tokens with the encoder embeddings"
+        assert hasattr(self, "context_tokens"), (
+            "Expected to have context tokens. Not present. Call set_context_tokens with the encoder embeddings"
+        )
         extra_block_kwargs = {"context": self.context_tokens, "extra_positional_embeddings": abs_pos_embed}
         packed_seq_params = None
 
@@ -108,9 +111,9 @@ class CosmosActionControlInferenceWrapper(CosmosInferenceWrapper):
         attention_mask = inference_input["attention_mask"]
         abs_pos_embed = inference_input["extra_positional_embeddings"]
 
-        assert hasattr(
-            self, "context_tokens"
-        ), "Expected to have context tokens. Not present. Call set_context_tokens with the encoder embeddings"
+        assert hasattr(self, "context_tokens"), (
+            "Expected to have context tokens. Not present. Call set_context_tokens with the encoder embeddings"
+        )
         mcore_model = self.model
         while not isinstance(mcore_model, MCoreGPTModel) and hasattr(mcore_model, "module"):
             mcore_model = mcore_model.module

@@ -23,6 +23,7 @@ import torch
 from numpy.polynomial.polynomial import Polynomial
 from scipy.optimize import curve_fit
 
+
 CropParams = TypeVar("CropParams")
 ScaleParams = TypeVar("ScaleParams")
 

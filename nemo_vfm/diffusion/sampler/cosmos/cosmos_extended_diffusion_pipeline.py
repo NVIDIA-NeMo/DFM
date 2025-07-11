@@ -24,8 +24,6 @@ import torch
 import torch.distributed
 from einops import rearrange
 from megatron.core import parallel_state
-from torch import Tensor
-
 from nemo.collections.diffusion.sampler.batch_ops import *
 from nemo.collections.diffusion.sampler.conditioner import (
     BaseVideoCondition,
@@ -36,6 +34,8 @@ from nemo.collections.diffusion.sampler.conditioner import (
 from nemo.collections.diffusion.sampler.context_parallel import cat_outputs_cp, split_inputs_cp
 from nemo.collections.diffusion.sampler.edm.edm import EDMSDE, EDMSampler, EDMScaling
 from nemo.collections.diffusion.sampler.res.res_sampler import COMMON_SOLVER_OPTIONS, RESSampler
+from torch import Tensor
+
 
 # key to check if the video data is normalized or image data is converted to video data
 # to avoid apply normalization or augment image dimension multiple times
@@ -92,10 +92,10 @@ class ExtendedDiffusionPipeline:
 
         self.scaling = EDMScaling(sigma_data)
 
-        self.input_data_key = 'video'
-        self.input_image_key = 'images_1024'
+        self.input_data_key = "video"
+        self.input_image_key = "images_1024"
         self.tensor_kwargs = {"device": "cuda", "dtype": torch.bfloat16}
-        self.loss_reduce = 'mean'
+        self.loss_reduce = "mean"
 
         self.loss_add_logvar = loss_add_logvar
         self.loss_scale = 1.0
@@ -111,7 +111,7 @@ class ExtendedDiffusionPipeline:
     def _initialize_generators(self):
         noise_seed = self.seed
         noise_level_seed = self.seed
-        self._noise_generator = torch.Generator(device='cuda')
+        self._noise_generator = torch.Generator(device="cuda")
         self._noise_generator.manual_seed(noise_seed)
         self._noise_level_generator = np.random.default_rng(noise_level_seed)
         self.sde._generator = self._noise_level_generator
@@ -122,9 +122,9 @@ class ExtendedDiffusionPipeline:
         """
         is_image = self.input_image_key in data_batch
         is_video = self.input_data_key in data_batch
-        assert (
-            is_image != is_video
-        ), "Only one of the input_image_key or input_data_key should be present in the data_batch."
+        assert is_image != is_video, (
+            "Only one of the input_image_key or input_data_key should be present in the data_batch."
+        )
         return is_image
 
     @torch.no_grad()
@@ -409,7 +409,7 @@ class ExtendedDiffusionPipeline:
             condition_latent, condition, num_condition_t
         )
 
-        if 'plucker_embeddings' in data_batch:
+        if "plucker_embeddings" in data_batch:
             condition.add_pose_condition = True
             condition = self.add_condition_pose(data_batch, condition)
 
@@ -550,9 +550,9 @@ class ExtendedDiffusionPipeline:
         if input_key in data_batch:
             # Check if the data has already been augmented and avoid re-augmenting
             if IS_PREPROCESSED_KEY in data_batch and data_batch[IS_PREPROCESSED_KEY] is True:
-                assert (
-                    data_batch[input_key].shape[2] == 1
-                ), f"Image data is claimed be augmented while its shape is {data_batch[input_key].shape}"
+                assert data_batch[input_key].shape[2] == 1, (
+                    f"Image data is claimed be augmented while its shape is {data_batch[input_key].shape}"
+                )
                 return
             else:
                 data_batch[input_key] = rearrange(data_batch[input_key], "b c h w -> b c 1 h w").contiguous()
@@ -603,7 +603,7 @@ class ExtendedDiffusionPipeline:
             latent_state, condition, num_condition_t=data_batch["num_condition_t"]
         )
 
-        if 'plucker_embeddings' in data_batch:
+        if "plucker_embeddings" in data_batch:
             condition.add_pose_condition = True
             condition.first_random_n_num_condition_t_max = 1
             condition = self.add_condition_pose(data_batch, condition)
@@ -636,9 +636,9 @@ class ExtendedDiffusionPipeline:
         elif condition.condition_location == "first_random_n":
             # Only in training
             num_condition_t_max = condition.first_random_n_num_condition_t_max
-            assert (
-                num_condition_t_max <= T
-            ), f"num_condition_t_max should be less than T, get {num_condition_t_max}, {T}"
+            assert num_condition_t_max <= T, (
+                f"num_condition_t_max should be less than T, get {num_condition_t_max}, {T}"
+            )
             assert num_condition_t_max >= condition.first_random_n_num_condition_t_min
             num_condition_t = torch.randint(
                 condition.first_random_n_num_condition_t_min,
@@ -711,9 +711,9 @@ class ExtendedDiffusionPipeline:
 
         elif condition.apply_corruption_to_condition_region == "noise_with_sigma_fixed":
             # Inference only, use fixed sigma for the condition region
-            assert (
-                condition_video_augment_sigma_in_inference is not None
-            ), "condition_video_augment_sigma_in_inference should be provided"
+            assert condition_video_augment_sigma_in_inference is not None, (
+                "condition_video_augment_sigma_in_inference should be provided"
+            )
             augment_sigma = condition_video_augment_sigma_in_inference
 
             if augment_sigma >= sigma.flatten()[0]:
@@ -758,9 +758,9 @@ class ExtendedDiffusionPipeline:
         Returns:
             VideoExtendCondition: updated condition object
         """
-        assert (
-            "plucker_embeddings" in data_batch or "plucker_embeddings_downsample" in data_batch.keys()
-        ), f"plucker_embeddings should be in data_batch. only find {data_batch.keys()}"
+        assert "plucker_embeddings" in data_batch or "plucker_embeddings_downsample" in data_batch.keys(), (
+            f"plucker_embeddings should be in data_batch. only find {data_batch.keys()}"
+        )
         plucker_embeddings = (
             data_batch["plucker_embeddings"]
             if "plucker_embeddings_downsample" not in data_batch.keys()

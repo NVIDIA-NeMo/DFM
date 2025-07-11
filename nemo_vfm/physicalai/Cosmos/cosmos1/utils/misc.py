@@ -29,6 +29,7 @@ from typing import Any, Callable, List, Tuple, TypeVar
 import numpy as np
 import termcolor
 import torch
+
 from cosmos1.utils import distributed, log
 
 
@@ -52,9 +53,9 @@ def to(
     Returns:
         data (Any): Data cast to the specified device, dtype, and/or memory_format.
     """
-    assert (
-        device is not None or dtype is not None or memory_format is not None
-    ), "at least one of device, dtype, memory_format should be specified"
+    assert device is not None or dtype is not None or memory_format is not None, (
+        "at least one of device, dtype, memory_format should be specified"
+    )
     if isinstance(data, torch.Tensor):
         is_cpu = (isinstance(device, str) and device == "cpu") or (
             isinstance(device, torch.device) and device.type == "cpu"

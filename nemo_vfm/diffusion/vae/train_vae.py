@@ -31,8 +31,6 @@ from megatron.core.transformer.enums import ModelType
 from megatron.core.transformer.module import MegatronModule
 from megatron.core.transformer.transformer_config import TransformerConfig
 from megatron.energon import DefaultTaskEncoder, ImageSample
-from torch import Tensor, nn
-
 from nemo import lightning as nl
 from nemo.collections import llm
 from nemo.collections.diffusion.data.diffusion_energon_datamodule import DiffusionDataModule
@@ -41,6 +39,7 @@ from nemo.collections.llm.gpt.model.base import GPTModel
 from nemo.lightning.io.mixin import IOMixin
 from nemo.lightning.megatron_parallel import DataT, MegatronLossReduction, ReductionT
 from nemo.lightning.pytorch.optim import OptimizerModule
+from torch import Tensor, nn
 
 
 class AvgLossReduction(MegatronLossReduction):
@@ -96,7 +95,7 @@ class VAE(MegatronModule):
             self.vae = AutoencoderKL.from_config(pretrained_model_name_or_path, weight_dtype=torch.bfloat16)
 
         sdxl_vae = AutoencoderKL.from_pretrained(
-            'stabilityai/stable-diffusion-xl-base-1.0', subfolder="vae", weight_dtype=torch.bfloat16
+            "stabilityai/stable-diffusion-xl-base-1.0", subfolder="vae", weight_dtype=torch.bfloat16
         )
         sd_dict = sdxl_vae.state_dict()
         vae_dict = self.vae.state_dict()
@@ -191,7 +190,7 @@ class VAEModel(GPTModel):
             A dictionary with 'pixel_values' ready for the model.
         """
         batch = next(dataloader_iter)[0]
-        return {'pixel_values': batch.image.to(device='cuda', dtype=torch.bfloat16, non_blocking=True)}
+        return {"pixel_values": batch.image.to(device="cuda", dtype=torch.bfloat16, non_blocking=True)}
 
     def forward(self, *args, **kwargs):
         """
@@ -283,7 +282,7 @@ class VAEModel(GPTModel):
         Used here to skip first validation on resume.
         """
         super().on_validation_model_zero_grad()
-        if self.trainer.ckpt_path is not None and getattr(self, '_restarting_skip_val_flag', True):
+        if self.trainer.ckpt_path is not None and getattr(self, "_restarting_skip_val_flag", True):
             self.trainer.sanity_checking = True
             self._restarting_skip_val_flag = False
 
@@ -345,7 +344,7 @@ def train_vae() -> run.Partial:
     recipe = pretrain()
     recipe.model = run.Config(
         VAEModel,
-        pretrained_model_name_or_path='nemo/collections/diffusion/vae/vae16x/config.json',
+        pretrained_model_name_or_path="nemo/collections/diffusion/vae/vae16x/config.json",
     )
     recipe.data = run.Config(
         DiffusionDataModule,
@@ -356,7 +355,7 @@ def train_vae() -> run.Partial:
     recipe.optim.lr_scheduler = run.Config(nl.lr_scheduler.WarmupHoldPolicyScheduler, warmup_steps=100, hold_steps=1e9)
     recipe.optim.config.lr = 5e-6
     recipe.optim.config.weight_decay = 1e-2
-    recipe.log.log_dir = 'nemo_experiments/train_vae'
+    recipe.log.log_dir = "nemo_experiments/train_vae"
     recipe.trainer.val_check_interval = 1000
     recipe.trainer.callbacks[0].every_n_train_steps = 1000
 

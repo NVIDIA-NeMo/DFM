@@ -18,7 +18,6 @@
 from typing import List
 
 import attrs
-
 from cosmos1.utils.lazy_config import LazyDict
 
 

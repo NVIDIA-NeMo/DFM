@@ -36,7 +36,7 @@ class AutoEncoderConfig:
     z_channels: int = 16
     scale_factor: float = 0.3611
     shift_factor: float = 0.1159
-    attn_type: str = 'vanilla'
+    attn_type: str = "vanilla"
     double_z: bool = True
     dropout: float = 0.0
     ckpt: str = None

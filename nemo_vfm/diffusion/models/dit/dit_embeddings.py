@@ -25,6 +25,7 @@ from megatron.core import parallel_state
 from megatron.core.transformer.module import MegatronModule
 from torch import nn
 
+
 log = logging.getLogger(__name__)
 
 
@@ -220,8 +221,8 @@ class FactorizedLearnable3DEmbedding(MegatronModule):
         self.emb_h = torch.nn.Embedding(h, config.hidden_size)
         self.emb_w = torch.nn.Embedding(w, config.hidden_size)
 
-        if 'seed' in kwargs.keys():
-            seed = kwargs['seed']
+        if "seed" in kwargs.keys():
+            seed = kwargs["seed"]
             with torch.random.fork_rng():
                 torch.manual_seed(seed)
                 if config.perform_initialization:

@@ -26,10 +26,9 @@ import torchvision
 from cosmos1.utils import log
 from einops import rearrange
 from huggingface_hub import snapshot_download
+from nemo.collections.diffusion.models.model import DiT7BConfig
 from tqdm import tqdm
 from transformers import T5EncoderModel, T5TokenizerFast
-
-from nemo.collections.diffusion.models.model import DiT7BConfig
 
 
 def get_parser():
@@ -100,12 +99,12 @@ def encode_for_batch(tokenizer, encoder, prompts: list[str], max_length=512):
 def create_condition_latent_from_input_frames(tokenizer, input_frames, num_frames_condition=25):
     B, C, T, H, W = input_frames.shape
     num_frames_encode = tokenizer.pixel_chunk_duration
-    assert (
-        input_frames.shape[2] >= num_frames_condition
-    ), f"input_frames not enough for condition, require at least {num_frames_condition}, get {input_frames.shape[2]}, {input_frames.shape}"
-    assert (
-        num_frames_encode >= num_frames_condition
-    ), f"num_frames_encode should be larger than num_frames_condition, get {num_frames_encode}, {num_frames_condition}"
+    assert input_frames.shape[2] >= num_frames_condition, (
+        f"input_frames not enough for condition, require at least {num_frames_condition}, get {input_frames.shape[2]}, {input_frames.shape}"
+    )
+    assert num_frames_encode >= num_frames_condition, (
+        f"num_frames_encode should be larger than num_frames_condition, get {num_frames_encode}, {num_frames_condition}"
+    )
 
     # Put the conditioal frames to the begining of the video, and pad the end with zero
     condition_frames = input_frames[:, :, -num_frames_condition:]

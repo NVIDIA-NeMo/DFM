@@ -175,10 +175,9 @@ class DiTLayerWithAdaLN(TransformerLayer):
         packed_seq_params=None,
         sequence_len_offset=None,
     ):
-
         rope_emb = rotary_pos_emb
-        extra_pos_emb = packed_seq_params['extra_pos_emb']
-        adaln_lora_B_3D = packed_seq_params['adaln_lora_B_3D']
+        extra_pos_emb = packed_seq_params["extra_pos_emb"]
+        adaln_lora_B_3D = packed_seq_params["adaln_lora_B_3D"]
         # if type(rotary_pos_emb) == list:
         #     rope_emb, extra_pos_emb = rotary_pos_emb
         #     # extra_pos_emb = rearrange(extra_pos_emb, 'B T H W D -> (T H W) B D')

@@ -18,8 +18,9 @@ from pathlib import Path
 from typing import Literal, TypedDict
 
 import torch
-from cosmos1.models.autoregressive.nemo.post_training.action_control.prepare_dataset import get_default_output_prefix
 from torch.utils.data import Dataset
+
+from cosmos1.models.autoregressive.nemo.post_training.action_control.prepare_dataset import get_default_output_prefix
 
 
 class ActionControlRow(TypedDict):

@@ -28,9 +28,6 @@ from einops import rearrange
 from megatron.core import parallel_state
 from megatron.core.packed_seq_params import PackedSeqParams
 from megatron.core.transformer.transformer_config import TransformerConfig
-from torch import nn
-from typing_extensions import override
-
 from nemo.collections.diffusion.models.dit_llama.dit_llama_model import DiTLlamaModel
 from nemo.collections.diffusion.sampler.conditioner import (
     VideoConditioner,
@@ -54,6 +51,8 @@ from nemo.collections.llm.gpt.model.base import GPTModel
 from nemo.lightning import io
 from nemo.lightning.megatron_parallel import MaskedTokenLossReduction, MegatronLossReduction
 from nemo.lightning.pytorch.optim import OptimizerModule
+from torch import nn
+from typing_extensions import override
 
 from .dit.dit_model import DiTCrossAttentionModel
 from .dit.dit_model_7b import (
@@ -77,24 +76,24 @@ def dit_forward_step(model, batch) -> torch.Tensor:
 def dit_data_step(module, dataloader_iter):
     batch = next(dataloader_iter)[0]
     batch = get_batch_on_this_cp_rank(batch)
-    batch = {k: v.to(device='cuda', non_blocking=True) if torch.is_tensor(v) else v for k, v in batch.items()}
+    batch = {k: v.to(device="cuda", non_blocking=True) if torch.is_tensor(v) else v for k, v in batch.items()}
     batch["is_preprocessed"] = True  # assume data is preprocessed
 
-    if ('seq_len_q' in batch) and ('seq_len_kv' in batch):
-        cu_seqlens = batch['seq_len_q'].cumsum(dim=0).to(torch.int32)
+    if ("seq_len_q" in batch) and ("seq_len_kv" in batch):
+        cu_seqlens = batch["seq_len_q"].cumsum(dim=0).to(torch.int32)
         zero = torch.zeros(1, dtype=torch.int32, device="cuda")
         cu_seqlens = torch.cat((zero, cu_seqlens))
 
-        cu_seqlens_kv = batch['seq_len_kv'].cumsum(dim=0).to(torch.int32)
+        cu_seqlens_kv = batch["seq_len_kv"].cumsum(dim=0).to(torch.int32)
         cu_seqlens_kv = torch.cat((zero, cu_seqlens_kv))
 
-        batch['packed_seq_params'] = {
-            'self_attention': PackedSeqParams(
+        batch["packed_seq_params"] = {
+            "self_attention": PackedSeqParams(
                 cu_seqlens_q=cu_seqlens,
                 cu_seqlens_kv=cu_seqlens,
                 qkv_format=module.qkv_format,
             ),
-            'cross_attention': PackedSeqParams(
+            "cross_attention": PackedSeqParams(
                 cu_seqlens_q=cu_seqlens,
                 cu_seqlens_kv=cu_seqlens_kv,
                 qkv_format=module.qkv_format,
@@ -116,11 +115,11 @@ def get_batch_on_this_cp_rank(data: Dict):
         # cp split on seq_length, for video_latent, noise_latent and pos_ids
         assert t % cp_size == 0, "t must divisibly by cp_size"
         num_valid_tokens_in_ub = None
-        if 'loss_mask' in data and data['loss_mask'] is not None:
-            num_valid_tokens_in_ub = data['loss_mask'].sum()
+        if "loss_mask" in data and data["loss_mask"] is not None:
+            num_valid_tokens_in_ub = data["loss_mask"].sum()
 
         for key, value in data.items():
-            if (value is not None) and (key in ['video', 'video_latent', 'noise_latent', 'pos_ids']):
+            if (value is not None) and (key in ["video", "video_latent", "noise_latent", "pos_ids"]):
                 if len(value.shape) > 5:
                     value = value.squeeze(0)
                 B, C, T, H, W = value.shape
@@ -134,7 +133,7 @@ def get_batch_on_this_cp_rank(data: Dict):
         data["loss_mask"] = loss_mask.view(loss_mask.shape[0], cp_size, loss_mask.shape[1] // cp_size)[
             :, cp_rank, ...
         ].contiguous()
-        data['num_valid_tokens_in_ub'] = num_valid_tokens_in_ub
+        data["num_valid_tokens_in_ub"] = num_valid_tokens_in_ub
 
     return data
 
@@ -173,7 +172,7 @@ class DiTConfig(TransformerConfig, io.IOMixin):
     bf16: bool = True
     params_dtype: torch.dtype = torch.bfloat16
 
-    vae_module: str = 'nemo.collections.diffusion.vae.diffusers_vae.AutoencoderKLVAE'
+    vae_module: str = "nemo.collections.diffusion.vae.diffusers_vae.AutoencoderKLVAE"
     vae_path: str = None
     sigma_data: float = 0.5
 
@@ -189,9 +188,9 @@ class DiTConfig(TransformerConfig, io.IOMixin):
         vp_size = self.virtual_pipeline_model_parallel_size
         if vp_size:
             p_size = self.pipeline_model_parallel_size
-            assert (
-                self.num_layers // p_size
-            ) % vp_size == 0, "Make sure the number of model chunks is the same across all pipeline stages."
+            assert (self.num_layers // p_size) % vp_size == 0, (
+                "Make sure the number of model chunks is the same across all pipeline stages."
+            )
 
         if isinstance(self, DiTLlama30BConfig):
             model = DiTLlamaModel
@@ -278,27 +277,27 @@ class DiT7BConfig(DiTConfig):
     attention_dropout: float = 0
     bf16: bool = True
     params_dtype: torch.dtype = torch.bfloat16
-    vae_module: str = 'nemo.collections.diffusion.vae.video_vae.video_vae3_512'
+    vae_module: str = "nemo.collections.diffusion.vae.video_vae.video_vae3_512"
     vae_path: str = None
     sigma_data: float = 0.5
     loss_add_logvar: bool = True
     data_step_fn = dit_data_step
     forward_step_fn = dit_forward_step
-    model_name: str = 'cosmos_7b_text2world'
+    model_name: str = "cosmos_7b_text2world"
 
 
 @dataclass
 class DiT7BVideo2WorldConfig(DiT7BConfig):
-    model_name: str = 'cosmos_7b_video2world'
+    model_name: str = "cosmos_7b_video2world"
 
     @override
     def configure_model(self, tokenizer=None) -> DiTCrossAttentionExtendModel7B:
         vp_size = self.virtual_pipeline_model_parallel_size
         if vp_size:
             p_size = self.pipeline_model_parallel_size
-            assert (
-                self.num_layers // p_size
-            ) % vp_size == 0, "Make sure the number of model chunks is the same across all pipeline stages."
+            assert (self.num_layers // p_size) % vp_size == 0, (
+                "Make sure the number of model chunks is the same across all pipeline stages."
+            )
 
         model = DiTCrossAttentionExtendModel7B
         return model(
@@ -312,7 +311,7 @@ class DiT7BVideo2WorldConfig(DiT7BConfig):
 
 @dataclass
 class DiT7BControl2WorldConfig(DiT7BConfig):
-    model_name: str = 'cosmos_7b_control2world'
+    model_name: str = "cosmos_7b_control2world"
 
     # num_layers: int =
     @override
@@ -320,9 +319,9 @@ class DiT7BControl2WorldConfig(DiT7BConfig):
         vp_size = self.virtual_pipeline_model_parallel_size
         if vp_size:
             p_size = self.pipeline_model_parallel_size
-            assert (
-                self.num_layers // p_size
-            ) % vp_size == 0, "Make sure the number of model chunks is the same across all pipeline stages."
+            assert (self.num_layers // p_size) % vp_size == 0, (
+                "Make sure the number of model chunks is the same across all pipeline stages."
+            )
 
         model = DiTControl7B
         return model(
@@ -336,7 +335,7 @@ class DiT7BControl2WorldConfig(DiT7BConfig):
 
 @dataclass
 class DiT7BCameraCtrlConfig(DiT7BConfig):
-    model_name: str = 'cosmos_7b_video2world_camera_ctrl'
+    model_name: str = "cosmos_7b_video2world_camera_ctrl"
 
     @override
     def configure_vae(self):
@@ -347,9 +346,9 @@ class DiT7BCameraCtrlConfig(DiT7BConfig):
         vp_size = self.virtual_pipeline_model_parallel_size
         if vp_size:
             p_size = self.pipeline_model_parallel_size
-            assert (
-                self.num_layers // p_size
-            ) % vp_size == 0, "Make sure the number of model chunks is the same across all pipeline stages."
+            assert (self.num_layers // p_size) % vp_size == 0, (
+                "Make sure the number of model chunks is the same across all pipeline stages."
+            )
 
         dit_model = DiTCrossAttentionExtendModel7B(
             self,
@@ -400,13 +399,13 @@ class DiT7BActionConfig(DiTConfig):
     attention_dropout: float = 0
     bf16: bool = True
     params_dtype: torch.dtype = torch.bfloat16
-    vae_module: str = 'nemo.collections.diffusion.vae.video_vae.video_vae3_512'
+    vae_module: str = "nemo.collections.diffusion.vae.video_vae.video_vae3_512"
     vae_path: str = None
     sigma_data: float = 0.5
     loss_add_logvar: bool = True
     data_step_fn = dit_data_step
     forward_step_fn = dit_forward_step
-    model_name: str = 'cosmos_7b_video2world_action_control'
+    model_name: str = "cosmos_7b_video2world_action_control"
     recompute_granularity: str = "full"
     recompute_method: str = "uniform"
     recompute_num_layers: int = 1
@@ -420,9 +419,9 @@ class DiT7BVideo2WorldActionConfig(DiT7BActionConfig):
         vp_size = self.virtual_pipeline_model_parallel_size
         if vp_size:
             p_size = self.pipeline_model_parallel_size
-            assert (
-                self.num_layers // p_size
-            ) % vp_size == 0, "Make sure the number of model chunks is the same across all pipeline stages."
+            assert (self.num_layers // p_size) % vp_size == 0, (
+                "Make sure the number of model chunks is the same across all pipeline stages."
+            )
 
         return DiTCrossAttentionActionExtendModel7B(
             self,
@@ -458,27 +457,27 @@ class DiT14BConfig(DiTConfig):
     attention_dropout: float = 0
     bf16: bool = True
     params_dtype: torch.dtype = torch.bfloat16
-    vae_module: str = 'nemo.collections.diffusion.vae.video_vae.video_vae3_512'
+    vae_module: str = "nemo.collections.diffusion.vae.video_vae.video_vae3_512"
     vae_path: str = None
     sigma_data: float = 0.5
     loss_add_logvar: bool = True
     data_step_fn = dit_data_step
     forward_step_fn = dit_forward_step
-    model_name = 'cosmos_14b_text2world'
+    model_name = "cosmos_14b_text2world"
 
 
 @dataclass
 class DiT14BVideo2WorldConfig(DiT14BConfig):
-    model_name = 'cosmos_14b_video2world'
+    model_name = "cosmos_14b_video2world"
 
     @override
     def configure_model(self, tokenizer=None) -> DiTCrossAttentionExtendModel14B:
         vp_size = self.virtual_pipeline_model_parallel_size
         if vp_size:
             p_size = self.pipeline_model_parallel_size
-            assert (
-                self.num_layers // p_size
-            ) % vp_size == 0, "Make sure the number of model chunks is the same across all pipeline stages."
+            assert (self.num_layers // p_size) % vp_size == 0, (
+                "Make sure the number of model chunks is the same across all pipeline stages."
+            )
 
         model = DiTCrossAttentionExtendModel14B
         return model(
@@ -515,13 +514,13 @@ class DiT14BActionConfig(DiTConfig):
     attention_dropout: float = 0
     bf16: bool = True
     params_dtype: torch.dtype = torch.bfloat16
-    vae_module: str = 'nemo.collections.diffusion.vae.video_vae.video_vae3_512'
+    vae_module: str = "nemo.collections.diffusion.vae.video_vae.video_vae3_512"
     vae_path: str = None
     sigma_data: float = 0.5
     loss_add_logvar: bool = True
     data_step_fn = dit_data_step
     forward_step_fn = dit_forward_step
-    model_name: str = 'cosmos_14b_video2world_action_control'
+    model_name: str = "cosmos_14b_video2world_action_control"
     recompute_granularity: str = "full"
     recompute_method: str = "uniform"
     recompute_num_layers: int = 1
@@ -535,9 +534,9 @@ class DiT14BVideo2WorldActionConfig(DiT14BActionConfig):
         vp_size = self.virtual_pipeline_model_parallel_size
         if vp_size:
             p_size = self.pipeline_model_parallel_size
-            assert (
-                self.num_layers // p_size
-            ) % vp_size == 0, "Make sure the number of model chunks is the same across all pipeline stages."
+            assert (self.num_layers // p_size) % vp_size == 0, (
+                "Make sure the number of model chunks is the same across all pipeline stages."
+            )
 
         return DiTCrossAttentionActionExtendModel14B(
             self,
@@ -597,10 +596,10 @@ class DiTModel(GPTModel):
         self._training_loss_reduction = None
         self._validation_loss_reduction = None
 
-        if hasattr(config, 'model_name'):
-            model_name = getattr(config, 'model_name')
+        if hasattr(config, "model_name"):
+            model_name = getattr(config, "model_name")
             print(f"Initializing the DiT model with configuration model name: [{model_name}]")
-            if 'cosmos' in model_name and 'text2world' in model_name:
+            if "cosmos" in model_name and "text2world" in model_name:
                 self.conditioner = VideoConditioner(
                     text=TextConfig(),
                     fps=FPSConfig(),
@@ -613,25 +612,25 @@ class DiTModel(GPTModel):
                     conditioner=self.conditioner,
                     loss_add_logvar=self.config.loss_add_logvar,
                 )
-            elif 'cosmos' in model_name and 'video2world' in model_name:
+            elif "cosmos" in model_name and "video2world" in model_name:
                 # Parse conditioner configs.
                 conditioner_configs = {
-                    'text': TextConfig(),
-                    'fps': FPSConfig(),
-                    'num_frames': NumFramesConfig(),
-                    'image_size': ImageSizeConfig(),
-                    'padding_mask': PaddingMaskConfig(),
-                    'video_cond_bool': VideoCondBoolConfig(
+                    "text": TextConfig(),
+                    "fps": FPSConfig(),
+                    "num_frames": NumFramesConfig(),
+                    "image_size": ImageSizeConfig(),
+                    "padding_mask": PaddingMaskConfig(),
+                    "video_cond_bool": VideoCondBoolConfig(
                         condition_location="first_random_n",
                         apply_corruption_to_condition_region="noise_with_sigma",
                     ),
                 }
-                if 'action_control' in model_name:
+                if "action_control" in model_name:
                     # Add an action control tensor input.
-                    conditioner_configs['action_ctrl'] = ActionControlConfig()
-                elif 'camera_ctrl' in model_name:
+                    conditioner_configs["action_ctrl"] = ActionControlConfig()
+                elif "camera_ctrl" in model_name:
                     # Overwrite the default 'video_cond_bool' condition
-                    conditioner_configs['video_cond_bool'] = VideoCondBoolConfig(
+                    conditioner_configs["video_cond_bool"] = VideoCondBoolConfig(
                         condition_location="first_random_n",
                         apply_corruption_to_condition_region="noise_with_sigma",
                         add_pose_condition=True,
@@ -644,14 +643,14 @@ class DiTModel(GPTModel):
                     conditioner=self.conditioner,
                     loss_add_logvar=self.config.loss_add_logvar,
                 )
-            elif 'cosmos' in model_name and 'control2world' in model_name:
+            elif "cosmos" in model_name and "control2world" in model_name:
                 conditioner_configs = {
-                    'text': TextConfig(),
-                    'fps': FPSConfig(),
-                    'num_frames': NumFramesConfig(),
-                    'image_size': ImageSizeConfig(),
-                    'padding_mask': PaddingMaskConfig(),
-                    'video_cond_bool': VideoCondBoolConfig(
+                    "text": TextConfig(),
+                    "fps": FPSConfig(),
+                    "num_frames": NumFramesConfig(),
+                    "image_size": ImageSizeConfig(),
+                    "padding_mask": PaddingMaskConfig(),
+                    "video_cond_bool": VideoCondBoolConfig(
                         condition_location="first_random_n",
                         apply_corruption_to_condition_region="noise_with_sigma",
                     ),
@@ -677,17 +676,17 @@ class DiTModel(GPTModel):
         return self.module.forward(*args, **kwargs)
 
     def forward_step(self, batch) -> torch.Tensor:
-        if hasattr(self.config, 'model_name'):
-            if 'cosmos' in getattr(self.config, 'model_name'):
+        if hasattr(self.config, "model_name"):
+            if "cosmos" in getattr(self.config, "model_name"):
                 data_batch = {
-                    k: v.to(device='cuda', non_blocking=True) if torch.is_tensor(v) else v for k, v in batch.items()
+                    k: v.to(device="cuda", non_blocking=True) if torch.is_tensor(v) else v for k, v in batch.items()
                 }
                 data_batch["is_preprocessed"] = True  # assume data is preprocessed
                 if parallel_state.is_pipeline_last_stage():
                     output_batch, kendall_loss = self.diffusion_pipeline.training_step(batch, 0)
                     if torch.distributed.get_rank() == 0 and wandb.run:
                         wandb.log(
-                            {k: output_batch[k] for k in ['edm_loss'] if k in output_batch}, step=self.global_step
+                            {k: output_batch[k] for k in ["edm_loss"] if k in output_batch}, step=self.global_step
                         )
                     kendall_loss = torch.mean(kendall_loss, dim=1)
                     return kendall_loss
@@ -711,34 +710,34 @@ class DiTModel(GPTModel):
     def on_validation_start(self):
         if self.vae is None:
             if self.config.vae_path is None:
-                warnings.warn('vae_path not specified skipping validation')
+                warnings.warn("vae_path not specified skipping validation")
                 return None
             self.vae = self.config.configure_vae()
-        self.vae.to('cuda')
+        self.vae.to("cuda")
 
     def on_validation_end(self):
         if self.vae is not None:
-            self.vae.to('cpu')
+            self.vae.to("cpu")
 
     def validation_step(self, batch, batch_idx=None) -> torch.Tensor:
         # In mcore the loss-function is part of the forward-pass (when labels are provided)
-        state_shape = batch['video'].shape
+        state_shape = batch["video"].shape
         sample = self.diffusion_pipeline.generate_samples_from_batch(
             batch,
             guidance=7,
             state_shape=state_shape,
             num_steps=35,
-            is_negative_prompt=True if 'neg_t5_text_embeddings' in batch else False,
+            is_negative_prompt=True if "neg_t5_text_embeddings" in batch else False,
         )
 
         # TODO visualize more than 1 sample
         sample = sample[0, None]
-        C, T, H, W = batch['latent_shape'][0]
-        seq_len_q = batch['seq_len_q'][0]
+        C, T, H, W = batch["latent_shape"][0]
+        seq_len_q = batch["seq_len_q"][0]
 
         sample = rearrange(
             sample[:, :seq_len_q],
-            'B (T H W) (ph pw pt C) -> B C (T pt) (H ph) (W pw)',
+            "B (T H W) (ph pw pt C) -> B C (T pt) (H ph) (W pw)",
             ph=self.config.patch_spatial,
             pw=self.config.patch_spatial,
             C=C,
@@ -753,7 +752,7 @@ class DiTModel(GPTModel):
 
         T = video.shape[2]
         if T == 1:
-            image = rearrange(video, 'b c t h w -> (b t h) w c')
+            image = rearrange(video, "b c t h w -> (b t h) w c")
             result = image
         else:
             # result = wandb.Video(video, fps=float(batch['fps'])) # (batch, time, channel, height width)
@@ -777,7 +776,7 @@ class DiTModel(GPTModel):
                         videos.append(wandb.Image(video))
                     else:
                         videos.append(wandb.Video(video, fps=30))
-                wandb.log({'prediction': videos}, step=self.global_step)
+                wandb.log({"prediction": videos}, step=self.global_step)
 
         return None
 
@@ -796,13 +795,13 @@ class DiTModel(GPTModel):
         return self._validation_loss_reduction
 
     def on_validation_model_zero_grad(self) -> None:
-        '''
+        """
         Small hack to avoid first validation on resume.
         This will NOT work if the gradient accumulation step should be performed at this point.
         https://github.com/Lightning-AI/pytorch-lightning/discussions/18110
-        '''
+        """
         super().on_validation_model_zero_grad()
-        if self.trainer.ckpt_path is not None and getattr(self, '_restarting_skip_val_flag', True):
+        if self.trainer.ckpt_path is not None and getattr(self, "_restarting_skip_val_flag", True):
             self.trainer.sanity_checking = True
             self._restarting_skip_val_flag = False
 
@@ -835,7 +834,7 @@ def dynamic_import(full_path):
     """
     try:
         # Split the full path into module path and attribute name
-        module_path, attribute_name = full_path.rsplit('.', 1)
+        module_path, attribute_name = full_path.rsplit(".", 1)
     except ValueError as e:
         raise ImportError(
             f"Invalid full path '{full_path}'. It should contain both module and attribute names."

@@ -22,7 +22,6 @@ import random
 from typing import Optional
 
 import torch
-
 from nemo.collections.physicalai.tokenizer.data.augmentors.augmentor import Augmentor
 from nemo.collections.physicalai.tokenizer.data.augmentors.image.cropping import RandomCrop
 from nemo.collections.physicalai.tokenizer.data.augmentors.image.misc import (

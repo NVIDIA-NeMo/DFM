@@ -18,11 +18,12 @@
 import json
 
 import torch
-from cosmos1.models.autoregressive.modules.embedding import SinCosPosEmbAxisTE
-from cosmos1.models.autoregressive.nemo.cosmos import CosmosConfig
+from nemo.collections.llm.gpt.data.mock import MockDataModule
 from torch.utils.data import Dataset
 
-from nemo.collections.llm.gpt.data.mock import MockDataModule
+from cosmos1.models.autoregressive.modules.embedding import SinCosPosEmbAxisTE
+from cosmos1.models.autoregressive.nemo.cosmos import CosmosConfig
+
 
 TOKENIZER_COMPRESSION_FACTOR = [8, 16, 16]
 DATA_RESOLUTION_SUPPORTED = [640, 1024]

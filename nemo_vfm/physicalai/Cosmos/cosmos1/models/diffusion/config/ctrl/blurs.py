@@ -16,7 +16,6 @@
 from typing import List, Optional
 
 import attrs
-
 from cosmos1.utils.lazy_config import LazyCall as L
 
 

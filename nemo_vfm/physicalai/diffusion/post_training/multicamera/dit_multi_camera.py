@@ -27,11 +27,6 @@ from einops import rearrange, repeat
 from megatron.core import InferenceParams, parallel_state, tensor_parallel
 from megatron.core.dist_checkpointing.mapping import ShardedStateDict
 from megatron.core.packed_seq_params import PackedSeqParams
-from torch import Tensor, nn
-from torch.distributed import ProcessGroup, get_process_group_ranks
-from torchvision import transforms
-from typing_extensions import override
-
 from nemo.collections.diffusion.models.dit.dit_model_7b import (
     DiTCrossAttentionModel7B,
     PatchEmbed,
@@ -56,6 +51,10 @@ from nemo.collections.diffusion.sampler.conditioner_configs import (
 )
 from nemo.collections.diffusion.sampler.cosmos.cosmos_diffusion_pipeline import CosmosDiffusionPipeline
 from nemo.collections.diffusion.sampler.res.res_sampler import COMMON_SOLVER_OPTIONS
+from torch import Tensor, nn
+from torch.distributed import ProcessGroup, get_process_group_ranks
+from torchvision import transforms
+from typing_extensions import override
 
 
 class MultiCameraVideoPositionEmb(nn.Module):
@@ -184,12 +183,12 @@ class MultiCameraVideoRopePosition3DEmb(MultiCameraVideoPositionEmb):
         uniform_fps = (fps is None) or (fps.min() == fps.max())
         assert uniform_fps  # only support uniform fps now
 
-        assert (
-            uniform_fps or B == 1 or T == 1
-        ), "For video batch, batch size should be 1 for non-uniform fps. For image batch, T should be 1"
-        assert (
-            H <= self.max_h and W <= self.max_w
-        ), f"Input dimensions (H={H}, W={W}) exceed the maximum dimensions (max_h={self.max_h}, max_w={self.max_w}) configured for positional embedding. Please adjust the input size or increase the maximum dimensions in the model configuration."
+        assert uniform_fps or B == 1 or T == 1, (
+            "For video batch, batch size should be 1 for non-uniform fps. For image batch, T should be 1"
+        )
+        assert H <= self.max_h and W <= self.max_w, (
+            f"Input dimensions (H={H}, W={W}) exceed the maximum dimensions (max_h={self.max_h}, max_w={self.max_w}) configured for positional embedding. Please adjust the input size or increase the maximum dimensions in the model configuration."
+        )
         half_emb_h = torch.outer(self.seq[:H], h_spatial_freqs)
         half_emb_w = torch.outer(self.seq[:W], w_spatial_freqs)
 
@@ -523,13 +522,13 @@ class MultiCameraDiTCrossAttentionModel7B(DiTCrossAttentionModel7B):
         original_shape = x.shape
         B, C, T, H, W = original_shape
 
-        fps = kwargs.get('fps', None)
+        fps = kwargs.get("fps", None)
         if len(fps.shape) > 1:
             fps = fps.squeeze(0)
-        padding_mask = kwargs.get('padding_mask', None)
-        image_size = kwargs.get('image_size', None)
-        trajectory = kwargs.get('trajectory', None)
-        frame_repeat = kwargs.get('frame_repeat', None)
+        padding_mask = kwargs.get("padding_mask", None)
+        image_size = kwargs.get("image_size", None)
+        trajectory = kwargs.get("trajectory", None)
+        frame_repeat = kwargs.get("frame_repeat", None)
 
         if self.pre_process:
             x_B_T_H_W_D, rope_emb_L_1_1_D = self.prepare_embedded_sequence(
@@ -572,7 +571,7 @@ class MultiCameraDiTCrossAttentionModel7B(DiTCrossAttentionModel7B):
         affline_scale_log_info["affline_emb_B_D"] = affline_emb_B_D.detach()
         affline_emb_B_D = self.affline_norm(affline_emb_B_D)
 
-        crossattn_emb = rearrange(crossattn_emb, 'B S D -> S B D')
+        crossattn_emb = rearrange(crossattn_emb, "B S D -> S B D")
 
         # [Parth] Enable Sequence Parallelism
         if self.config.sequence_parallel:
@@ -591,8 +590,8 @@ class MultiCameraDiTCrossAttentionModel7B(DiTCrossAttentionModel7B):
                 crossattn_emb = crossattn_emb.clone()
 
         packed_seq_params = {
-            'adaln_lora_B_3D': adaln_lora_B_3D.detach(),
-            'extra_pos_emb': rope_emb_L_1_1_D[1].detach(),
+            "adaln_lora_B_3D": adaln_lora_B_3D.detach(),
+            "extra_pos_emb": rope_emb_L_1_1_D[1].detach(),
         }
         x_S_B_D = self.decoder(
             hidden_states=x_S_B_D,
@@ -660,9 +659,9 @@ class VideoExtendMultiCameraDiTCrossAttentionModel7B(MultiCameraDiTCrossAttentio
         B, C, T, H, W = x.shape
 
         if data_type == DataType.VIDEO:
-            assert (
-                condition_video_input_mask is not None
-            ), "condition_video_input_mask is required for video data type; check if your model_obj is extend_model.FSDPDiffusionModel or the base DiffusionModel"
+            assert condition_video_input_mask is not None, (
+                "condition_video_input_mask is required for video data type; check if your model_obj is extend_model.FSDPDiffusionModel or the base DiffusionModel"
+            )
             if self.cp_group is not None:
                 condition_video_input_mask = rearrange(
                     condition_video_input_mask, "B C (V T) H W -> B C V T H W", V=self.n_cameras
@@ -698,24 +697,24 @@ class VideoExtendMultiCameraDiTCrossAttentionModel7B(MultiCameraDiTCrossAttentio
 def dit_data_step_no_split_on_cp(module, dataloader_iter):
     batch = next(dataloader_iter)[0]
 
-    batch = {k: v.to(device='cuda', non_blocking=True) if torch.is_tensor(v) else v for k, v in batch.items()}
+    batch = {k: v.to(device="cuda", non_blocking=True) if torch.is_tensor(v) else v for k, v in batch.items()}
 
     batch["is_preprocessed"] = True  # assume data is preprocessed
-    if ('seq_len_q' in batch) and ('seq_len_kv' in batch):
-        cu_seqlens = batch['seq_len_q'].cumsum(dim=0).to(torch.int32)
+    if ("seq_len_q" in batch) and ("seq_len_kv" in batch):
+        cu_seqlens = batch["seq_len_q"].cumsum(dim=0).to(torch.int32)
         zero = torch.zeros(1, dtype=torch.int32, device="cuda")
         cu_seqlens = torch.cat((zero, cu_seqlens))
 
-        cu_seqlens_kv = batch['seq_len_kv'].cumsum(dim=0).to(torch.int32)
+        cu_seqlens_kv = batch["seq_len_kv"].cumsum(dim=0).to(torch.int32)
         cu_seqlens_kv = torch.cat((zero, cu_seqlens_kv))
 
-        batch['packed_seq_params'] = {
-            'self_attention': PackedSeqParams(
+        batch["packed_seq_params"] = {
+            "self_attention": PackedSeqParams(
                 cu_seqlens_q=cu_seqlens,
                 cu_seqlens_kv=cu_seqlens,
                 qkv_format=module.qkv_format,
             ),
-            'cross_attention': PackedSeqParams(
+            "cross_attention": PackedSeqParams(
                 cu_seqlens_q=cu_seqlens,
                 cu_seqlens_kv=cu_seqlens_kv,
                 qkv_format=module.qkv_format,
@@ -758,7 +757,7 @@ class MultiCameraDiT7BConfig(DiT7BConfig):
 
 @dataclass
 class VideoExtendMultiCameraDiT7BConfig(MultiCameraDiT7BConfig):
-    model_name = ('cosmos_7b_video2world',)
+    model_name = ("cosmos_7b_video2world",)
 
     @override
     def configure_model(self, tokenizer=None) -> VideoExtendMultiCameraDiTCrossAttentionModel7B:
@@ -1018,11 +1017,11 @@ class MultiCameraDiTModel(DiTModel):
 
         if self.vae is None:
             self.vae = self.config.configure_vae()
-            self.vae.to('cuda')
+            self.vae.to("cuda")
 
-        batch['video'] = self.encode(batch['video'])
-        seq_len = batch['video'].shape[-1] * batch['video'].shape[-2] * batch['video'].shape[-3]
-        batch["loss_mask"] = torch.ones(seq_len, dtype=torch.bfloat16, device=batch['video'].device)
+        batch["video"] = self.encode(batch["video"])
+        seq_len = batch["video"].shape[-1] * batch["video"].shape[-2] * batch["video"].shape[-3]
+        batch["loss_mask"] = torch.ones(seq_len, dtype=torch.bfloat16, device=batch["video"].device)
         from megatron.core import mpu
 
         cp_size = mpu.get_context_parallel_world_size()
@@ -1030,9 +1029,9 @@ class MultiCameraDiTModel(DiTModel):
 
         if cp_size > 1:
             num_valid_tokens_in_ub = None
-            if 'loss_mask' in batch and batch['loss_mask'] is not None:
-                num_valid_tokens_in_ub = batch['loss_mask'].sum()
-            batch['num_valid_tokens_in_ub'] = num_valid_tokens_in_ub
+            if "loss_mask" in batch and batch["loss_mask"] is not None:
+                num_valid_tokens_in_ub = batch["loss_mask"].sum()
+            batch["num_valid_tokens_in_ub"] = num_valid_tokens_in_ub
             batch["loss_mask"] = (
                 batch["loss_mask"].view(cp_size, batch["loss_mask"].shape[0] // cp_size)[cp_rank, ...].contiguous()
             )
@@ -1041,13 +1040,13 @@ class MultiCameraDiTModel(DiTModel):
 
     def validation_step(self, batch, batch_idx=None) -> torch.Tensor:
         # In mcore the loss-function is part of the forward-pass (when labels are provided)
-        state_shape = batch['video'].shape
+        state_shape = batch["video"].shape
         sample = self.diffusion_pipeline.generate_samples_from_batch(
             batch,
             guidance=7,
             state_shape=state_shape,
             num_steps=35,
-            is_negative_prompt=True if 'neg_t5_text_embeddings' in batch else False,
+            is_negative_prompt=True if "neg_t5_text_embeddings" in batch else False,
         )
 
         video = (1.0 + self.decode(sample)).clamp(0, 2) / 2  # [B, 3, T, H, W]
@@ -1089,7 +1088,7 @@ class MultiCameraDiTModel(DiTModel):
                 for grid_video in gather_list:
                     grid_video = grid_video.numpy()
                     videos.append(wandb.Video(grid_video, fps=12))
-                wandb.log({'prediction': videos}, step=self.global_step)
+                wandb.log({"prediction": videos}, step=self.global_step)
 
         return None
 

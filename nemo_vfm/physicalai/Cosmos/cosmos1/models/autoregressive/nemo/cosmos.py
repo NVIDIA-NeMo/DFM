@@ -23,17 +23,17 @@ from typing import TYPE_CHECKING, Annotated, Callable, Optional
 
 import torch
 import torch.nn.functional as F
-from cosmos1.utils import log
 from einops import rearrange, repeat
 from megatron.core.models.common.embeddings.rotary_pos_embedding import RotaryEmbedding
 from megatron.core.models.gpt.gpt_model import GPTModel as MCoreGPTModel
 from megatron.core.transformer.enums import AttnBackend
-from torch import Tensor, nn
-
 from nemo.collections.llm.gpt.model.llama import Llama3Config, LlamaModel
 from nemo.collections.llm.utils import Config
 from nemo.lightning import OptimizerModule, io
 from nemo.lightning.base import teardown
+from torch import Tensor, nn
+
+from cosmos1.utils import log
 
 
 class RotaryEmbedding3D(RotaryEmbedding):
@@ -135,9 +135,9 @@ class RotaryEmbedding3D(RotaryEmbedding):
 
         self.seq = (torch.arange(max_seq_len_cached, device=device, dtype=dtype) + offset).cuda()
 
-        assert hasattr(
-            self, "latent_shape"
-        ), "Latent shape is not set. Please run set_latent_shape() method on rope embedding. "
+        assert hasattr(self, "latent_shape"), (
+            "Latent shape is not set. Please run set_latent_shape() method on rope embedding. "
+        )
         T, H, W = self.latent_shape
         half_emb_t = torch.outer(self.seq[:T], self.temporal_inv_freq.cuda())
         half_emb_h = torch.outer(self.seq[:H], self.spatial_inv_freq.cuda())

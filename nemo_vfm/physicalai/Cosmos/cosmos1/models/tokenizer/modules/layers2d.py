@@ -164,9 +164,9 @@ class Encoder(nn.Module):
 
         # calculate the number of downsample operations
         self.num_downsamples = int(math.log2(spatial_compression)) - int(math.log2(patch_size))
-        assert (
-            self.num_downsamples <= self.num_resolutions
-        ), f"we can only downsample {self.num_resolutions} times at most"
+        assert self.num_downsamples <= self.num_resolutions, (
+            f"we can only downsample {self.num_resolutions} times at most"
+        )
 
         # downsampling
         self.conv_in = torch.nn.Conv2d(in_channels, channels, kernel_size=3, stride=1, padding=1)

@@ -24,7 +24,6 @@ from typing import Any, Dict, List, Optional, Tuple, Union
 
 import torch
 import torch.nn as nn
-
 from cosmos1.models.diffusion.diffusion.functional.batch_ops import batch_mul
 from cosmos1.utils import log
 from cosmos1.utils.lazy_config import instantiate
@@ -161,9 +160,9 @@ class GeneralConditioner(nn.Module, ABC):
         self.embedders = nn.ModuleDict()
         for n, (emb_name, embconfig) in enumerate(emb_models.items()):
             embedder = instantiate(embconfig.obj)
-            assert isinstance(
-                embedder, BaseConditionEntry
-            ), f"embedder model {embedder.__class__.__name__} has to inherit from AbstractEmbModel"
+            assert isinstance(embedder, BaseConditionEntry), (
+                f"embedder model {embedder.__class__.__name__} has to inherit from AbstractEmbModel"
+            )
             embedder.dropout_rate = getattr(embconfig, "dropout_rate", 0.0)
 
             if hasattr(embconfig, "input_key"):

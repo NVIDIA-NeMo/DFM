@@ -25,6 +25,7 @@ from torch import nn
 from torch.utils.checkpoint import checkpoint
 from transformer_engine.pytorch.attention import DotProductAttention, apply_rotary_pos_emb
 
+
 # ---------------------- Feed Forward Network -----------------------
 
 
@@ -279,9 +280,9 @@ class Attention(nn.Module):
     def cal_attn(self, q, k, v, mask=None):
         if self.backend == "transformer_engine":
             seq_dim = self.qkv_format.index("s")
-            assert (
-                q.shape[seq_dim] > 1 and k.shape[seq_dim] > 1
-            ), "Seqlen must be larger than 1 for TE Attention starting with 1.8 TE version."
+            assert q.shape[seq_dim] > 1 and k.shape[seq_dim] > 1, (
+                "Seqlen must be larger than 1 for TE Attention starting with 1.8 TE version."
+            )
             out = self.attn_op(q, k, v, core_attention_bias_type="no_bias", core_attention_bias=None)  # [B, Mq, H, V]
             return self.to_out(out)
         elif self.backend == "torch":

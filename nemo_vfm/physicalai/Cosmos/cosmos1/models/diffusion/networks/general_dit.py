@@ -379,9 +379,9 @@ class GeneralDIT(nn.Module):
             crossattn_mask: (B, N) tensor of cross-attention masks
         """
         del kwargs
-        assert isinstance(
-            data_type, DataType
-        ), f"Expected DataType, got {type(data_type)}. We need discuss this flag later."
+        assert isinstance(data_type, DataType), (
+            f"Expected DataType, got {type(data_type)}. We need discuss this flag later."
+        )
         original_shape = x.shape
         x_B_T_H_W_D, rope_emb_L_1_1_D, extra_pos_emb_B_T_H_W_D_or_T_H_W_B_D = self.prepare_embedded_sequence(
             x,
@@ -488,14 +488,14 @@ class GeneralDIT(nn.Module):
         )
         extra_pos_emb_B_T_H_W_D_or_T_H_W_B_D = inputs["extra_pos_emb_B_T_H_W_D_or_T_H_W_B_D"]
         if extra_pos_emb_B_T_H_W_D_or_T_H_W_B_D is not None:
-            assert (
-                x.shape == extra_pos_emb_B_T_H_W_D_or_T_H_W_B_D.shape
-            ), f"{x.shape} != {extra_pos_emb_B_T_H_W_D_or_T_H_W_B_D.shape} {original_shape}"
+            assert x.shape == extra_pos_emb_B_T_H_W_D_or_T_H_W_B_D.shape, (
+                f"{x.shape} != {extra_pos_emb_B_T_H_W_D_or_T_H_W_B_D.shape} {original_shape}"
+            )
 
         for _, block in self.blocks.items():
-            assert (
-                self.blocks["block0"].x_format == block.x_format
-            ), f"First block has x_format {self.blocks[0].x_format}, got {block.x_format}"
+            assert self.blocks["block0"].x_format == block.x_format, (
+                f"First block has x_format {self.blocks[0].x_format}, got {block.x_format}"
+            )
 
             x = block(
                 x,

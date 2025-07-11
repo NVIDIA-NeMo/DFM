@@ -16,6 +16,7 @@
 from cosmos1.utils.lazy_config import LazyDict
 from hydra.core.config_store import ConfigStore
 
+
 Cosmos_1_0_Diffusion_Text2World_7B: LazyDict = LazyDict(
     dict(
         defaults=[

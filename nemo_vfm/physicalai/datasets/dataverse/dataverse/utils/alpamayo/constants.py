@@ -14,6 +14,7 @@
 
 from typing import Final
 
+
 CROSS_LEFT_CAMERA_NAME: Final = "camera_cross_left_120fov"
 CROSS_RIGHT_CAMERA_NAME: Final = "camera_cross_right_120fov"
 FRONT_TELE_CAMERA_NAME: Final = "camera_front_tele_30fov"

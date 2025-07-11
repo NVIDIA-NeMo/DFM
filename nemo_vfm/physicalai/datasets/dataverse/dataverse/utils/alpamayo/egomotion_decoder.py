@@ -32,6 +32,7 @@ from dataverse.utils.alpamayo import transformation
 from dataverse.utils.alpamayo.camera import Quaternion
 from scipy.interpolate import interp1d
 
+
 _VALID_DECODE_STRATEGY_PATTERN = r"^(random|uniform|at)_(-?\d+)_frame$"
 
 
@@ -518,7 +519,7 @@ def interpolate_egopose(
         num_frames = int(match.group(2))
         if num_frames > len(valid_frame_indices):
             raise ValueError(
-                f"Requested {num_frames} frames, but only {len(valid_frame_indices)} " "frames are available."
+                f"Requested {num_frames} frames, but only {len(valid_frame_indices)} frames are available."
             )
         prediction_start_offset = np.random.uniform(*prediction_start_offset_range, size=num_frames)
         if strategy_type == "random":

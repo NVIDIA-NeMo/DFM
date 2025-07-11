@@ -25,11 +25,12 @@ from typing import Any, Dict, Optional
 
 import attr
 import attrs
-from cosmos1.utils import log
-from cosmos1.utils.config import Config
 from hydra import compose, initialize
 from hydra.core.config_store import ConfigStore
 from omegaconf import DictConfig, OmegaConf
+
+from cosmos1.utils import log
+from cosmos1.utils.config import Config
 
 
 def is_attrs_or_dataclass(obj) -> bool:
@@ -110,16 +111,16 @@ def override(config: Config, overrides: Optional[list[str]] = None) -> Config:
             return kwargs
         else:
             ref_fields = set(get_fields(ref_instance))
-            assert isinstance(kwargs, dict) or isinstance(
-                kwargs, DictConfig
-            ), "kwargs must be a dictionary or a DictConfig"
+            assert isinstance(kwargs, dict) or isinstance(kwargs, DictConfig), (
+                "kwargs must be a dictionary or a DictConfig"
+            )
             keys = set(kwargs.keys())
 
             # ref_fields must equal to or include all keys
             extra_keys = keys - ref_fields
-            assert ref_fields == keys or keys.issubset(
-                ref_fields
-            ), f"Fields mismatch: {ref_fields} != {keys}. Extra keys found: {extra_keys} \n \t when constructing {type(ref_instance)} with {keys}"
+            assert ref_fields == keys or keys.issubset(ref_fields), (
+                f"Fields mismatch: {ref_fields} != {keys}. Extra keys found: {extra_keys} \n \t when constructing {type(ref_instance)} with {keys}"
+            )
 
             resolved_kwargs: Dict[str, Any] = {}
             for f in keys:

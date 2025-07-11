@@ -424,9 +424,9 @@ class RotaryPositionEmbeddingPytorchV1(RotaryPositionEmbedding):
             cos_cached = self.cos_cached[:, input_pos]
             sin_cached = self.sin_cached[:, input_pos]
         else:
-            assert (
-                self.cos_cached.shape[1] >= seq_len
-            ), f"Invalid sequence length; cos_cached.shape {self.cos_cached.shape}, seq_len {seq_len}."
+            assert self.cos_cached.shape[1] >= seq_len, (
+                f"Invalid sequence length; cos_cached.shape {self.cos_cached.shape}, seq_len {seq_len}."
+            )
             cos_cached = self.cos_cached[:, :seq_len, ...]
             sin_cached = self.sin_cached[:, :seq_len, ...]
         xq = q * cos_cached + self.rotate_half(q) * sin_cached

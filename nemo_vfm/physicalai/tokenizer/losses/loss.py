@@ -22,8 +22,8 @@ import torch.nn.functional as F
 import torch.utils.checkpoint as checkpoint
 import torchvision.models.optical_flow as optical_flow
 from einops import rearrange
-
 from nemo.collections.physicalai.tokenizer.losses.lpips import LPIPS
+
 
 IMAGE_KEY = "images"
 VIDEO_KEY = "video"

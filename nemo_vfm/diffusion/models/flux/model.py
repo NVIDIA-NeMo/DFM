@@ -30,11 +30,6 @@ from megatron.core.optimizer import OptimizerConfig
 from megatron.core.transformer.enums import ModelType
 from megatron.core.transformer.transformer_config import TransformerConfig
 from megatron.core.transformer.utils import openai_gelu, sharded_state_dict_default
-from safetensors.torch import load_file as load_safetensors
-from safetensors.torch import save_file as save_safetensors
-from torch import nn
-from torch.nn import functional as F
-
 from nemo.collections.diffusion.encoders.conditioner import FrozenCLIPEmbedder, FrozenT5Embedder
 from nemo.collections.diffusion.models.dit.dit_layer_spec import (
     AdaLNContinuous,
@@ -56,6 +51,10 @@ from nemo.lightning import io, teardown
 from nemo.lightning.megatron_parallel import MaskedTokenLossReduction
 from nemo.lightning.pytorch.optim import MegatronOptimizerModule, OptimizerModule
 from nemo.utils import logging
+from safetensors.torch import load_file as load_safetensors
+from safetensors.torch import save_file as save_safetensors
+from torch import nn
+from torch.nn import functional as F
 
 
 # pylint: disable=C0116
@@ -66,7 +65,7 @@ def flux_data_step(dataloader_iter):
     else:
         _batch = batch
 
-    _batch['loss_mask'] = torch.Tensor([1.0]).cuda(non_blocking=True)
+    _batch["loss_mask"] = torch.Tensor([1.0]).cuda(non_blocking=True)
     return _batch
 
 
@@ -147,7 +146,7 @@ class FluxModelParams:
     t5_params: T5Config = field(default_factory=T5Config)
 
     scheduler_steps: int = 1000
-    device: str = 'cuda'
+    device: str = "cuda"
 
 
 # pylint: disable=C0116
@@ -347,13 +346,13 @@ class Flux(VisionModule):
                 ckpt = flux_transformer_converter(ckpt_path, self.config)
                 if save_converted_model_to is not None:
                     os.makedirs(save_converted_model_to, exist_ok=True)
-                    save_path = os.path.join(save_converted_model_to, 'nemo_flux_transformer.safetensors')
+                    save_path = os.path.join(save_converted_model_to, "nemo_flux_transformer.safetensors")
                     save_safetensors(ckpt, save_path)
-                    logging.info(f'saving converted transformer checkpoint to {save_path}')
+                    logging.info(f"saving converted transformer checkpoint to {save_path}")
             else:
                 ckpt = load_safetensors(ckpt_path)
         missing, unexpected = self.load_state_dict(ckpt, strict=False)
-        missing = [k for k in missing if not k.endswith('_extra_state')]
+        missing = [k for k in missing if not k.endswith("_extra_state")]
         # These keys are mcore specific and should not affect the model performance
         if len(missing) > 0:
             logging.info(
@@ -363,15 +362,15 @@ class Flux(VisionModule):
             logging.info(f"Found unexepected keys: \n {unexpected}")
         logging.info(f"Restored flux model weights from {ckpt_path}")
 
-    def sharded_state_dict(self, prefix='', sharded_offsets: tuple = (), metadata: dict = None) -> ShardedStateDict:
+    def sharded_state_dict(self, prefix="", sharded_offsets: tuple = (), metadata: dict = None) -> ShardedStateDict:
         sharded_state_dict = {}
-        layer_prefix = f'{prefix}double_blocks.'
+        layer_prefix = f"{prefix}double_blocks."
         for layer in self.double_blocks:
             offset = layer._get_layer_offset(self.config)
 
             global_layer_offset = layer.layer_number
-            state_dict_prefix = f'{layer_prefix}{global_layer_offset - offset}.'
-            sharded_prefix = f'{layer_prefix}{global_layer_offset}.'
+            state_dict_prefix = f"{layer_prefix}{global_layer_offset - offset}."
+            sharded_prefix = f"{layer_prefix}{global_layer_offset}."
             sharded_pp_offset = []
 
             layer_sharded_state_dict = layer.sharded_state_dict(state_dict_prefix, sharded_pp_offset, metadata)
@@ -379,13 +378,13 @@ class Flux(VisionModule):
 
             sharded_state_dict.update(layer_sharded_state_dict)
 
-        layer_prefix = f'{prefix}single_blocks.'
+        layer_prefix = f"{prefix}single_blocks."
         for layer in self.single_blocks:
             offset = layer._get_layer_offset(self.config)
 
             global_layer_offset = layer.layer_number
-            state_dict_prefix = f'{layer_prefix}{global_layer_offset - offset}.'
-            sharded_prefix = f'{layer_prefix}{global_layer_offset}.'
+            state_dict_prefix = f"{layer_prefix}{global_layer_offset - offset}."
+            sharded_prefix = f"{layer_prefix}{global_layer_offset}."
             sharded_pp_offset = []
 
             layer_sharded_state_dict = layer.sharded_state_dict(state_dict_prefix, sharded_pp_offset, metadata)
@@ -396,18 +395,18 @@ class Flux(VisionModule):
         for name, module in self.named_children():
             if not (module is self.single_blocks or module is self.double_blocks):
                 sharded_state_dict.update(
-                    sharded_state_dict_default(module, f'{prefix}{name}.', sharded_offsets, metadata)
+                    sharded_state_dict_default(module, f"{prefix}{name}.", sharded_offsets, metadata)
                 )
         return sharded_state_dict
 
 
 class MegatronFluxModel(L.LightningModule, io.IOMixin, io.ConnectorMixin, fn.FNMixin):
-    '''
+    """
     Megatron wrapper for flux.
 
     Args:
         flux_params (FluxModelParams): Parameters to configure the Flux model.
-    '''
+    """
 
     def __init__(
         self,
@@ -439,11 +438,11 @@ class MegatronFluxModel(L.LightningModule, io.IOMixin, io.ConnectorMixin, fn.FNM
         self.configure_text_encoders(self.clip_params, self.t5_params)
         for name, param in self.module.named_parameters():
             if self.config.num_single_layers == 0:
-                if 'context' in name or 'added' in name:
+                if "context" in name or "added" in name:
                     param.requires_grad = False
             # When getting rid of concat, the projection bias in attention and mlp bias are identical
             # So this bias is skipped and not included in the computation graph
-            if 'single_blocks' in name and 'self_attention.linear_proj.bias' in name:
+            if "single_blocks" in name and "self_attention.linear_proj.bias" in name:
                 param.requires_grad = False
 
     def configure_scheduler(self):
@@ -521,19 +520,19 @@ class MegatronFluxModel(L.LightningModule, io.IOMixin, io.ConnectorMixin, fn.FNM
             self.autocast_dtype = torch.float32
 
         if self.image_precached:
-            latents = batch['latents'].cuda(non_blocking=True)
+            latents = batch["latents"].cuda(non_blocking=True)
         else:
-            img = batch['images'].cuda(non_blocking=True)
+            img = batch["images"].cuda(non_blocking=True)
             latents = self.vae.encode(img).to(dtype=self.autocast_dtype)
         latents, noise, packed_noisy_model_input, latent_image_ids, guidance_vec, timesteps = (
             self.prepare_image_latent(latents)
         )
         if self.text_precached:
-            prompt_embeds = batch['prompt_embeds'].cuda(non_blocking=True).transpose(0, 1)
-            pooled_prompt_embeds = batch['pooled_prompt_embeds'].cuda(non_blocking=True)
-            text_ids = batch['text_ids'].cuda(non_blocking=True)
+            prompt_embeds = batch["prompt_embeds"].cuda(non_blocking=True).transpose(0, 1)
+            pooled_prompt_embeds = batch["pooled_prompt_embeds"].cuda(non_blocking=True)
+            text_ids = batch["text_ids"].cuda(non_blocking=True)
         else:
-            txt = batch['txt']
+            txt = batch["txt"]
             prompt_embeds, pooled_prompt_embeds, text_ids = self.encode_prompt(
                 txt, device=latents.device, dtype=latents.dtype
             )
@@ -562,7 +561,7 @@ class MegatronFluxModel(L.LightningModule, io.IOMixin, io.ConnectorMixin, fn.FNM
         loss = F.mse_loss(noise_pred.float(), target.float(), reduction="mean")
         return loss
 
-    def encode_prompt(self, prompt, device='cuda', dtype=torch.float32):
+    def encode_prompt(self, prompt, device="cuda", dtype=torch.float32):
         # pylint: disable=C0116
         prompt_embeds = self.t5(prompt).transpose(0, 1)
         _, pooled_prompt_embeds = self.clip(prompt)
@@ -715,9 +714,9 @@ class MegatronFluxModel(L.LightningModule, io.IOMixin, io.ConnectorMixin, fn.FNM
 
 @io.model_importer(MegatronFluxModel, "hf")
 class HFFluxImporter(io.ModelConnector["FluxTransformer2DModel", MegatronFluxModel]):
-    '''
+    """
     Convert a HF ckpt into NeMo dist-ckpt compatible format.
-    '''
+    """
 
     # pylint: disable=C0116
     def init(self) -> MegatronFluxModel:
@@ -773,60 +772,60 @@ class HFFluxImporter(io.ModelConnector["FluxTransformer2DModel", MegatronFluxMod
             clip_params=None,
             t5_params=None,
             scheduler_steps=1000,
-            device='cuda',
+            device="cuda",
         )
         return output
 
     def convert_state(self, source, target):
         # pylint: disable=C0301
         mapping = {
-            'transformer_blocks.*.norm1.linear.weight': 'double_blocks.*.adaln.adaLN_modulation.1.weight',
-            'transformer_blocks.*.norm1.linear.bias': 'double_blocks.*.adaln.adaLN_modulation.1.bias',
-            'transformer_blocks.*.norm1_context.linear.weight': 'double_blocks.*.adaln_context.adaLN_modulation.1.weight',
-            'transformer_blocks.*.norm1_context.linear.bias': 'double_blocks.*.adaln_context.adaLN_modulation.1.bias',
-            'transformer_blocks.*.attn.norm_q.weight': 'double_blocks.*.self_attention.q_layernorm.weight',
-            'transformer_blocks.*.attn.norm_k.weight': 'double_blocks.*.self_attention.k_layernorm.weight',
-            'transformer_blocks.*.attn.norm_added_q.weight': 'double_blocks.*.self_attention.added_q_layernorm.weight',
-            'transformer_blocks.*.attn.norm_added_k.weight': 'double_blocks.*.self_attention.added_k_layernorm.weight',
-            'transformer_blocks.*.attn.to_out.0.weight': 'double_blocks.*.self_attention.linear_proj.weight',
-            'transformer_blocks.*.attn.to_out.0.bias': 'double_blocks.*.self_attention.linear_proj.bias',
-            'transformer_blocks.*.attn.to_add_out.weight': 'double_blocks.*.self_attention.added_linear_proj.weight',
-            'transformer_blocks.*.attn.to_add_out.bias': 'double_blocks.*.self_attention.added_linear_proj.bias',
-            'transformer_blocks.*.ff.net.0.proj.weight': 'double_blocks.*.mlp.linear_fc1.weight',
-            'transformer_blocks.*.ff.net.0.proj.bias': 'double_blocks.*.mlp.linear_fc1.bias',
-            'transformer_blocks.*.ff.net.2.weight': 'double_blocks.*.mlp.linear_fc2.weight',
-            'transformer_blocks.*.ff.net.2.bias': 'double_blocks.*.mlp.linear_fc2.bias',
-            'transformer_blocks.*.ff_context.net.0.proj.weight': 'double_blocks.*.context_mlp.linear_fc1.weight',
-            'transformer_blocks.*.ff_context.net.0.proj.bias': 'double_blocks.*.context_mlp.linear_fc1.bias',
-            'transformer_blocks.*.ff_context.net.2.weight': 'double_blocks.*.context_mlp.linear_fc2.weight',
-            'transformer_blocks.*.ff_context.net.2.bias': 'double_blocks.*.context_mlp.linear_fc2.bias',
-            'single_transformer_blocks.*.norm.linear.weight': 'single_blocks.*.adaln.adaLN_modulation.1.weight',
-            'single_transformer_blocks.*.norm.linear.bias': 'single_blocks.*.adaln.adaLN_modulation.1.bias',
-            'single_transformer_blocks.*.proj_mlp.weight': 'single_blocks.*.mlp.linear_fc1.weight',
-            'single_transformer_blocks.*.proj_mlp.bias': 'single_blocks.*.mlp.linear_fc1.bias',
-            'single_transformer_blocks.*.attn.norm_q.weight': 'single_blocks.*.self_attention.q_layernorm.weight',
-            'single_transformer_blocks.*.attn.norm_k.weight': 'single_blocks.*.self_attention.k_layernorm.weight',
-            'single_transformer_blocks.*.proj_out.bias': 'single_blocks.*.mlp.linear_fc2.bias',
-            'norm_out.linear.bias': 'norm_out.adaLN_modulation.1.bias',
-            'norm_out.linear.weight': 'norm_out.adaLN_modulation.1.weight',
-            'proj_out.bias': 'proj_out.bias',
-            'proj_out.weight': 'proj_out.weight',
-            'time_text_embed.guidance_embedder.linear_1.bias': 'guidance_embedding.in_layer.bias',
-            'time_text_embed.guidance_embedder.linear_1.weight': 'guidance_embedding.in_layer.weight',
-            'time_text_embed.guidance_embedder.linear_2.bias': 'guidance_embedding.out_layer.bias',
-            'time_text_embed.guidance_embedder.linear_2.weight': 'guidance_embedding.out_layer.weight',
-            'x_embedder.bias': 'img_embed.bias',
-            'x_embedder.weight': 'img_embed.weight',
-            'time_text_embed.timestep_embedder.linear_1.bias': 'timestep_embedding.time_embedder.in_layer.bias',
-            'time_text_embed.timestep_embedder.linear_1.weight': 'timestep_embedding.time_embedder.in_layer.weight',
-            'time_text_embed.timestep_embedder.linear_2.bias': 'timestep_embedding.time_embedder.out_layer.bias',
-            'time_text_embed.timestep_embedder.linear_2.weight': 'timestep_embedding.time_embedder.out_layer.weight',
-            'context_embedder.bias': 'txt_embed.bias',
-            'context_embedder.weight': 'txt_embed.weight',
-            'time_text_embed.text_embedder.linear_1.bias': 'vector_embedding.in_layer.bias',
-            'time_text_embed.text_embedder.linear_1.weight': 'vector_embedding.in_layer.weight',
-            'time_text_embed.text_embedder.linear_2.bias': 'vector_embedding.out_layer.bias',
-            'time_text_embed.text_embedder.linear_2.weight': 'vector_embedding.out_layer.weight',
+            "transformer_blocks.*.norm1.linear.weight": "double_blocks.*.adaln.adaLN_modulation.1.weight",
+            "transformer_blocks.*.norm1.linear.bias": "double_blocks.*.adaln.adaLN_modulation.1.bias",
+            "transformer_blocks.*.norm1_context.linear.weight": "double_blocks.*.adaln_context.adaLN_modulation.1.weight",
+            "transformer_blocks.*.norm1_context.linear.bias": "double_blocks.*.adaln_context.adaLN_modulation.1.bias",
+            "transformer_blocks.*.attn.norm_q.weight": "double_blocks.*.self_attention.q_layernorm.weight",
+            "transformer_blocks.*.attn.norm_k.weight": "double_blocks.*.self_attention.k_layernorm.weight",
+            "transformer_blocks.*.attn.norm_added_q.weight": "double_blocks.*.self_attention.added_q_layernorm.weight",
+            "transformer_blocks.*.attn.norm_added_k.weight": "double_blocks.*.self_attention.added_k_layernorm.weight",
+            "transformer_blocks.*.attn.to_out.0.weight": "double_blocks.*.self_attention.linear_proj.weight",
+            "transformer_blocks.*.attn.to_out.0.bias": "double_blocks.*.self_attention.linear_proj.bias",
+            "transformer_blocks.*.attn.to_add_out.weight": "double_blocks.*.self_attention.added_linear_proj.weight",
+            "transformer_blocks.*.attn.to_add_out.bias": "double_blocks.*.self_attention.added_linear_proj.bias",
+            "transformer_blocks.*.ff.net.0.proj.weight": "double_blocks.*.mlp.linear_fc1.weight",
+            "transformer_blocks.*.ff.net.0.proj.bias": "double_blocks.*.mlp.linear_fc1.bias",
+            "transformer_blocks.*.ff.net.2.weight": "double_blocks.*.mlp.linear_fc2.weight",
+            "transformer_blocks.*.ff.net.2.bias": "double_blocks.*.mlp.linear_fc2.bias",
+            "transformer_blocks.*.ff_context.net.0.proj.weight": "double_blocks.*.context_mlp.linear_fc1.weight",
+            "transformer_blocks.*.ff_context.net.0.proj.bias": "double_blocks.*.context_mlp.linear_fc1.bias",
+            "transformer_blocks.*.ff_context.net.2.weight": "double_blocks.*.context_mlp.linear_fc2.weight",
+            "transformer_blocks.*.ff_context.net.2.bias": "double_blocks.*.context_mlp.linear_fc2.bias",
+            "single_transformer_blocks.*.norm.linear.weight": "single_blocks.*.adaln.adaLN_modulation.1.weight",
+            "single_transformer_blocks.*.norm.linear.bias": "single_blocks.*.adaln.adaLN_modulation.1.bias",
+            "single_transformer_blocks.*.proj_mlp.weight": "single_blocks.*.mlp.linear_fc1.weight",
+            "single_transformer_blocks.*.proj_mlp.bias": "single_blocks.*.mlp.linear_fc1.bias",
+            "single_transformer_blocks.*.attn.norm_q.weight": "single_blocks.*.self_attention.q_layernorm.weight",
+            "single_transformer_blocks.*.attn.norm_k.weight": "single_blocks.*.self_attention.k_layernorm.weight",
+            "single_transformer_blocks.*.proj_out.bias": "single_blocks.*.mlp.linear_fc2.bias",
+            "norm_out.linear.bias": "norm_out.adaLN_modulation.1.bias",
+            "norm_out.linear.weight": "norm_out.adaLN_modulation.1.weight",
+            "proj_out.bias": "proj_out.bias",
+            "proj_out.weight": "proj_out.weight",
+            "time_text_embed.guidance_embedder.linear_1.bias": "guidance_embedding.in_layer.bias",
+            "time_text_embed.guidance_embedder.linear_1.weight": "guidance_embedding.in_layer.weight",
+            "time_text_embed.guidance_embedder.linear_2.bias": "guidance_embedding.out_layer.bias",
+            "time_text_embed.guidance_embedder.linear_2.weight": "guidance_embedding.out_layer.weight",
+            "x_embedder.bias": "img_embed.bias",
+            "x_embedder.weight": "img_embed.weight",
+            "time_text_embed.timestep_embedder.linear_1.bias": "timestep_embedding.time_embedder.in_layer.bias",
+            "time_text_embed.timestep_embedder.linear_1.weight": "timestep_embedding.time_embedder.in_layer.weight",
+            "time_text_embed.timestep_embedder.linear_2.bias": "timestep_embedding.time_embedder.out_layer.bias",
+            "time_text_embed.timestep_embedder.linear_2.weight": "timestep_embedding.time_embedder.out_layer.weight",
+            "context_embedder.bias": "txt_embed.bias",
+            "context_embedder.weight": "txt_embed.weight",
+            "time_text_embed.text_embedder.linear_1.bias": "vector_embedding.in_layer.bias",
+            "time_text_embed.text_embedder.linear_1.weight": "vector_embedding.in_layer.weight",
+            "time_text_embed.text_embedder.linear_2.bias": "vector_embedding.out_layer.bias",
+            "time_text_embed.text_embedder.linear_2.weight": "vector_embedding.out_layer.weight",
         }
         return io.apply_transforms(
             source,
@@ -923,8 +922,8 @@ def import_single_block_qkv_bias(ctx: io.TransformCTX, qb, kb, vb):
 
 
 @io.state_transform(
-    source_key=('single_transformer_blocks.*.proj_out.weight'),
-    target_key=('single_blocks.*.mlp.linear_fc2.weight', 'single_blocks.*.self_attention.linear_proj.weight'),
+    source_key=("single_transformer_blocks.*.proj_out.weight"),
+    target_key=("single_blocks.*.mlp.linear_fc2.weight", "single_blocks.*.self_attention.linear_proj.weight"),
 )
 def transform_single_proj_out(proj_weight):
     linear_fc2 = proj_weight.detach()[:, 3072:].clone()

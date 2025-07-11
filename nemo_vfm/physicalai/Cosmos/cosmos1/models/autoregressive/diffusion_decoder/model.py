@@ -19,12 +19,13 @@ from dataclasses import dataclass
 from typing import Callable, Dict, Optional, Tuple
 
 import torch
+from torch import Tensor
+
 from cosmos1.models.diffusion.conditioner import BaseVideoCondition
 from cosmos1.models.diffusion.diffusion.functional.batch_ops import batch_mul
 from cosmos1.models.diffusion.diffusion.modules.res_sampler import COMMON_SOLVER_OPTIONS
 from cosmos1.models.diffusion.model.model_t2w import DiffusionT2WModel as VideoDiffusionModel
 from cosmos1.utils.lazy_config import instantiate as lazy_instantiate
-from torch import Tensor
 
 
 @dataclass
@@ -86,9 +87,9 @@ class LatentDiffusionDecoderModel(VideoDiffusionModel):
         """
         is_image = self.input_image_key in data_batch
         is_video = self.input_data_key in data_batch
-        assert (
-            is_image != is_video
-        ), "Only one of the input_image_key or input_data_key should be present in the data_batch."
+        assert is_image != is_video, (
+            "Only one of the input_image_key or input_data_key should be present in the data_batch."
+        )
         return is_image
 
     def get_x0_fn_from_batch(

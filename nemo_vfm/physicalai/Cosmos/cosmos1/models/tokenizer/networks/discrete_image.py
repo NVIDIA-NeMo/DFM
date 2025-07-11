@@ -16,6 +16,7 @@
 # pylint: disable=C0115,C0116,C0301
 
 """The network definition for discrete image tokenization with VQ, LFQ, FSQ or ResidualFSQ."""
+
 from collections import OrderedDict, namedtuple
 
 import torch
@@ -23,6 +24,7 @@ from cosmos1.models.tokenizer.modules import DecoderType, DiscreteQuantizer, Enc
 from cosmos1.models.tokenizer.modules.quantizers import InvQuantizerJit
 from loguru import logger as logging
 from torch import nn
+
 
 NetworkEval = namedtuple("NetworkEval", ["reconstructions", "quant_loss", "quant_info"])
 

@@ -21,6 +21,8 @@ from typing import List, Optional, Tuple
 
 import numpy as np
 import torch
+from einops import rearrange
+
 from cosmos1.models.autoregressive.configs.base.model_config import create_video2world_model_config
 from cosmos1.models.autoregressive.configs.base.tokenizer import TokenizerConfig
 from cosmos1.models.autoregressive.configs.inference.inference_config import (
@@ -40,7 +42,6 @@ from cosmos1.models.diffusion.inference.inference_utils import (
     load_tokenizer_model,
 )
 from cosmos1.utils import log, misc
-from einops import rearrange
 
 
 def detect_model_size_from_ckpt_path(ckpt_path: str) -> str:
@@ -489,7 +490,9 @@ class ARBaseGenerationPipeline(BaseWorldGenerationPipeline):
         assert logit_clipping_range == [
             0,
             self.model.tokenizer.video_vocab_size,
-        ], f"logit_clipping_range {logit_clipping_range} is not supported for fast generate. Expected [0, {self.model.tokenizer.video_vocab_size}]"
+        ], (
+            f"logit_clipping_range {logit_clipping_range} is not supported for fast generate. Expected [0, {self.model.tokenizer.video_vocab_size}]"
+        )
 
         out_videos = {}
         out_indices_tensors = {}

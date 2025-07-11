@@ -25,13 +25,13 @@ import imageio
 import numpy as np
 import torch
 import torchvision.transforms.functional as transforms_F
-
 from cosmos1.models.diffusion.model.model_sample_multiview_driving import DiffusionMultiCameraV2WModel
 from cosmos1.models.diffusion.model.model_t2w import DiffusionT2WModel
 from cosmos1.models.diffusion.model.model_v2w import DiffusionV2WModel
 from cosmos1.utils import log, misc
 from cosmos1.utils.config_helper import get_config_module, override
 from cosmos1.utils.io import load_from_fileobj
+
 
 TORCH_VERSION: Tuple[int, ...] = tuple(int(x) for x in torch.__version__.split(".")[:2])
 if TORCH_VERSION >= (1, 11):
@@ -178,9 +178,9 @@ def validate_args(args: argparse.Namespace, inference_type: str) -> None:
     if inference_type == "text2world" or (inference_type == "video2world" and args.disable_prompt_upsampler):
         assert args.prompt or args.batch_input_path, "--prompt or --batch_input_path must be provided."
     if inference_type == "video2world" and not args.batch_input_path:
-        assert (
-            args.input_image_or_video_path
-        ), "--input_image_or_video_path must be provided for single video generation."
+        assert args.input_image_or_video_path, (
+            "--input_image_or_video_path must be provided for single video generation."
+        )
 
 
 class _IncompatibleKeys(
@@ -654,9 +654,9 @@ def compute_num_latent_frames(model: DiffusionV2WModel, num_input_frames: int, d
     if num_input_frames % model.tokenizer.video_vae.latent_chunk_duration == 1:
         num_latent_frames += 1
     elif num_input_frames % model.tokenizer.video_vae.latent_chunk_duration > 1:
-        assert (
-            num_input_frames % model.tokenizer.video_vae.pixel_chunk_duration - 1
-        ) % downsample_factor == 0, f"num_input_frames % model.tokenizer.video_vae.pixel_chunk_duration - 1 must be divisible by {downsample_factor}"
+        assert (num_input_frames % model.tokenizer.video_vae.pixel_chunk_duration - 1) % downsample_factor == 0, (
+            f"num_input_frames % model.tokenizer.video_vae.pixel_chunk_duration - 1 must be divisible by {downsample_factor}"
+        )
         num_latent_frames += (
             1 + (num_input_frames % model.tokenizer.video_vae.pixel_chunk_duration - 1) // downsample_factor
         )
@@ -695,12 +695,12 @@ def create_condition_latent_from_input_frames(
         f"Create condition latent from input frames {input_frames.shape}, value {input_frames.min()}, {input_frames.max()}, dtype {input_frames.dtype}"
     )
 
-    assert (
-        input_frames.shape[2] >= num_frames_condition
-    ), f"input_frames not enough for condition, require at least {num_frames_condition}, get {input_frames.shape[2]}, {input_frames.shape}"
-    assert (
-        num_frames_encode >= num_frames_condition
-    ), f"num_frames_encode should be larger than num_frames_condition, get {num_frames_encode}, {num_frames_condition}"
+    assert input_frames.shape[2] >= num_frames_condition, (
+        f"input_frames not enough for condition, require at least {num_frames_condition}, get {input_frames.shape[2]}, {input_frames.shape}"
+    )
+    assert num_frames_encode >= num_frames_condition, (
+        f"num_frames_encode should be larger than num_frames_condition, get {num_frames_encode}, {num_frames_condition}"
+    )
 
     # Put the conditioal frames to the begining of the video, and pad the end with zero
     condition_frames = input_frames[:, :, -num_frames_condition:]

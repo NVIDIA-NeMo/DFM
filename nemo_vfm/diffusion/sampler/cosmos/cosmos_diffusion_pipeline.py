@@ -22,14 +22,14 @@ import torch
 import torch.distributed
 from einops import rearrange
 from megatron.core import parallel_state
-from torch import Tensor
-
 from nemo.collections.diffusion.sampler.batch_ops import *
 from nemo.collections.diffusion.sampler.conditioner import BaseVideoCondition, DataType, Edify4Condition
 from nemo.collections.diffusion.sampler.context_parallel import cat_outputs_cp, split_inputs_cp
 from nemo.collections.diffusion.sampler.edm.edm import EDMSDE, EDMSampler, EDMScaling
 from nemo.collections.diffusion.sampler.edm.edm_pipeline import EDMPipeline
 from nemo.collections.diffusion.sampler.res.res_sampler import COMMON_SOLVER_OPTIONS, RESSampler
+from torch import Tensor
+
 
 # key to check if the video data is normalized or image data is converted to video data
 # to avoid apply normalization or augment image dimension multiple times
@@ -61,7 +61,6 @@ class CosmosDiffusionPipeline(EDMPipeline):
         seed=1,
         loss_add_logvar=True,
     ):
-
         super().__init__(
             net,
         )
@@ -89,10 +88,10 @@ class CosmosDiffusionPipeline(EDMPipeline):
 
         self.scaling = EDMScaling(sigma_data)
 
-        self.input_data_key = 'video'
-        self.input_image_key = 'images_1024'
+        self.input_data_key = "video"
+        self.input_image_key = "images_1024"
         self.tensor_kwargs = {"device": "cuda", "dtype": torch.bfloat16}
-        self.loss_reduce = 'mean'
+        self.loss_reduce = "mean"
 
         self.loss_add_logvar = loss_add_logvar
         self.loss_scale = 1.0
@@ -108,7 +107,7 @@ class CosmosDiffusionPipeline(EDMPipeline):
     def _initialize_generators(self):
         noise_seed = self.seed + 100 * parallel_state.get_data_parallel_rank(with_context_parallel=True)
         noise_level_seed = self.seed + 100 * parallel_state.get_data_parallel_rank(with_context_parallel=False)
-        self._noise_generator = torch.Generator(device='cuda')
+        self._noise_generator = torch.Generator(device="cuda")
         self._noise_generator.manual_seed(noise_seed)
         self._noise_level_generator = np.random.default_rng(noise_level_seed)
         self.sde._generator = self._noise_level_generator
@@ -119,9 +118,9 @@ class CosmosDiffusionPipeline(EDMPipeline):
         """
         is_image = self.input_image_key in data_batch
         is_video = self.input_data_key in data_batch
-        assert (
-            is_image != is_video
-        ), "Only one of the input_image_key or input_data_key should be present in the data_batch."
+        assert is_image != is_video, (
+            "Only one of the input_image_key or input_data_key should be present in the data_batch."
+        )
         return is_image
 
     @torch.no_grad()
@@ -475,9 +474,9 @@ class CosmosDiffusionPipeline(EDMPipeline):
         if input_key in data_batch:
             # Check if the data has already been augmented and avoid re-augmenting
             if IS_PREPROCESSED_KEY in data_batch and data_batch[IS_PREPROCESSED_KEY] is True:
-                assert (
-                    data_batch[input_key].shape[2] == 1
-                ), f"Image data is claimed be augmented while its shape is {data_batch[input_key].shape}"
+                assert data_batch[input_key].shape[2] == 1, (
+                    f"Image data is claimed be augmented while its shape is {data_batch[input_key].shape}"
+                )
                 return
             else:
                 data_batch[input_key] = rearrange(data_batch[input_key], "b c h w -> b c 1 h w").contiguous()

@@ -37,9 +37,9 @@ def rope(pos: torch.Tensor, dim: int, theta: int) -> torch.Tensor:
 
 
 class EmbedND(nn.Module):
-    '''
+    """
     Generate Rope matrix with preset axes dimensions.
-    '''
+    """
 
     def __init__(self, dim: int, theta: int, axes_dim: list[int]):
         # pylint: disable=C0116
@@ -60,9 +60,9 @@ class EmbedND(nn.Module):
 
 
 class MLPEmbedder(nn.Module):
-    '''
+    """
     MLP embedder with two projection layers and Silu in between.
-    '''
+    """
 
     def __init__(self, in_dim: int, hidden_dim: int):
         # pylint: disable=C0116
@@ -196,7 +196,6 @@ class TimeStepEmbedder(nn.Module):
         scale: float = 1,
         max_period: int = 10000,
     ):
-
         super().__init__()
 
         self.time_proj = Timesteps(

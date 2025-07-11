@@ -22,6 +22,9 @@ from pathlib import Path
 from typing import Any, Dict, List, Optional, Set
 
 import torch
+from safetensors.torch import load_file
+from torch.nn.modules.module import _IncompatibleKeys
+
 from cosmos1.models.autoregressive.configs.base.model import ModelConfig
 from cosmos1.models.autoregressive.configs.base.tokenizer import TokenizerConfig
 from cosmos1.models.autoregressive.modules.mm_projector import MultimodalProjector
@@ -35,8 +38,6 @@ from cosmos1.models.autoregressive.utils.checkpoint import (
 )
 from cosmos1.models.autoregressive.utils.sampling import decode_n_tokens, decode_one_token, prefill
 from cosmos1.utils import log, misc
-from safetensors.torch import load_file
-from torch.nn.modules.module import _IncompatibleKeys
 
 
 class AutoRegressiveModel(torch.nn.Module):
@@ -194,18 +195,16 @@ class AutoRegressiveModel(torch.nn.Module):
                 checkpoints = sorted(Path(ckpt_dir).glob("*.pth"))
 
             assert len(checkpoints) > 0, f"no checkpoint files found in {ckpt_dir}"
-            assert (
-                len(checkpoints) == 1
-            ), f"multiple checkpoint files found in {ckpt_dir} (currently only one is supported)"
+            assert len(checkpoints) == 1, (
+                f"multiple checkpoint files found in {ckpt_dir} (currently only one is supported)"
+            )
             ckpt_path = str(checkpoints[0])  # Assuming single checkpoint for non-parallel case
 
             if os.path.exists(Path(ckpt_dir) / "config.json"):
                 with open(Path(ckpt_dir) / "config.json", "r") as f:
                     config_params = json.loads(f.read())
             else:
-                log.info(
-                    f"No params.json found in the checkpoint directory ({ckpt_dir}). " f"Using default model config."
-                )
+                log.info(f"No params.json found in the checkpoint directory ({ckpt_dir}). Using default model config.")
 
         else:
             # If ckpt_path is provided, we load the model from the specified path,
@@ -255,9 +254,9 @@ class AutoRegressiveModel(torch.nn.Module):
                 log.debug("Using fine-tuned mm_projector")
                 projector_checkpoint = get_partial_state_dict(llm_checkpoint, prefix="mm_projector.")
                 projector_checkpoint = process_state_dict(projector_checkpoint, prefix_to_remove="mm_projector.")
-            assert (
-                len(vit_checkpoint) > 0 and len(projector_checkpoint) > 0
-            ), "vit_checkpoint and projector_checkpoint cannot be empty. We do not support random initialization for vision_encoder and mm_projector."
+            assert len(vit_checkpoint) > 0 and len(projector_checkpoint) > 0, (
+                "vit_checkpoint and projector_checkpoint cannot be empty. We do not support random initialization for vision_encoder and mm_projector."
+            )
 
         tokenizer = DiscreteMultimodalTokenizer(tokenizer_config)
         orig_precision = torch.get_default_dtype()
@@ -272,9 +271,9 @@ class AutoRegressiveModel(torch.nn.Module):
         model_kwargs = {}
 
         if model_config.vision_encoder is not None:
-            assert (
-                model_config.mm_projector is not None
-            ), "mm_projector must be provided if vision_encoder is provided."
+            assert model_config.mm_projector is not None, (
+                "mm_projector must be provided if vision_encoder is provided."
+            )
             vit_config = get_vit_config(model_config.vision_encoder)
             vision_encoder = VisionTransformer.build(
                 vit_config,
@@ -420,20 +419,20 @@ class AutoRegressiveModel(torch.nn.Module):
         if context_mask is not None:
             context_mask = context_mask.to(dtype=torch.bool)
             if context_mask.ndim == 2:
-                assert (
-                    context_mask.shape[0] == batch_size
-                ), f"batch_size mismatch: {context_mask.shape[0]} != {batch_size}"
+                assert context_mask.shape[0] == batch_size, (
+                    f"batch_size mismatch: {context_mask.shape[0]} != {batch_size}"
+                )
                 # Unsqueeze it to make it of shape [batch_size, 1, 1, context_seq_len]
                 context_mask = context_mask.view(batch_size, 1, 1, -1)
 
         if num_gen_seq > 1:
-            assert (
-                batch_size == 1
-            ), f"num_gen_seq > 1 is only supported for a single prompt, got {len(prompt_tokens)} prompts"
+            assert batch_size == 1, (
+                f"num_gen_seq > 1 is only supported for a single prompt, got {len(prompt_tokens)} prompts"
+            )
             log.debug(f"Generating {num_gen_seq} sequences with the same prompt")
-            assert (
-                num_gen_seq <= params.max_batch_size
-            ), f"num_gen_seq={num_gen_seq} exceeds max_batch_size={params.max_batch_size}"
+            assert num_gen_seq <= params.max_batch_size, (
+                f"num_gen_seq={num_gen_seq} exceeds max_batch_size={params.max_batch_size}"
+            )
             # repeat the prompt tokens for num_gen_seq times
             prompt_tokens = prompt_tokens.repeat(num_gen_seq, 1)
             assert prompt_tokens.shape == (
@@ -562,9 +561,9 @@ class AutoRegressiveModel(torch.nn.Module):
 
         # Validate dimensions
         assert D_txt == D_img, f"Text features dim {D_txt} should be equal to image features dim {D_img}"
-        assert (
-            N_total == N_txt + N_img * N_patch
-        ), f"seq_len {seq_len} should be equal to N_txt + N_img*N_Patch {(N_txt, N_img * N_patch, image_locations.sum().item())}"
+        assert N_total == N_txt + N_img * N_patch, (
+            f"seq_len {seq_len} should be equal to N_txt + N_img*N_Patch {(N_txt, N_img * N_patch, image_locations.sum().item())}"
+        )
 
         # Combine text and image features
         combined_features = torch.empty(

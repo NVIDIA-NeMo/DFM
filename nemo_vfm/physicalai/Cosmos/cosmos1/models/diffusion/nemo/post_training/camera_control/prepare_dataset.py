@@ -32,14 +32,13 @@ from cosmos1.models.diffusion.nemo.post_training.prepare_dataset import create_c
 from cosmos1.utils import log
 from einops import rearrange
 from huggingface_hub import snapshot_download
-from tqdm import tqdm
-from transformers import T5EncoderModel, T5TokenizerFast
-
 from nemo.collections.diffusion.data.camera_ctrl_utils import (
     estimate_pose_list_to_plucker_embedding,
     normalize_camera_trajectory_to_unit_sphere,
 )
 from nemo.collections.diffusion.models.model import DiT7BCameraCtrlConfig
+from tqdm import tqdm
+from transformers import T5EncoderModel, T5TokenizerFast
 
 
 def get_parser():

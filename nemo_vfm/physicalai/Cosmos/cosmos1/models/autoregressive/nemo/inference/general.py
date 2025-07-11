@@ -21,6 +21,7 @@ from argparse import ArgumentParser
 from typing import List
 
 import imageio
+import nemo.lightning as nl
 import numpy as np
 import torch
 from cosmos1.models.autoregressive.nemo.utils import run_diffusion_decoder_model
@@ -35,11 +36,10 @@ from megatron.core.inference.engines.mcore_engine import MCoreEngine
 from megatron.core.inference.text_generation_controllers.simple_text_generation_controller import (
     SimpleTextGenerationController,
 )
-
-import nemo.lightning as nl
 from nemo.collections.llm.inference.base import _setup_trainer_and_restore_model
 from nemo.lightning import io
 from nemo.lightning.ckpt_utils import ckpt_to_context_subdir
+
 
 torch._C._jit_set_texpr_fuser_enabled(False)
 

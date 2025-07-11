@@ -22,7 +22,6 @@ from typing import Any, Optional
 import einops
 import numpy as np
 import torch
-
 from cosmos1.models.common.base_world_generation_pipeline import BaseWorldGenerationPipeline
 from cosmos1.models.diffusion.inference.inference_utils import (
     generate_world_from_text,
@@ -53,6 +52,7 @@ from cosmos1.models.diffusion.prompt_upsampler.video2world_prompt_upsampler_infe
     run_chat_completion as run_chat_completion_vlm,
 )
 from cosmos1.utils import log
+
 
 MODEL_NAME_DICT = {
     "Cosmos-1.0-Diffusion-7B-Text2World": "Cosmos_1_0_Diffusion_Text2World_7B",

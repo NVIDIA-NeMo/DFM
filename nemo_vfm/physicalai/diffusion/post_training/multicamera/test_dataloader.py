@@ -18,7 +18,7 @@ from nemo.collections.physicalai.datasets.dataverse_dataset.driving_dataloader.a
 )
 
 
-if __name__ == '__main__':
+if __name__ == "__main__":
     d = DrivingVideoDataLoader(
         dataset=get_driving_dataset(
             dataset_name="alpamayo_v2_traj_qwen_24fps_6_cameras_frame_repeat",

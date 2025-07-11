@@ -37,7 +37,6 @@ from megatron.core.transformer.transformer_block import TransformerConfig
 from megatron.core.transformer.transformer_config import TransformerConfig
 from megatron.core.transformer.transformer_layer import TransformerLayer, TransformerLayerSubmodules
 from megatron.core.utils import make_viewless_tensor
-
 from nemo.collections.diffusion.models.dit.dit_layer_spec import AdaLN
 
 
@@ -109,7 +108,7 @@ class MoviegGenLayer(TransformerLayer):
         attention_output, _ = self.self_attention(
             pre_full_attn_layernorm_output_ada,
             attention_mask=None,
-            packed_seq_params=None if packed_seq_params is None else packed_seq_params['self_attention'],
+            packed_seq_params=None if packed_seq_params is None else packed_seq_params["self_attention"],
         )
 
         hidden_states = self.adaLN.scale_add(residual=hidden_states, x=attention_output, gate=gate_full)
@@ -119,7 +118,7 @@ class MoviegGenLayer(TransformerLayer):
             hidden_states,
             attention_mask=context_mask,
             key_value_states=context,
-            packed_seq_params=None if packed_seq_params is None else packed_seq_params['cross_attention'],
+            packed_seq_params=None if packed_seq_params is None else packed_seq_params["cross_attention"],
         )
 
         # ******************************************** mlp ******************************************************

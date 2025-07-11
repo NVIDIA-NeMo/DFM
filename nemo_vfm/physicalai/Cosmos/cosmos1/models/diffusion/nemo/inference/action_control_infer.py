@@ -30,6 +30,7 @@ from nemo.collections.diffusion.models.model import (
 )
 from nemo.collections.diffusion.sampler.cosmos.cosmos_extended_diffusion_pipeline import ExtendedDiffusionPipeline
 
+
 DEFAULT_AUGMENT_SIGMA_LIST = 0.001
 
 

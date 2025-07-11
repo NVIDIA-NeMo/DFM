@@ -18,9 +18,8 @@ import logging
 from typing import Any, Dict, Literal
 
 from megatron.energon import DefaultTaskEncoder, get_train_dataset
-from pytorch_lightning.utilities.types import EVAL_DATALOADERS
-
 from nemo.collections.multimodal.data.energon.base import EnergonMultiModalDataModule
+from pytorch_lightning.utilities.types import EVAL_DATALOADERS
 
 
 class DiffusionDataModule(EnergonMultiModalDataModule):
@@ -85,7 +84,7 @@ class DiffusionDataModule(EnergonMultiModalDataModule):
         )
         self.use_train_split_for_val = use_train_split_for_val
 
-    def datasets_provider(self, worker_config, split: Literal['train', 'val'] = 'val'):
+    def datasets_provider(self, worker_config, split: Literal["train", "val"] = "val"):
         """
         Provide the dataset for training or validation.
 
@@ -99,10 +98,10 @@ class DiffusionDataModule(EnergonMultiModalDataModule):
         Returns:
         Dataset: The dataset configured for the specified split.
         """
-        if split not in {'train', 'val'}:
+        if split not in {"train", "val"}:
             raise ValueError("Invalid value for split. Allowed values are 'train' or 'val'.")
         if self.use_train_split_for_val:
-            split = 'train'
+            split = "train"
         _dataset = get_train_dataset(
             self.path,
             batch_size=self.micro_batch_size,

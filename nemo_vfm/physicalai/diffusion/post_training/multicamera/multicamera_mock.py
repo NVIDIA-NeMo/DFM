@@ -19,7 +19,6 @@ import os
 import nemo_run as run
 import torch
 from huggingface_hub import snapshot_download
-
 from nemo.collections import llm
 from nemo.collections.diffusion.datamodule import DiTDataModule
 from nemo.collections.diffusion.train import pretrain

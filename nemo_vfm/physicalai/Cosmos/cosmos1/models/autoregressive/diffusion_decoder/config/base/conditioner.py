@@ -19,7 +19,6 @@ from dataclasses import dataclass
 from typing import Dict, Optional
 
 import torch
-
 from cosmos1.models.diffusion.conditioner import BaseVideoCondition, GeneralConditioner
 from cosmos1.models.diffusion.config.base.conditioner import (
     FPSConfig,

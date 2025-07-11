@@ -15,7 +15,8 @@
 
 # pylint: disable=C0115,C0116,C0301
 
-"""The network definition for discrete video tokenizer with VQ, LFQ, FSQ or ResidualFSQ. """
+"""The network definition for discrete video tokenizer with VQ, LFQ, FSQ or ResidualFSQ."""
+
 from collections import OrderedDict, namedtuple
 
 import torch
@@ -24,6 +25,7 @@ from cosmos1.models.tokenizer.modules.layers3d import CausalConv3d
 from cosmos1.models.tokenizer.modules.quantizers import InvQuantizerJit
 from loguru import logger as logging
 from torch import nn
+
 
 NetworkEval = namedtuple("NetworkEval", ["reconstructions", "quant_loss", "quant_info"])
 

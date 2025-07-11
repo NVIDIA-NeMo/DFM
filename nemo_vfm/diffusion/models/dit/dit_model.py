@@ -29,13 +29,12 @@ from megatron.core.transformer.enums import ModelType
 from megatron.core.transformer.transformer_block import TransformerBlock
 from megatron.core.transformer.transformer_config import TransformerConfig
 from megatron.core.utils import make_sharded_tensor_for_checkpoint
-from torch import Tensor
-
 from nemo.collections.diffusion.models.dit import dit_embeddings
 from nemo.collections.diffusion.models.dit.dit_embeddings import ParallelTimestepEmbedding
 from nemo.collections.diffusion.models.dit.dit_layer_spec import (
     get_dit_adaln_block_with_transformer_engine_spec as DiTLayerWithAdaLNspec,
 )
+from torch import Tensor
 
 
 def modulate(x, shift, scale):
@@ -152,7 +151,7 @@ class DiTCrossAttentionModel(VisionModule):
         self.position_embedding_type = position_embedding_type
         self.share_embeddings_and_output_weights = False
         self.concat_padding_mask = True
-        self.pos_emb_cls = 'sincos'
+        self.pos_emb_cls = "sincos"
         self.patch_spatial = patch_spatial
         self.patch_temporal = patch_temporal
 
@@ -235,7 +234,7 @@ class DiTCrossAttentionModel(VisionModule):
         """
         B = x.shape[0]
         fps = kwargs.get(
-            'fps',
+            "fps",
             torch.tensor(
                 [
                     30,
@@ -271,7 +270,7 @@ class DiTCrossAttentionModel(VisionModule):
         fps_B_D = nn.functional.pad(fps_B_D, (0, self.config.hidden_size - fps_B_D.shape[1]))
         affline_emb_B_D += fps_B_D
 
-        crossattn_emb = rearrange(crossattn_emb, 'B S D -> S B D')
+        crossattn_emb = rearrange(crossattn_emb, "B S D -> S B D")
 
         if self.config.sequence_parallel:
             if self.pre_process:
@@ -319,11 +318,11 @@ class DiTCrossAttentionModel(VisionModule):
         if not isinstance(input_tensor, list):
             input_tensor = [input_tensor]
 
-        assert len(input_tensor) == 1, 'input_tensor should only be length 1 for gpt/bert'
+        assert len(input_tensor) == 1, "input_tensor should only be length 1 for gpt/bert"
         self.decoder.set_input_tensor(input_tensor[0])
 
     def sharded_state_dict(
-        self, prefix: str = 'module.', sharded_offsets: tuple = (), metadata: Optional[Dict] = None
+        self, prefix: str = "module.", sharded_offsets: tuple = (), metadata: Optional[Dict] = None
     ) -> ShardedStateDict:
         """Sharded state dict implementation for GPTModel backward-compatibility (removing extra state).
 
@@ -337,9 +336,9 @@ class DiTCrossAttentionModel(VisionModule):
         """
         sharded_state_dict = super().sharded_state_dict(prefix, sharded_offsets, metadata)
 
-        for module in ['t_embedder']:
+        for module in ["t_embedder"]:
             for param_name, param in getattr(self, module).named_parameters():
-                weight_key = f'{prefix}{module}.{param_name}'
+                weight_key = f"{prefix}{module}.{param_name}"
                 self._set_embedder_weights_replica_id(param, sharded_state_dict, weight_key)
         return sharded_state_dict
 

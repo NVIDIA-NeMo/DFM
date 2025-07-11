@@ -19,9 +19,10 @@ from collections import defaultdict
 from typing import Optional
 
 import torch
+from einops import rearrange
+
 from cosmos1.models.autoregressive.configs.base.tokenizer import TokenizerConfig
 from cosmos1.utils.lazy_config import instantiate as lazy_instantiate
-from einops import rearrange
 
 
 def update_vocab_size(
@@ -204,9 +205,9 @@ class DiscreteMultimodalTokenizer:
             else:
                 for i in range(batch_size):
                     video_tokens.append(indices[i].tolist())
-                    assert (
-                        len(video_tokens[-1]) == self.tokenizer_config.video_tokenizer.max_seq_len
-                    ), f"Expected {self.tokenizer_config.video_tokenizer.max_seq_len} tokens, got {len(video_tokens[-1])}; video shape: {videos.shape}"
+                    assert len(video_tokens[-1]) == self.tokenizer_config.video_tokenizer.max_seq_len, (
+                        f"Expected {self.tokenizer_config.video_tokenizer.max_seq_len} tokens, got {len(video_tokens[-1])}; video shape: {videos.shape}"
+                    )
 
         return video_tokens
 
@@ -245,9 +246,9 @@ class DiscreteMultimodalTokenizer:
                 max_visual_seq_len = max_visual_seq_len + 1
             else:
                 pass
-            assert (
-                max_visual_seq_len <= self.total_seq_len
-            ), f"max_visual_seq_len ({max_visual_seq_len}) is greater that total sequence length ({self.total_seq_len})"
+            assert max_visual_seq_len <= self.total_seq_len, (
+                f"max_visual_seq_len ({max_visual_seq_len}) is greater that total sequence length ({self.total_seq_len})"
+            )
             max_text_seq_len = self.total_seq_len - max_visual_seq_len
 
         # Tokenize the text

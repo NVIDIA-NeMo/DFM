@@ -181,13 +181,13 @@ class FluxInferencePipeline(nn.Module):
         if do_convert_from_hf:
             ckpt = flux_transformer_converter(ckpt_path, self.transformer.config)
             if save_converted_model_to is not None:
-                save_path = os.path.join(save_converted_model_to, 'nemo_flux_transformer.safetensors')
+                save_path = os.path.join(save_converted_model_to, "nemo_flux_transformer.safetensors")
                 save_safetensors(ckpt, save_path)
-                logging.info(f'saving converted transformer checkpoint to {save_path}')
+                logging.info(f"saving converted transformer checkpoint to {save_path}")
         else:
             ckpt = load_safetensors(ckpt_path)
         missing, unexpected = self.transformer.load_state_dict(ckpt, strict=False)
-        missing = [k for k in missing if not k.endswith('_extra_state')]
+        missing = [k for k in missing if not k.endswith("_extra_state")]
         # These keys are mcore specific and should not affect the model performance
         if len(missing) > 0:
             logging.info(
@@ -203,7 +203,7 @@ class FluxInferencePipeline(nn.Module):
         prompt_embeds: Optional[torch.FloatTensor] = None,
         pooled_prompt_embeds: Optional[torch.FloatTensor] = None,
         max_sequence_length: int = 512,
-        device: Optional[torch.device] = 'cuda',
+        device: Optional[torch.device] = "cuda",
         dtype: Optional[torch.dtype] = torch.float,
     ):
         """
@@ -240,7 +240,7 @@ class FluxInferencePipeline(nn.Module):
             batch_size = prompt_embeds.shape[0]
         else:
             raise ValueError("Either prompt or prompt_embeds must be provided.")
-        if device == 'cuda' and self.t5_encoder.device != device:
+        if device == "cuda" and self.t5_encoder.device != device:
             self.t5_encoder.to(device)
         if prompt_embeds is None:
             prompt_embeds = self.t5_encoder(prompt, max_sequence_length=max_sequence_length)
@@ -248,7 +248,7 @@ class FluxInferencePipeline(nn.Module):
         prompt_embeds = prompt_embeds.repeat(1, num_images_per_prompt, 1)
         prompt_embeds = prompt_embeds.view(batch_size * num_images_per_prompt, seq_len, -1).to(dtype=dtype)
 
-        if device == 'cuda' and self.clip_encoder.device != device:
+        if device == "cuda" and self.clip_encoder.device != device:
             self.clip_encoder.to(device)
         if pooled_prompt_embeds is None:
             _, pooled_prompt_embeds = self.clip_encoder(prompt)
@@ -430,9 +430,9 @@ class FluxInferencePipeline(nn.Module):
         device,
         dtype,
     ):
-        '''
+        """
         Create random latents using a random generator or a list of generators.
-        '''
+        """
         if isinstance(generator, list):
             shape = (1,) + shape[1:]
             latents = [
@@ -459,9 +459,9 @@ class FluxInferencePipeline(nn.Module):
 
     @staticmethod
     def torch_to_numpy(images):
-        '''
+        """
         Convert a torch image or a batch of images to a numpy image.
-        '''
+        """
         numpy_images = images.float().cpu().permute(0, 2, 3, 1).numpy()
         return numpy_images
 
@@ -485,7 +485,7 @@ class FluxInferencePipeline(nn.Module):
         pooled_prompt_embeds: Optional[torch.FloatTensor] = None,
         output_type: Optional[str] = "pil",
         max_sequence_length: int = 512,
-        device: torch.device = 'cuda',
+        device: torch.device = "cuda",
         dtype: torch.dtype = torch.float32,
         save_to_disk: bool = True,
         offload: bool = False,
@@ -553,7 +553,7 @@ class FluxInferencePipeline(nn.Module):
               providing flexibility for different usage scenarios.
             - If `save_to_disk` is enabled, images will be saved with a filename derived from the prompt text.
         """
-        assert device == 'cuda', 'Transformer blocks in Mcore must run on cuda devices'
+        assert device == "cuda", "Transformer blocks in Mcore must run on cuda devices"
 
         if prompt is not None and isinstance(prompt, str):
             batch_size = 1
@@ -576,8 +576,8 @@ class FluxInferencePipeline(nn.Module):
             dtype=dtype,
         )
         if offload:
-            self.t5_encoder.to('cpu')
-            self.clip_encoder.to('cpu')
+            self.t5_encoder.to("cpu")
+            self.clip_encoder.to("cpu")
             torch.cuda.empty_cache()
 
         # prepare image latents
@@ -600,7 +600,7 @@ class FluxInferencePipeline(nn.Module):
         self.scheduler.set_timesteps(sigmas=sigmas, device=device, mu=mu)
         timesteps = self.scheduler.timesteps
 
-        if device == 'cuda' and device != self.device:
+        if device == "cuda" and device != self.device:
             self.transformer.to(device)
         with torch.no_grad():
             for i, t in tqdm(enumerate(timesteps)):
@@ -609,7 +609,7 @@ class FluxInferencePipeline(nn.Module):
                     guidance = torch.tensor([guidance_scale], device=device).expand(latents.shape[1])
                 else:
                     guidance = None
-                with torch.autocast(device_type='cuda', dtype=latents.dtype):
+                with torch.autocast(device_type="cuda", dtype=latents.dtype):
                     pred = self.transformer(
                         img=latents,
                         txt=prompt_embeds,
@@ -621,29 +621,29 @@ class FluxInferencePipeline(nn.Module):
                     )
                     latents = self.scheduler.step(pred, t, latents)[0]
             if offload:
-                self.transformer.to('cpu')
+                self.transformer.to("cpu")
                 torch.cuda.empty_cache()
 
             if output_type == "latent":
                 return latents.transpose(0, 1)
             elif output_type == "pil":
                 latents = self._unpack_latents(latents.transpose(0, 1), height, width, self.vae_scale_factor)
-                if device == 'cuda' and device != self.device:
+                if device == "cuda" and device != self.device:
                     self.vae.to(device)
-                with torch.autocast(device_type='cuda', dtype=latents.dtype):
+                with torch.autocast(device_type="cuda", dtype=latents.dtype):
                     image = self.vae.decode(latents)
                 if offload:
-                    self.vae.to('cpu')
+                    self.vae.to("cpu")
                     torch.cuda.empty_cache()
                 image = FluxInferencePipeline.denormalize(image)
                 image = FluxInferencePipeline.torch_to_numpy(image)
                 image = FluxInferencePipeline.numpy_to_pil(image)
         if save_to_disk:
-            print('Saving to disk')
+            print("Saving to disk")
             assert len(image) == int(len(prompt) * num_images_per_prompt)
-            prompt = [p[:40] + f'_{idx}' for p in prompt for idx in range(num_images_per_prompt)]
+            prompt = [p[:40] + f"_{idx}" for p in prompt for idx in range(num_images_per_prompt)]
             for file_name, image in zip(prompt, image):
-                image.save(f'{file_name}.png')
+                image.save(f"{file_name}.png")
 
         return image
 
@@ -660,9 +660,9 @@ class FluxControlNetInferencePipeline(FluxInferencePipeline):
         scheduler_steps: int = 1000,
         flux_controlnet: FluxControlNet = None,
     ):
-        '''
+        """
         Flux Contronlnet inference pipeline initializes controlnet component in addition to a normal flux pipeline.
-        '''
+        """
         super().__init__(
             params,
             flux,
@@ -676,25 +676,25 @@ class FluxControlNetInferencePipeline(FluxInferencePipeline):
     def load_from_pretrained(
         self, flux_ckpt_path, controlnet_ckpt_path, do_convert_from_hf=True, save_converted_model_to=None
     ):
-        '''
+        """
         Converts both flux base model and flux controlnet ckpt into NeMo format.
-        '''
+        """
         if do_convert_from_hf:
             flux_ckpt = flux_transformer_converter(flux_ckpt_path, self.transformer.config)
             flux_controlnet_ckpt = flux_transformer_converter(controlnet_ckpt_path, self.flux_controlnet.config)
 
             if save_converted_model_to is not None:
-                save_path = os.path.join(save_converted_model_to, 'nemo_flux_transformer.safetensors')
+                save_path = os.path.join(save_converted_model_to, "nemo_flux_transformer.safetensors")
                 save_safetensors(flux_ckpt, save_path)
-                logging.info(f'saving converted transformer checkpoint to {save_path}')
-                save_path = os.path.join(save_converted_model_to, 'nemo_flux_controlnet_transformer.safetensors')
+                logging.info(f"saving converted transformer checkpoint to {save_path}")
+                save_path = os.path.join(save_converted_model_to, "nemo_flux_controlnet_transformer.safetensors")
                 save_safetensors(flux_controlnet_ckpt, save_path)
-                logging.info(f'saving converted transformer checkpoint to {save_path}')
+                logging.info(f"saving converted transformer checkpoint to {save_path}")
         else:
             flux_ckpt = load_safetensors(flux_ckpt_path)
             flux_controlnet_ckpt = load_safetensors(controlnet_ckpt_path)
         missing, unexpected = self.transformer.load_state_dict(flux_ckpt, strict=False)
-        missing = [k for k in missing if not k.endswith('_extra_state')]
+        missing = [k for k in missing if not k.endswith("_extra_state")]
         # These keys are mcore specific and should not affect the model performance
         if len(missing) > 0:
             logging.info(
@@ -704,7 +704,7 @@ class FluxControlNetInferencePipeline(FluxInferencePipeline):
             logging.info(f"Found unexepected keys: \n {unexpected}")
 
         missing, unexpected = self.flux_controlnet.load_state_dict(flux_controlnet_ckpt, strict=False)
-        missing = [k for k in missing if not k.endswith('_extra_state')]
+        missing = [k for k in missing if not k.endswith("_extra_state")]
         # These keys are mcore specific and should not affect the model performance
         if len(missing) > 0:
             logging.info(
@@ -714,9 +714,9 @@ class FluxControlNetInferencePipeline(FluxInferencePipeline):
             logging.info(f"Found unexepected keys: \n {unexpected}")
 
     def pil_to_numpy(self, images):
-        '''
+        """
         PIL image to numpy array
-        '''
+        """
         if not isinstance(images, list):
             images = [images]
         images = [np.array(image).astype(np.float32) / 255.0 for image in images]
@@ -725,9 +725,9 @@ class FluxControlNetInferencePipeline(FluxInferencePipeline):
         return images
 
     def numpy_to_pt(self, images: np.ndarray) -> torch.Tensor:
-        '''
+        """
         Convert numpy image into torch tensors
-        '''
+        """
         if images.ndim == 3:
             images = images[..., None]
 
@@ -744,9 +744,9 @@ class FluxControlNetInferencePipeline(FluxInferencePipeline):
         device,
         dtype,
     ):
-        '''
+        """
         Preprocess image into torch tensor, also duplicate by batch size.
-        '''
+        """
         if isinstance(images, torch.Tensor):
             pass
         else:
@@ -782,7 +782,7 @@ class FluxControlNetInferencePipeline(FluxInferencePipeline):
         pooled_prompt_embeds: Optional[torch.FloatTensor] = None,
         output_type: Optional[str] = "pil",
         max_sequence_length: int = 512,
-        device: torch.device = 'cuda',
+        device: torch.device = "cuda",
         dtype: torch.dtype = torch.float32,
         save_to_disk: bool = True,
         offload: bool = False,
@@ -863,7 +863,7 @@ class FluxControlNetInferencePipeline(FluxInferencePipeline):
               generation process.
             - If `save_to_disk` is enabled, images will be saved with a filename derived from the prompt text.
         """
-        assert device == 'cuda', 'Transformer blocks in Mcore must run on cuda devices'
+        assert device == "cuda", "Transformer blocks in Mcore must run on cuda devices"
 
         if prompt is not None and isinstance(prompt, str):
             batch_size = 1
@@ -886,8 +886,8 @@ class FluxControlNetInferencePipeline(FluxInferencePipeline):
             dtype=dtype,
         )
         if offload:
-            self.t5_encoder.to('cpu')
-            self.clip_encoder.to('cpu')
+            self.t5_encoder.to("cpu")
+            self.clip_encoder.to("cpu")
             torch.cuda.empty_cache()
 
         # prepare image latents
@@ -923,7 +923,7 @@ class FluxControlNetInferencePipeline(FluxInferencePipeline):
 
         height, width = control_image.shape[-2:]
         if self.flux_controlnet.input_hint_block is None:
-            if device == 'cuda' and self.device != device:
+            if device == "cuda" and self.device != device:
                 self.vae.to(device)
             with torch.no_grad():
                 control_image = self.vae.encode(control_image).to(dtype=dtype)
@@ -943,7 +943,7 @@ class FluxControlNetInferencePipeline(FluxInferencePipeline):
                 1.0
                 - float(i / len(timesteps) < control_guidance_start or (i + 1) / len(timesteps) > control_guidance_end)
             )
-        if device == 'cuda' and device != self.device:
+        if device == "cuda" and device != self.device:
             self.transformer.to(device)
             self.flux_controlnet.to(device)
         with torch.no_grad():
@@ -956,7 +956,7 @@ class FluxControlNetInferencePipeline(FluxInferencePipeline):
 
                 conditioning_scale = controlnet_keep[i] * controlnet_conditioning_scale
 
-                with torch.autocast(device_type='cuda', dtype=latents.dtype):
+                with torch.autocast(device_type="cuda", dtype=latents.dtype):
                     controlnet_double_block_samples, controlnet_single_block_samples = self.flux_controlnet(
                         img=latents,
                         controlnet_cond=control_image,
@@ -981,29 +981,29 @@ class FluxControlNetInferencePipeline(FluxInferencePipeline):
                     )
                     latents = self.scheduler.step(pred, t, latents)[0]
             if offload:
-                self.transformer.to('cpu')
+                self.transformer.to("cpu")
                 torch.cuda.empty_cache()
 
             if output_type == "latent":
                 return latents.transpose(0, 1)
             elif output_type == "pil":
                 latents = self._unpack_latents(latents.transpose(0, 1), height, width, self.vae_scale_factor)
-                if device == 'cuda' and device != self.device:
+                if device == "cuda" and device != self.device:
                     self.vae.to(device)
-                with torch.autocast(device_type='cuda', dtype=latents.dtype):
+                with torch.autocast(device_type="cuda", dtype=latents.dtype):
                     image = self.vae.decode(latents)
                 if offload:
-                    self.vae.to('cpu')
+                    self.vae.to("cpu")
                     torch.cuda.empty_cache()
                 image = FluxInferencePipeline.denormalize(image)
                 image = FluxInferencePipeline.torch_to_numpy(image)
                 image = FluxInferencePipeline.numpy_to_pil(image)
         if save_to_disk:
-            print('Saving to disk')
+            print("Saving to disk")
             assert len(image) == int(len(prompt) * num_images_per_prompt)
-            prompt = [p[:40] + f'_{idx}' for p in prompt for idx in range(num_images_per_prompt)]
+            prompt = [p[:40] + f"_{idx}" for p in prompt for idx in range(num_images_per_prompt)]
             for file_name, image in zip(prompt, image):
-                image.save(f'{file_name}.png')
+                image.save(f"{file_name}.png")
 
         return image
 

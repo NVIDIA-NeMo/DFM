@@ -365,16 +365,16 @@ class BasePretrainedVideoTokenizer(ABC):
         Rearranges the input state tensor to the required shape for encoding video data. Mainly for chunk based encoding
         """
         B, C, T, H, W = state.shape
-        assert (
-            T % self.pixel_chunk_duration == 0
-        ), f"Temporal dimension {T} is not divisible by chunk_length {self.pixel_chunk_duration}"
+        assert T % self.pixel_chunk_duration == 0, (
+            f"Temporal dimension {T} is not divisible by chunk_length {self.pixel_chunk_duration}"
+        )
         return rearrange(state, "b c (n t) h w -> (b n) c t h w", t=self.pixel_chunk_duration)
 
     def transform_decode_state_shape(self, latent: torch.Tensor) -> torch.Tensor:
         B, _, T, _, _ = latent.shape
-        assert (
-            T % self.latent_chunk_duration == 0
-        ), f"Temporal dimension {T} is not divisible by chunk_length {self.latent_chunk_duration}"
+        assert T % self.latent_chunk_duration == 0, (
+            f"Temporal dimension {T} is not divisible by chunk_length {self.latent_chunk_duration}"
+        )
         return rearrange(latent, "b c (n t) h w -> (b n) c t h w", t=self.latent_chunk_duration)
 
     @torch.no_grad()
@@ -453,17 +453,17 @@ class BasePretrainedVideoTokenizer(ABC):
     def get_latent_num_frames(self, num_pixel_frames: int) -> int:
         if num_pixel_frames == 1:
             return 1
-        assert (
-            num_pixel_frames % self.pixel_chunk_duration == 0
-        ), f"Temporal dimension {num_pixel_frames} is not divisible by chunk_length {self.pixel_chunk_duration}"
+        assert num_pixel_frames % self.pixel_chunk_duration == 0, (
+            f"Temporal dimension {num_pixel_frames} is not divisible by chunk_length {self.pixel_chunk_duration}"
+        )
         return num_pixel_frames // self.pixel_chunk_duration * self.latent_chunk_duration
 
     def get_pixel_num_frames(self, num_latent_frames: int) -> int:
         if num_latent_frames == 1:
             return 1
-        assert (
-            num_latent_frames % self.latent_chunk_duration == 0
-        ), f"Temporal dimension {num_latent_frames} is not divisible by chunk_length {self.latent_chunk_duration}"
+        assert num_latent_frames % self.latent_chunk_duration == 0, (
+            f"Temporal dimension {num_latent_frames} is not divisible by chunk_length {self.latent_chunk_duration}"
+        )
         return num_latent_frames // self.latent_chunk_duration * self.pixel_chunk_duration
 
 
@@ -598,9 +598,9 @@ class JointImageVideoSharedJITTokenizer(JointImageVideoTokenizer):
     def __init__(self, image_vae: Module, video_vae: Module, name: str, latent_ch: int = 16):
         super().__init__(image_vae, video_vae, name, latent_ch, squeeze_for_image=False)
         assert isinstance(image_vae, JITVAE)
-        assert isinstance(
-            video_vae, VideoJITTokenizer
-        ), f"video_vae should be an instance of VideoJITVAE, got {type(video_vae)}"
+        assert isinstance(video_vae, VideoJITTokenizer), (
+            f"video_vae should be an instance of VideoJITVAE, got {type(video_vae)}"
+        )
         # a hack to make the image_vae and video_vae share the same encoder and decoder
 
     def load_weights(self, vae_dir: str):

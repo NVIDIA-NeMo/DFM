@@ -365,7 +365,7 @@ class FThetaCamera:
             # If we're here, then it means we can parse the rig successfully.
             poly = props["polynomial"]
         else:
-            raise ValueError("Unable to parse the rig. " f"Only FTheta rigs are supported! Rig:\n{rig_dict}")
+            raise ValueError(f"Unable to parse the rig. Only FTheta rigs are supported! Rig:\n{rig_dict}")
 
         bw_poly = [np.float32(val) for val in poly.split()]
         return cx, cy, width, height, bw_poly

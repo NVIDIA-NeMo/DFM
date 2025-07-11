@@ -28,9 +28,9 @@ class AutoencoderKLVAE(torch.nn.Module):
     def decode(self, x):
         B, C, T, H, W = x.shape
         if T == 1:
-            x = rearrange(x, 'b c t h w -> (b t) c h w')
+            x = rearrange(x, "b c t h w -> (b t) c h w")
         x = x / self.vae.config.scaling_factor
         out = self.vae.decode(x, return_dict=False)[0]
         if T == 1:
-            return rearrange(out, '(b t) c h w -> b c t h w', t=1)
+            return rearrange(out, "(b t) c h w -> b c t h w", t=1)
         return out

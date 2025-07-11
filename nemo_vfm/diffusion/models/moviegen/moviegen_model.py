@@ -23,10 +23,9 @@ from einops import rearrange
 from megatron.core import tensor_parallel
 from megatron.core.packed_seq_params import PackedSeqParams
 from megatron.core.transformer.transformer_config import TransformerConfig
-from torch import Tensor
-
 from nemo.collections.diffusion.models.dit.dit_model import DiTCrossAttentionModel
 from nemo.collections.diffusion.models.dit_llama.dit_llama_layer_spec import get_dit_llama_spec
+from torch import Tensor
 
 
 class TransposedLinear(nn.Module):
@@ -97,7 +96,7 @@ class DiTLlamaModel(DiTCrossAttentionModel):
         """
         B = x.shape[0]
         fps = kwargs.get(
-            'fps',
+            "fps",
             torch.tensor(
                 [
                     30,
@@ -124,7 +123,7 @@ class DiTLlamaModel(DiTCrossAttentionModel):
         fps_B_D = nn.functional.pad(fps_B_D, (0, self.config.hidden_size - fps_B_D.shape[1]))
         affline_emb_B_D += fps_B_D
 
-        crossattn_emb = rearrange(crossattn_emb, 'B S D -> S B D')
+        crossattn_emb = rearrange(crossattn_emb, "B S D -> S B D")
 
         if self.config.sequence_parallel:
             if self.pre_process:
@@ -169,5 +168,5 @@ class DiTLlamaModel(DiTCrossAttentionModel):
         if not isinstance(input_tensor, list):
             input_tensor = [input_tensor]
 
-        assert len(input_tensor) == 1, 'input_tensor should only be length 1 for gpt/bert'
+        assert len(input_tensor) == 1, "input_tensor should only be length 1 for gpt/bert"
         self.decoder.set_input_tensor(input_tensor[0])

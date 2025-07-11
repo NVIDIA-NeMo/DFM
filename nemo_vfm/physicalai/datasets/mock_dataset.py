@@ -20,6 +20,7 @@ from typing import Any, Callable, Dict
 import torch
 from torch.utils.data import Dataset
 
+
 MAX_LENGTH = 1 << 15
 
 

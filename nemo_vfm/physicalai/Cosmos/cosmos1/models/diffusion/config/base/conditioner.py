@@ -19,7 +19,6 @@ from typing import Dict, List, Optional
 
 import attrs
 import torch
-
 from cosmos1.models.diffusion.conditioner import BaseConditionEntry, TextAttr, VideoConditioner, VideoExtendConditioner
 from cosmos1.utils.lazy_config import LazyCall as L
 from cosmos1.utils.lazy_config import LazyDict

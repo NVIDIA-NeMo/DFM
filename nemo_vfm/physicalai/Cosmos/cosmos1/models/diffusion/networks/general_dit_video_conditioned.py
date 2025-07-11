@@ -144,9 +144,9 @@ class VideoExtendGeneralDIT(GeneralDIT):
             condition_video_augment_sigma: (B, T) tensor of sigma value for the conditional input augmentation
         """
         del kwargs
-        assert isinstance(
-            data_type, DataType
-        ), f"Expected DataType, got {type(data_type)}. We need discuss this flag later."
+        assert isinstance(data_type, DataType), (
+            f"Expected DataType, got {type(data_type)}. We need discuss this flag later."
+        )
         original_shape = x.shape
         x_B_T_H_W_D, rope_emb_L_1_1_D, extra_pos_emb_B_T_H_W_D_or_T_H_W_B_D = self.prepare_embedded_sequence(
             x,

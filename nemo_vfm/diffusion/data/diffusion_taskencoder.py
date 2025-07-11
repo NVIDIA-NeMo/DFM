@@ -19,7 +19,6 @@ import torch.nn.functional as F
 from einops import rearrange
 from megatron.energon import DefaultTaskEncoder, SkipSample
 from megatron.energon.task_encoder.cooking import Cooker, basic_sample_keys
-
 from nemo.lightning.io.mixin import IOMixin
 
 
@@ -39,9 +38,9 @@ def cook(sample: dict) -> dict:
     """
     return dict(
         **basic_sample_keys(sample),
-        json=sample['.json'],
-        pth=sample['.pth'],
-        pickle=sample['.pickle'],
+        json=sample[".json"],
+        pth=sample[".pth"],
+        pickle=sample[".pickle"],
     )
 
 
@@ -87,14 +86,14 @@ class BasicDiffusionTaskEncoder(DefaultTaskEncoder, IOMixin):
         self.patch_temporal = patch_temporal
 
     def encode_sample(self, sample: dict) -> dict:
-        video_latent = sample['pth']
+        video_latent = sample["pth"]
 
         if torch.isnan(video_latent).any() or torch.isinf(video_latent).any():
             raise SkipSample()
         if torch.max(torch.abs(video_latent)) > 1e3:
             raise SkipSample()
 
-        info = sample['json']
+        info = sample["json"]
         C, T, H, W = video_latent.shape
         seq_len = (
             video_latent.shape[-1]
@@ -120,16 +119,16 @@ class BasicDiffusionTaskEncoder(DefaultTaskEncoder, IOMixin):
 
         video_latent = rearrange(
             video_latent,
-            'C (T pt) (H ph) (W pw) -> (T H W) (ph pw pt C)',
+            "C (T pt) (H ph) (W pw) -> (T H W) (ph pw pt C)",
             ph=self.patch_spatial,
             pw=self.patch_spatial,
             pt=self.patch_temporal,
         )
 
         if is_image:
-            t5_text_embeddings = torch.from_numpy(sample['pickle']).to(torch.bfloat16)
+            t5_text_embeddings = torch.from_numpy(sample["pickle"]).to(torch.bfloat16)
         else:
-            t5_text_embeddings = torch.from_numpy(sample['pickle'][0]).to(torch.bfloat16)
+            t5_text_embeddings = torch.from_numpy(sample["pickle"][0]).to(torch.bfloat16)
         t5_text_embeddings_seq_length = t5_text_embeddings.shape[0]
 
         if t5_text_embeddings_seq_length > self.text_embedding_padding_size:
@@ -147,18 +146,18 @@ class BasicDiffusionTaskEncoder(DefaultTaskEncoder, IOMixin):
         t5_text_mask = torch.ones(t5_text_embeddings_seq_length, dtype=torch.bfloat16)
 
         if is_image:
-            h, w = info['image_height'], info['image_width']
+            h, w = info["image_height"], info["image_width"]
             fps = torch.tensor([30] * 1, dtype=torch.bfloat16)
             num_frames = torch.tensor([1] * 1, dtype=torch.bfloat16)
         else:
-            h, w = info['height'], info['width']
-            fps = torch.tensor([info['framerate']] * 1, dtype=torch.bfloat16)
-            num_frames = torch.tensor([info['num_frames']] * 1, dtype=torch.bfloat16)
+            h, w = info["height"], info["width"]
+            fps = torch.tensor([info["framerate"]] * 1, dtype=torch.bfloat16)
+            num_frames = torch.tensor([info["num_frames"]] * 1, dtype=torch.bfloat16)
         image_size = torch.tensor([[h, w, h, w]] * 1, dtype=torch.bfloat16)
 
         pos_ids = rearrange(
             pos_id_3d.get_pos_id_3d(t=T // self.patch_temporal, h=H // self.patch_spatial, w=W // self.patch_spatial),
-            'T H W d -> (T H W) d',
+            "T H W d -> (T H W) d",
         )
 
         if self.seq_length is not None:
@@ -194,9 +193,9 @@ class PosID3D:
     def generate_pos_id(self):
         self.grid = torch.stack(
             torch.meshgrid(
-                torch.arange(self.max_t, device='cpu'),
-                torch.arange(self.max_h, device='cpu'),
-                torch.arange(self.max_w, device='cpu'),
+                torch.arange(self.max_t, device="cpu"),
+                torch.arange(self.max_h, device="cpu"),
+                torch.arange(self.max_w, device="cpu"),
             ),
             dim=-1,
         )
@@ -229,16 +228,16 @@ def cook_raw_iamges(sample: dict) -> dict:
     """
     return dict(
         **basic_sample_keys(sample),
-        images=sample['jpg'],
-        hint=sample['png'],
-        txt=sample['txt'],
+        images=sample["jpg"],
+        hint=sample["png"],
+        txt=sample["txt"],
     )
 
 
 class RawImageDiffusionTaskEncoder(DefaultTaskEncoder, IOMixin):
-    '''
+    """
     Dummy task encoder takes raw image input on CrudeDataset.
-    '''
+    """
 
     cookers = [
         # Cooker(cook),

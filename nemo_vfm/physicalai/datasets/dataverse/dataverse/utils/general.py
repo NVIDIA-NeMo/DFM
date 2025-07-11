@@ -16,11 +16,13 @@ import importlib
 import logging
 
 import numpy as np
-from dataverse.datasets.base import BaseDataset
 from omegaconf.dictconfig import DictConfig
 from rich.console import Console
 from rich.logging import RichHandler
 from rich.table import Table
+
+from dataverse.datasets.base import BaseDataset
+
 
 try:
     import torch

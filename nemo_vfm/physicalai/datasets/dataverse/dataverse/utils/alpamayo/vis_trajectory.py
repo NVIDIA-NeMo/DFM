@@ -22,6 +22,7 @@ import numpy as np
 import torch
 from matplotlib.axes import Axes
 
+
 # Used for different predicted trajectories
 # It comes from [rgb_to_hex(k) for k in plotly.colors.qualitative.Set3]
 TRAJ_MODE_COLOR_MAP: Final[list[str]] = [

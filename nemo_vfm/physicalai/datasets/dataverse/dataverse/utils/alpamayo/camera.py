@@ -331,9 +331,9 @@ def get_center_and_ray(pose, intr, image_size):
         center_3D (tensor [HW,3]/[B,HW,3]): Center of the camera.
         ray (tensor [HW,3]/[B,HW,3]): Ray of the camera with depth=1 (note: not unit ray).
     """
-    assert (
-        pose.dtype == torch.float32 and intr.dtype == torch.float32
-    ), f"pose and intr should be float32, got {pose.dtype} and {intr.dtype}"
+    assert pose.dtype == torch.float32 and intr.dtype == torch.float32, (
+        f"pose and intr should be float32, got {pose.dtype} and {intr.dtype}"
+    )
 
     H, W = image_size
     # Given the intrinsic/extrinsic matrices, get the camera center and ray directions.
@@ -389,9 +389,9 @@ def get_3D_points_from_dist(
     Returns:
         torch.tensor: [..., 3] or [..., N_samples, 3]
     """
-    assert torch.allclose(
-        ray_unit.norm(dim=-1), torch.ones_like(ray_unit.norm(dim=-1))
-    ), f"ray_unit norm is not equal to 1, max {ray_unit.norm(dim=-1).max()} min {ray_unit.norm(dim=-1).min()}"
+    assert torch.allclose(ray_unit.norm(dim=-1), torch.ones_like(ray_unit.norm(dim=-1))), (
+        f"ray_unit norm is not equal to 1, max {ray_unit.norm(dim=-1).max()} min {ray_unit.norm(dim=-1).min()}"
+    )
     if multiple_samples_per_ray:
         assert len(dist.shape) == len(center.shape) + 1
         center, ray_unit = center[..., None, :], ray_unit[..., None, :]  # [...,1,3]
@@ -634,9 +634,9 @@ def dist_to_pointcloud(dist: torch.tensor, intr: torch.tensor, extr: torch.tenso
         pc_dist (torch.tensor): [HW,3]
     """
 
-    assert (
-        len(dist.shape) == len(intr.shape) + 1
-    ), f"dist ({dist.shape}) and intr ({intr.shape}) should have the same batch size"
+    assert len(dist.shape) == len(intr.shape) + 1, (
+        f"dist ({dist.shape}) and intr ({intr.shape}) should have the same batch size"
+    )
     # convert dist to pointcloud
     center, ray = get_center_and_ray(extr, intr, dist.shape[-2:])
     ray = ray / ray.norm(dim=-1, keepdim=True)

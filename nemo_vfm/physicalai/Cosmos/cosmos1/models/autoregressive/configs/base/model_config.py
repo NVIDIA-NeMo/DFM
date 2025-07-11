@@ -30,6 +30,7 @@ from cosmos1.models.autoregressive.tokenizer.text_tokenizer import TextTokenizer
 from cosmos1.utils import log
 from cosmos1.utils.lazy_config import LazyCall as L
 
+
 # Common architecture specifications
 BASE_CONFIG = {"n_kv_heads": 8, "norm_type": "rmsnorm", "norm_eps": 1e-5, "ffn_hidden_size": 14336}
 COSMOS_ARCHITECTURES = {
@@ -338,16 +339,16 @@ def create_video2world_model_config(
     Returns:
         dict: A dictionary containing the model configuration representing the model object, can be instantiated.
     """
-    assert (
-        pixel_chunk_duration % compression_ratio[0] == 1
-    ), f"pixel_chunk_duration({pixel_chunk_duration}) should be k*n + 1 (k={compression_ratio[0]})"
+    assert pixel_chunk_duration % compression_ratio[0] == 1, (
+        f"pixel_chunk_duration({pixel_chunk_duration}) should be k*n + 1 (k={compression_ratio[0]})"
+    )
     latent_chunk_duration = (pixel_chunk_duration - 1) // compression_ratio[0] + 1
     latent_height = video_height // compression_ratio[1]
     latent_width = video_width // compression_ratio[2]
     # Do some math to compute the video latent shape and sequence length
-    assert (
-        num_video_frames % pixel_chunk_duration == 0
-    ), f"num_video_frames {num_video_frames} should be divisible by pixel_chunk_duration {pixel_chunk_duration}"
+    assert num_video_frames % pixel_chunk_duration == 0, (
+        f"num_video_frames {num_video_frames} should be divisible by pixel_chunk_duration {pixel_chunk_duration}"
+    )
     video_latent_shape = [
         num_video_frames // pixel_chunk_duration * latent_chunk_duration,
         latent_height,

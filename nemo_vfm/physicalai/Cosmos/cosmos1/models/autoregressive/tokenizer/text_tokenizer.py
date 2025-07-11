@@ -19,8 +19,9 @@ from typing import Any, Dict, List, Optional, Union
 
 import numpy as np
 import torch
-from cosmos1.utils import log
 from transformers import AutoTokenizer
+
+from cosmos1.utils import log
 
 
 def get_tokenizer_path(model_family: str, is_instruct_model: bool = False):

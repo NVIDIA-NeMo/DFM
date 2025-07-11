@@ -28,6 +28,7 @@ from megatron.core.tensor_parallel.random import model_parallel_cuda_manual_seed
 from nemo import lightning as nl
 from nemo.lightning.megatron_parallel import MegatronParallel
 
+
 MegatronParallel.init_ddp = lambda self: None
 from cosmos1.models.diffusion.conditioner import DataType
 from cosmos1.models.diffusion.inference.inference_utils import read_video_or_image_into_frames_BCTHW
@@ -46,6 +47,7 @@ from nemo.collections.diffusion.sampler.conditioner_configs import (
     VideoCondBoolConfig,
 )
 from nemo.collections.diffusion.sampler.cosmos.cosmos_control_diffusion_pipeline import CosmosControlDiffusionPipeline
+
 
 EXAMPLE_PROMPT = (
     "The teal robot is cooking food in a kitchen. Steam rises from a simmering pot "
@@ -216,12 +218,12 @@ def create_condition_latent_from_input_frames(tokenizer, input_frames, num_frame
     B, C, T, H, W = input_frames.shape
     num_frames_encode = tokenizer.pixel_chunk_duration
 
-    assert (
-        input_frames.shape[2] >= num_frames_condition
-    ), f"input_frames not enough for condition, require at least {num_frames_condition}, get {input_frames.shape[2]}, {input_frames.shape}"
-    assert (
-        num_frames_encode >= num_frames_condition
-    ), f"num_frames_encode should be larger than num_frames_condition, get {num_frames_encode}, {num_frames_condition}"
+    assert input_frames.shape[2] >= num_frames_condition, (
+        f"input_frames not enough for condition, require at least {num_frames_condition}, get {input_frames.shape[2]}, {input_frames.shape}"
+    )
+    assert num_frames_encode >= num_frames_condition, (
+        f"num_frames_encode should be larger than num_frames_condition, get {num_frames_encode}, {num_frames_condition}"
+    )
 
     # Put the conditioal frames to the begining of the video, and pad the end with zero
     condition_frames = input_frames[:, :, -num_frames_condition:]
@@ -370,9 +372,7 @@ def compute_num_latent_frames(tokenizer, num_input_frames: int, downsample_facto
     if num_input_frames % tokenizer.video_vae.latent_chunk_duration == 1:
         num_latent_frames += 1
     elif num_input_frames % tokenizer.video_vae.latent_chunk_duration > 1:
-        assert (
-            num_input_frames % tokenizer.video_vae.pixel_chunk_duration - 1
-        ) % downsample_factor == 0, (
+        assert (num_input_frames % tokenizer.video_vae.pixel_chunk_duration - 1) % downsample_factor == 0, (
             f"num_input_frames % tokenizer.video_vae.pixel_chunk_duration - 1 must be divisible by {downsample_factor}"
         )
         num_latent_frames += 1 + (num_input_frames % tokenizer.video_vae.pixel_chunk_duration - 1) // downsample_factor

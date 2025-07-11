@@ -20,7 +20,6 @@ import torch
 from lightning.pytorch.callbacks.callback import Callback
 from megatron.core.distributed import DistributedDataParallelConfig
 from megatron.core.optimizer import OptimizerConfig
-
 from nemo import lightning as nl
 from nemo.collections.diffusion.data.diffusion_mock_datamodule import MockDataModule
 from nemo.collections.diffusion.models.flux.model import FluxModelParams, MegatronFluxModel
@@ -28,6 +27,7 @@ from nemo.collections.llm.api import pretrain
 from nemo.collections.llm.recipes.log.default import default_log, tensorboard_logger
 from nemo.collections.llm.recipes.precision.mixed_precision import bf16_mixed
 from nemo.utils.exp_manager import TimingCallback
+
 
 NAME = "flux_12b"
 
@@ -114,7 +114,7 @@ def trainer(
         ddp=run.Config(
             DistributedDataParallelConfig,
             use_custom_fsdp=True,
-            data_parallel_sharding_strategy='optim_grads_params',
+            data_parallel_sharding_strategy="optim_grads_params",
             check_for_nan_in_grad=True,
             grad_reduce_in_fp32=True,
             overlap_grad_reduce=True,

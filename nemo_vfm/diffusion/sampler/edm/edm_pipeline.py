@@ -18,11 +18,10 @@ import numpy as np
 import torch
 import torch.distributed
 from megatron.core import parallel_state
-from torch import Tensor
-
 from nemo.collections.diffusion.sampler.batch_ops import batch_mul
 from nemo.collections.diffusion.sampler.context_parallel import cat_outputs_cp
 from nemo.collections.diffusion.sampler.edm.edm import EDMSDE, EDMSampler, EDMScaling
+from torch import Tensor
 
 
 class EDMPipeline:
@@ -127,10 +126,10 @@ class EDMPipeline:
         self.sampler = EDMSampler()
         self.scaling = EDMScaling(sigma_data)
 
-        self.input_data_key = 'video'
-        self.input_image_key = 'images_1024'
+        self.input_data_key = "video"
+        self.input_image_key = "images_1024"
         self.tensor_kwargs = {"device": "cuda", "dtype": torch.bfloat16}
-        self.loss_reduce = 'mean'
+        self.loss_reduce = "mean"
         self.loss_scale = 1.0
 
     @property
@@ -156,7 +155,7 @@ class EDMPipeline:
         """
         noise_seed = self.seed + 100 * parallel_state.get_data_parallel_rank(with_context_parallel=True)
         noise_level_seed = self.seed + 100 * parallel_state.get_data_parallel_rank(with_context_parallel=False)
-        self._noise_generator = torch.Generator(device='cuda')
+        self._noise_generator = torch.Generator(device="cuda")
         self._noise_generator.manual_seed(noise_seed)
         self._noise_level_generator = np.random.default_rng(noise_level_seed)
         self.sde._generator = self._noise_level_generator
@@ -297,8 +296,8 @@ class EDMPipeline:
         """Returns conditioning and unconditioning for classifier-free guidance."""
         _, _, condition = self.get_data_and_condition(data_batch, dropout_rate=0.0)
 
-        if 'neg_t5_text_embeddings' in data_batch:
-            data_batch['t5_text_embeddings'] = data_batch['neg_t5_text_embeddings']
+        if "neg_t5_text_embeddings" in data_batch:
+            data_batch["t5_text_embeddings"] = data_batch["neg_t5_text_embeddings"]
             data_batch["t5_text_mask"] = data_batch["neg_t5_text_mask"]
             _, _, uncondition = self.get_data_and_condition(data_batch, dropout_rate=1.0)
         else:
@@ -426,8 +425,8 @@ class EDMPipeline:
         latent_state = raw_state
 
         # Condition
-        data_batch['crossattn_emb'] = self.random_dropout_input(
-            data_batch['t5_text_embeddings'], dropout_rate=dropout_rate
+        data_batch["crossattn_emb"] = self.random_dropout_input(
+            data_batch["t5_text_embeddings"], dropout_rate=dropout_rate
         )
 
         return raw_state, latent_state, data_batch

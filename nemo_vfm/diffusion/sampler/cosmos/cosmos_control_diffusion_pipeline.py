@@ -21,11 +21,10 @@ import numpy as np
 import torch
 import torch.distributed
 from megatron.core import parallel_state
-from torch import Tensor
-
 from nemo.collections.diffusion.sampler.context_parallel import cat_outputs_cp, split_inputs_cp
 from nemo.collections.diffusion.sampler.cosmos.cosmos_extended_diffusion_pipeline import ExtendedDiffusionPipeline
 from nemo.collections.diffusion.sampler.res.res_sampler import COMMON_SOLVER_OPTIONS
+from torch import Tensor
 
 
 class CosmosControlDiffusionPipeline(ExtendedDiffusionPipeline):
@@ -170,7 +169,7 @@ class CosmosControlDiffusionPipeline(ExtendedDiffusionPipeline):
 
         cp_enabled = parallel_state.get_context_parallel_world_size() > 1
         condition_latent = torch.zeros_like(x_sigma_max)
-        data_batch['condition_latent'] = condition_latent
+        data_batch["condition_latent"] = condition_latent
         x0_fn = self.get_x0_fn_from_batch_with_condition_latent(
             data_batch,
             guidance,

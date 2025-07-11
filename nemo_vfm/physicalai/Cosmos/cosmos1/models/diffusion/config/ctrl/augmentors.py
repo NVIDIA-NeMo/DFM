@@ -22,6 +22,7 @@ from cosmos1.models.diffusion.config.ctrl.blurs import (
 )
 from cosmos1.utils.lazy_config import LazyCall as L
 
+
 # predefined BilateralFilterConfig with different strength level
 NoFilterConfig = L(BilateralFilterConfig)(use_random=False, d=1, sigma_color=1, sigma_space=1, iter=1)
 

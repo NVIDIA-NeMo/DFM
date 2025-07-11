@@ -18,7 +18,6 @@
 from typing import Any, List
 
 import attrs
-
 from cosmos1.models.diffusion.config.base.model import DefaultModelConfig
 from cosmos1.models.diffusion.config.registry import register_configs
 from cosmos1.utils import config
