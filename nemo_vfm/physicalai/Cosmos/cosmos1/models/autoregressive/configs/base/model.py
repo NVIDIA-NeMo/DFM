@@ -19,7 +19,7 @@ from typing import Optional
 
 import attrs
 
-from cosmos1.models.autoregressive.configs.base.tokenizer import TokenizerConfig
+from nemo_vfm.physicalai.Cosmos.cosmos1.models.autoregressive.configs.base.tokenizer import TokenizerConfig
 
 
 @attrs.define

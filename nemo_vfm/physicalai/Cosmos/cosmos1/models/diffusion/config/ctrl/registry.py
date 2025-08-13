@@ -16,12 +16,12 @@
 # pylint: disable=C0115,C0116,C0301
 
 import cosmos1.models.diffusion.config.registry as base_registry
-from cosmos1.models.diffusion.config.ctrl.conditioner import (
+from nemo_vfm.physicalai.Cosmos.cosmos1.models.diffusion.config.ctrl.conditioner import (
     CTRL_HINT_KEYS,
     BaseVideoConditionerWithCtrlConfig,
     VideoConditionerFpsSizePaddingWithCtrlConfig,
 )
-from cosmos1.models.diffusion.config.ctrl.net_ctrl import FADITV2_14B_EncoderConfig, FADITV2EncoderConfig
+from nemo_vfm.physicalai.Cosmos.cosmos1.models.diffusion.config.ctrl.net_ctrl import FADITV2_14B_EncoderConfig, FADITV2EncoderConfig
 from hydra.core.config_store import ConfigStore
 
 

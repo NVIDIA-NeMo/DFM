@@ -18,7 +18,7 @@
 from typing import Any
 
 import torch
-from cosmos1.models.autoregressive.modules.embedding import SinCosPosEmbAxisTE
+from nemo_vfm.physicalai.Cosmos.cosmos1.models.autoregressive.modules.embedding import SinCosPosEmbAxisTE
 from megatron.core import tensor_parallel
 from megatron.core.inference.model_inference_wrappers.gpt.gpt_inference_wrapper import GPTInferenceWrapper
 from megatron.core.inference.model_inference_wrappers.inference_wrapper_config import InferenceWrapperConfig

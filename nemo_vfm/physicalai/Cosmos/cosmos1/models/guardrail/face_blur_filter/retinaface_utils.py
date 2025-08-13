@@ -19,7 +19,7 @@ import numpy as np
 import torch
 from pytorch_retinaface.utils.nms.py_cpu_nms import py_cpu_nms
 
-from cosmos1.utils import log
+from nemo_vfm.physicalai.Cosmos.cosmos1.utils import log
 
 
 # Adapted from https://github.com/biubug6/Pytorch_Retinaface/blob/master/detect.py

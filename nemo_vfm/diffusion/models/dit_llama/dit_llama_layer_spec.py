@@ -37,7 +37,7 @@ from megatron.core.transformer.transformer_block import TransformerConfig
 from megatron.core.transformer.transformer_config import TransformerConfig
 from megatron.core.transformer.transformer_layer import TransformerLayer, TransformerLayerSubmodules
 from megatron.core.utils import make_viewless_tensor
-from nemo.collections.diffusion.models.dit.dit_layer_spec import AdaLN
+from nemo_vfm.diffusion.models.dit.dit_layer_spec import AdaLN
 
 
 class MoviegGenLayer(TransformerLayer):

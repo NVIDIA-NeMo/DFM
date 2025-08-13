@@ -15,7 +15,7 @@
 
 """The default image and video tokenizer configs."""
 
-from cosmos1.models.tokenizer.modules import (
+from nemo_vfm.physicalai.Cosmos.cosmos1.models.tokenizer.modules import (
     ContinuousFormulation,
     Decoder3DType,
     DecoderType,

@@ -109,7 +109,7 @@ Here we demonstrate a step by step example of how to prepare a dummy image datas
 
 .. code-block:: bash
 
-    torchrun --nproc-per-node 2 nemo/collections/diffusion/data/prepare_energon_dataset.py --factory prepare_dummy_image_dataset
+    torchrun --nproc-per-node 2 nemo_vfm/diffusion/data/prepare_energon_dataset_butterfly.py --factory prepare_dummy_image_dataset
 
 this will generate a folder a tar files. .pth contains image/video latent representations encode by image/video tokenizer, .json contains metadata including text caption, resolution, aspection ratio, and .pickle contains text embeddings encoded by language model like T5.
 

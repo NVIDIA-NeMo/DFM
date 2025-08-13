@@ -43,7 +43,7 @@ from megatron.core.transformer.transformer_block import TransformerConfig
 from megatron.core.transformer.transformer_config import TransformerConfig
 from megatron.core.transformer.transformer_layer import TransformerLayer, TransformerLayerSubmodules
 from megatron.core.utils import make_viewless_tensor
-from nemo.collections.diffusion.models.dit.dit_attention import (
+from nemo_vfm.diffusion.models.dit.dit_attention import (
     FluxSingleAttention,
     JointSelfAttention,
     JointSelfAttentionSubmodules,
@@ -109,17 +109,15 @@ class AdaLN(MegatronModule):
     def forward(self, timestep_emb):
         return self.adaLN_modulation(timestep_emb).chunk(self.n_adaln_chunks, dim=-1)
 
-    @jit_fuser
     def modulate(self, x, shift, scale):
         return x * (1 + scale) + shift
 
-    @jit_fuser
     def scale_add(self, residual, x, gate):
         return residual + gate * x
 
-    @jit_fuser
     def modulated_layernorm(self, x, shift, scale):
         # Optional Input Layer norm
+        # import pdb; pdb.set_trace()
         input_layernorm_output = self.ln(x).type_as(x)
 
         # DiT block specific
@@ -280,6 +278,7 @@ class STDiTLayerWithAdaLN(TransformerLayer):
             scale=scale_ca,
         )
 
+        #import pdb; pdb.set_trace()
         attention_output, _ = self.cross_attention(
             pre_cross_attn_layernorm_output_ada,
             attention_mask=context_mask,
@@ -390,8 +389,12 @@ class DiTLayerWithAdaLN(TransformerLayer):
         context=None,
         context_mask=None,
         rotary_pos_emb=None,
+        rotary_pos_cos=None,
+        rotary_pos_sin=None,
+        attention_bias=None,
         inference_params=None,
         packed_seq_params=None,
+        sequence_len_offset=None,
     ):
         # timestep embedding
         timestep_emb = attention_mask
@@ -403,6 +406,8 @@ class DiTLayerWithAdaLN(TransformerLayer):
             )
         else:
             shift_full, scale_full, gate_full, shift_mlp, scale_mlp, gate_mlp = self.adaLN(timestep_emb)
+
+        # import pdb; pdb.set_trace()
 
         # adaLN with scale + shift
         pre_full_attn_layernorm_output_ada = self.adaLN.modulated_layernorm(
@@ -425,7 +430,7 @@ class DiTLayerWithAdaLN(TransformerLayer):
                 shift=shift_ca,
                 scale=scale_ca,
             )
-
+            #import pdb; pdb.set_trace()
             attention_output, _ = self.cross_attention(
                 pre_cross_attn_layernorm_output_ada,
                 attention_mask=context_mask,

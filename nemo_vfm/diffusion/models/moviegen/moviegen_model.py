@@ -23,8 +23,8 @@ from einops import rearrange
 from megatron.core import tensor_parallel
 from megatron.core.packed_seq_params import PackedSeqParams
 from megatron.core.transformer.transformer_config import TransformerConfig
-from nemo.collections.diffusion.models.dit.dit_model import DiTCrossAttentionModel
-from nemo.collections.diffusion.models.dit_llama.dit_llama_layer_spec import get_dit_llama_spec
+from nemo_vfm.diffusion.models.dit.dit_model import DiTCrossAttentionModel
+from nemo_vfm.diffusion.models.dit_llama.dit_llama_layer_spec import get_dit_llama_spec
 from torch import Tensor
 
 

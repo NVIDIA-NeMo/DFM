@@ -24,11 +24,11 @@ import imageio
 import nemo.lightning as nl
 import numpy as np
 import torch
-from cosmos1.models.autoregressive.nemo.utils import run_diffusion_decoder_model
-from cosmos1.models.autoregressive.tokenizer.discrete_video import DiscreteVideoFSQJITTokenizer
-from cosmos1.models.autoregressive.utils.inference import load_vision_input
-from cosmos1.models.guardrail.common import presets as guardrail_presets
-from cosmos1.utils import log
+from nemo_vfm.physicalai.Cosmos.cosmos1.models.autoregressive.nemo.utils import run_diffusion_decoder_model
+from nemo_vfm.physicalai.Cosmos.cosmos1.models.autoregressive.tokenizer.discrete_video import DiscreteVideoFSQJITTokenizer
+from nemo_vfm.physicalai.Cosmos.cosmos1.models.autoregressive.utils.inference import load_vision_input
+from nemo_vfm.physicalai.Cosmos.cosmos1.models.guardrail.common import presets as guardrail_presets
+from nemo_vfm.physicalai.Cosmos.cosmos1.utils import log
 from einops import rearrange
 from huggingface_hub import snapshot_download
 from megatron.core.inference.common_inference_params import CommonInferenceParams

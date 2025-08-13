@@ -16,8 +16,8 @@
 
 import numpy as np
 import torch
-from nemo.collections.diffusion.data import camera
-from nemo.collections.diffusion.data.camera import get_center_and_ray
+from nemo_vfm.diffusion.data import camera
+from nemo_vfm.diffusion.data.camera import get_center_and_ray
 
 
 def plucker_coordinates(pose: torch.tensor, intr: torch.tensor, width: int, height: int):

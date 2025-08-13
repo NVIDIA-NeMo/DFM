@@ -19,7 +19,7 @@ from typing import Optional, Tuple
 
 import torch
 
-from cosmos1.models.autoregressive.networks.transformer import Transformer
+from nemo_vfm.physicalai.Cosmos.cosmos1.models.autoregressive.networks.transformer import Transformer
 
 
 def sample_top_p(logits, temperature, top_p, return_probs: bool = False):

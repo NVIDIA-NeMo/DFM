@@ -18,7 +18,7 @@
 from typing import List
 
 import attrs
-from cosmos1.utils.lazy_config import LazyDict
+from nemo_vfm.physicalai.Cosmos.cosmos1.utils.lazy_config import LazyDict
 
 
 @attrs.define(slots=False)

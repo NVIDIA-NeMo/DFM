@@ -20,8 +20,8 @@ import os
 import nemo_run as run
 from huggingface_hub import snapshot_download
 from nemo.collections import llm
-from nemo.collections.diffusion.models.model import DiT7BConfig, DiT14BConfig
-from nemo.collections.diffusion.train import pretrain, videofolder_datamodule
+from nemo_vfm.diffusion.models.model import DiT7BConfig, DiT14BConfig
+from nemo_vfm.diffusion.train import pretrain, videofolder_datamodule
 from nemo.lightning.pytorch.strategies.utils import RestoreConfig
 
 

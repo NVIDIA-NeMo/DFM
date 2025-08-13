@@ -19,8 +19,8 @@ from typing import Optional
 
 import numpy as np
 import torch
-from cosmos1.models.diffusion.module.attention import normalize
-from cosmos1.models.diffusion.module.timm import trunc_normal_
+from nemo_vfm.physicalai.Cosmos.cosmos1.models.diffusion.module.attention import normalize
+from nemo_vfm.physicalai.Cosmos.cosmos1.models.diffusion.module.timm import trunc_normal_
 from einops import rearrange, repeat
 from torch import nn
 

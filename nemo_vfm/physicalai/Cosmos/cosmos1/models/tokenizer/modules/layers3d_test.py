@@ -25,9 +25,9 @@ import os
 import numpy as np
 import pytest
 import torch
-from cosmos1.models.tokenizer.inference.utils import read_video
-from cosmos1.models.tokenizer.inference.video_lib import CausalVideoTokenizer
-from cosmos1.models.tokenizer.networks import TokenizerConfigs
+from nemo_vfm.physicalai.Cosmos.cosmos1.models.tokenizer.inference.utils import read_video
+from nemo_vfm.physicalai.Cosmos.cosmos1.models.tokenizer.inference.video_lib import CausalVideoTokenizer
+from nemo_vfm.physicalai.Cosmos.cosmos1.models.tokenizer.networks import TokenizerConfigs
 from torchvision.transforms import CenterCrop
 
 

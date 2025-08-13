@@ -21,10 +21,10 @@ import os
 import imageio
 import torch
 
-from cosmos1.models.autoregressive.inference.world_generation_pipeline import ARVideo2WorldGenerationPipeline
-from cosmos1.models.autoregressive.utils.inference import add_common_arguments, load_vision_input, validate_args
-from cosmos1.utils import log
-from cosmos1.utils.io import read_prompts_from_file
+from nemo_vfm.physicalai.Cosmos.cosmos1.models.autoregressive.inference.world_generation_pipeline import ARVideo2WorldGenerationPipeline
+from nemo_vfm.physicalai.Cosmos.cosmos1.models.autoregressive.utils.inference import add_common_arguments, load_vision_input, validate_args
+from nemo_vfm.physicalai.Cosmos.cosmos1.utils import log
+from nemo_vfm.physicalai.Cosmos.cosmos1.utils.io import read_prompts_from_file
 
 
 def parse_args():

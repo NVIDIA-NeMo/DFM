@@ -29,9 +29,9 @@ from megatron.core.transformer.enums import ModelType
 from megatron.core.transformer.transformer_block import TransformerBlock
 from megatron.core.transformer.transformer_config import TransformerConfig
 from megatron.core.utils import make_sharded_tensor_for_checkpoint
-from nemo.collections.diffusion.models.dit import dit_embeddings
-from nemo.collections.diffusion.models.dit.dit_embeddings import ParallelTimestepEmbedding
-from nemo.collections.diffusion.models.dit.dit_layer_spec import (
+from nemo_vfm.diffusion.models.dit import dit_embeddings
+from nemo_vfm.diffusion.models.dit.dit_embeddings import ParallelTimestepEmbedding
+from nemo_vfm.diffusion.models.dit.dit_layer_spec import (
     get_dit_adaln_block_with_transformer_engine_spec as DiTLayerWithAdaLNspec,
 )
 from torch import Tensor
@@ -272,6 +272,8 @@ class DiTCrossAttentionModel(VisionModule):
 
         crossattn_emb = rearrange(crossattn_emb, "B S D -> S B D")
 
+
+        #import pdb; pdb.set_trace()
         if self.config.sequence_parallel:
             if self.pre_process:
                 x_S_B_D = tensor_parallel.scatter_to_sequence_parallel_region(x_S_B_D)

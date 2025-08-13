@@ -19,10 +19,10 @@ from typing import Optional
 
 import attrs
 
-from cosmos1.models.autoregressive.tokenizer.discrete_video import DiscreteVideoFSQStateDictTokenizer
-from cosmos1.models.autoregressive.tokenizer.networks import CausalDiscreteVideoTokenizer
-from cosmos1.utils.lazy_config import LazyCall as L
-from cosmos1.utils.lazy_config import LazyDict
+from nemo_vfm.physicalai.Cosmos.cosmos1.models.autoregressive.tokenizer.discrete_video import DiscreteVideoFSQStateDictTokenizer
+from nemo_vfm.physicalai.Cosmos.cosmos1.models.autoregressive.tokenizer.networks import CausalDiscreteVideoTokenizer
+from nemo_vfm.physicalai.Cosmos.cosmos1.utils.lazy_config import LazyCall as L
+from nemo_vfm.physicalai.Cosmos.cosmos1.utils.lazy_config import LazyDict
 
 
 def create_discrete_video_fsq_tokenizer_state_dict_config(

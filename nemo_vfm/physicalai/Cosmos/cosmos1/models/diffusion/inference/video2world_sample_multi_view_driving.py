@@ -18,12 +18,12 @@ import argparse
 import os
 
 import torch
-from cosmos1.models.diffusion.inference.inference_utils import add_common_arguments, remove_argument, validate_args
-from cosmos1.models.diffusion.inference.world_generation_pipeline import (
+from nemo_vfm.physicalai.Cosmos.cosmos1.models.diffusion.inference.inference_utils import add_common_arguments, remove_argument, validate_args
+from nemo_vfm.physicalai.Cosmos.cosmos1.models.diffusion.inference.world_generation_pipeline import (
     DiffusionVideo2WorldMultiViewGenerationPipeline,
 )
-from cosmos1.utils import log, misc
-from cosmos1.utils.io import save_video
+from nemo_vfm.physicalai.Cosmos.cosmos1.utils import log, misc
+from nemo_vfm.physicalai.Cosmos.cosmos1.utils.io import save_video
 
 
 torch.enable_grad(False)

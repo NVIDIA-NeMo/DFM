@@ -13,9 +13,9 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-from cosmos1.models.diffusion.networks.general_dit_video_conditioned import VideoExtendGeneralDIT
-from cosmos1.utils.lazy_config import LazyCall as L
-from cosmos1.utils.lazy_config import LazyDict
+from nemo_vfm.physicalai.Cosmos.cosmos1.models.diffusion.networks.general_dit_video_conditioned import VideoExtendGeneralDIT
+from nemo_vfm.physicalai.Cosmos.cosmos1.utils.lazy_config import LazyCall as L
+from nemo_vfm.physicalai.Cosmos.cosmos1.utils.lazy_config import LazyDict
 from hydra.core.config_store import ConfigStore
 
 

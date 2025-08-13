@@ -24,7 +24,7 @@ from einops import rearrange
 from megatron.energon import DefaultTaskEncoder
 from nemo import lightning as nl
 from nemo.collections import llm
-from nemo.collections.diffusion.data.diffusion_energon_datamodule import DiffusionDataModule
+from nemo_vfm.diffusion.data.diffusion_energon_datamodule import DiffusionDataModule
 from nemo.collections.physicalai.tokenizer.augmentors import TemporalRandomCrop
 from nemo.collections.physicalai.tokenizer.data.augmentors.image.cropping import RandomCrop
 from nemo.collections.physicalai.tokenizer.data.augmentors.image.normalize import Normalize

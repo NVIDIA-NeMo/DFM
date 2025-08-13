@@ -25,7 +25,7 @@ import numpy as np
 import pycocotools
 import torch
 import torchvision.transforms.functional as transforms_F
-from cosmos1.models.diffusion.config.ctrl.blurs import (
+from nemo_vfm.physicalai.Cosmos.cosmos1.models.diffusion.config.ctrl.blurs import (
     AnisotropicDiffusionConfig,
     BilateralFilterConfig,
     BlurAugmentorConfig,
@@ -34,9 +34,9 @@ from cosmos1.models.diffusion.config.ctrl.blurs import (
     LaplacianOfGaussianConfig,
     MedianBlurConfig,
 )
-from cosmos1.models.diffusion.datasets.augmentors.guided_filter import FastGuidedFilter
-from cosmos1.models.diffusion.datasets.augmentors.human_keypoint_utils import coco_wholebody_133_skeleton
-from cosmos1.utils import log
+from nemo_vfm.physicalai.Cosmos.cosmos1.models.diffusion.datasets.augmentors.guided_filter import FastGuidedFilter
+from nemo_vfm.physicalai.Cosmos.cosmos1.models.diffusion.datasets.augmentors.human_keypoint_utils import coco_wholebody_133_skeleton
+from nemo_vfm.physicalai.Cosmos.cosmos1.utils import log
 
 
 IMAGE_RES_SIZE_INFO: dict[str, tuple[int, int]] = {
@@ -1577,12 +1577,12 @@ class AddControlInputHumanKpts(Augmentor):
 if __name__ == "__main__":
     import sys
 
-    from cosmos1.models.diffusion.config.ctrl.augmentors import (
+    from nemo_vfm.physicalai.Cosmos.cosmos1.models.diffusion.config.ctrl.augmentors import (
         BilateralOnlyBlurAugmentorConfig,
         GaussianOnlyBlurAugmentorConfig,
     )
-    from cosmos1.models.diffusion.inference.demo_video import save_video
-    from cosmos1.models.diffusion.utils.inference_long_video import read_video_or_image_into_frames_BCTHW
+    from nemo_vfm.physicalai.Cosmos.cosmos1.models.diffusion.inference.demo_video import save_video
+    from nemo_vfm.physicalai.Cosmos.cosmos1.models.diffusion.utils.inference_long_video import read_video_or_image_into_frames_BCTHW
 
     path_in = sys.argv[1]
 

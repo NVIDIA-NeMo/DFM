@@ -20,10 +20,10 @@ from pathlib import Path
 
 import matplotlib.pyplot as plt
 import torch
-from cosmos1.models.autoregressive.nemo.inference.general import MockMCoreTokenizer
-from cosmos1.models.autoregressive.nemo.inference.inference_controller import CosmosActionGenerationController
-from cosmos1.models.autoregressive.nemo.post_training.action_control.action_control_dataset import ActionControlDataset
-from cosmos1.models.autoregressive.nemo.post_training.action_control.prepare_dataset import Split, create_tokenizer
+from nemo_vfm.physicalai.Cosmos.cosmos1.models.autoregressive.nemo.inference.general import MockMCoreTokenizer
+from nemo_vfm.physicalai.Cosmos.cosmos1.models.autoregressive.nemo.inference.inference_controller import CosmosActionGenerationController
+from nemo_vfm.physicalai.Cosmos.cosmos1.models.autoregressive.nemo.post_training.action_control.action_control_dataset import ActionControlDataset
+from nemo_vfm.physicalai.Cosmos.cosmos1.models.autoregressive.nemo.post_training.action_control.prepare_dataset import Split, create_tokenizer
 from megatron.core.inference.common_inference_params import CommonInferenceParams
 from megatron.core.inference.engines.mcore_engine import MCoreEngine
 from nemo import lightning as nl

@@ -31,8 +31,8 @@ from megatron.core.packed_seq_params import PackedSeqParams
 from megatron.core.transformer.transformer_block import TransformerBlock
 from megatron.core.transformer.transformer_config import TransformerConfig
 from megatron.core.utils import make_sharded_tensor_for_checkpoint
-from nemo.collections.diffusion.models.dit.action_control.action_control_layers import ActionControlTorchMlp
-from nemo.collections.diffusion.models.dit.cosmos_layer_spec import (
+from nemo_vfm.diffusion.models.dit.action_control.action_control_layers import ActionControlTorchMlp
+from nemo_vfm.diffusion.models.dit.cosmos_layer_spec import (
     get_dit_adaln_block_with_transformer_engine_spec as DiTLayerWithAdaLNspec,
 )
 from torch import Tensor

@@ -22,8 +22,8 @@ from einops import rearrange
 from torch import nn
 from torchvision import transforms
 
-from cosmos1.models.diffusion.module.blocks import PatchEmbed
-from cosmos1.models.diffusion.networks.general_dit import GeneralDIT
+from nemo_vfm.physicalai.Cosmos.cosmos1.models.diffusion.module.blocks import PatchEmbed
+from nemo_vfm.physicalai.Cosmos.cosmos1.models.diffusion.networks.general_dit import GeneralDIT
 
 
 class DiffusionDecoderGeneralDIT(GeneralDIT):

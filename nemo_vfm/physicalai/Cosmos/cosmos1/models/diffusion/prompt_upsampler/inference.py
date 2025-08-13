@@ -18,9 +18,9 @@
 from typing import List, Optional, TypedDict
 
 import torch
-from cosmos1.models.autoregressive.model import AutoRegressiveModel
-from cosmos1.models.autoregressive.tokenizer.image_text_tokenizer import ImageTextTokenizer
-from cosmos1.models.autoregressive.tokenizer.text_tokenizer import TextTokenizer
+from nemo_vfm.physicalai.Cosmos.cosmos1.models.autoregressive.model import AutoRegressiveModel
+from nemo_vfm.physicalai.Cosmos.cosmos1.models.autoregressive.tokenizer.image_text_tokenizer import ImageTextTokenizer
+from nemo_vfm.physicalai.Cosmos.cosmos1.models.autoregressive.tokenizer.text_tokenizer import TextTokenizer
 
 
 class ChatPrediction(TypedDict, total=False):

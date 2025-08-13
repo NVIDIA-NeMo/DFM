@@ -18,11 +18,11 @@
 from typing import Any, List
 
 import attrs
-from cosmos1.models.autoregressive.diffusion_decoder.config.registry import register_configs as register_dd_configs
-from cosmos1.models.diffusion.config.base.model import LatentDiffusionDecoderModelConfig
-from cosmos1.models.diffusion.config.registry import register_configs
-from cosmos1.utils import config
-from cosmos1.utils.config_helper import import_all_modules_from_package
+from nemo_vfm.physicalai.Cosmos.cosmos1.models.autoregressive.diffusion_decoder.config.registry import register_configs as register_dd_configs
+from nemo_vfm.physicalai.Cosmos.cosmos1.models.diffusion.config.base.model import LatentDiffusionDecoderModelConfig
+from nemo_vfm.physicalai.Cosmos.cosmos1.models.diffusion.config.registry import register_configs
+from nemo_vfm.physicalai.Cosmos.cosmos1.utils import config
+from nemo_vfm.physicalai.Cosmos.cosmos1.utils.config_helper import import_all_modules_from_package
 
 
 @attrs.define(slots=False)

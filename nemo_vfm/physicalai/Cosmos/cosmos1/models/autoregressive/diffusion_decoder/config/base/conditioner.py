@@ -19,8 +19,8 @@ from dataclasses import dataclass
 from typing import Dict, Optional
 
 import torch
-from cosmos1.models.diffusion.conditioner import BaseVideoCondition, GeneralConditioner
-from cosmos1.models.diffusion.config.base.conditioner import (
+from nemo_vfm.physicalai.Cosmos.cosmos1.models.diffusion.conditioner import BaseVideoCondition, GeneralConditioner
+from nemo_vfm.physicalai.Cosmos.cosmos1.models.diffusion.config.base.conditioner import (
     FPSConfig,
     ImageSizeConfig,
     LatentConditionConfig,
@@ -29,8 +29,8 @@ from cosmos1.models.diffusion.config.base.conditioner import (
     PaddingMaskConfig,
     TextConfig,
 )
-from cosmos1.utils.lazy_config import LazyCall as L
-from cosmos1.utils.lazy_config import LazyDict
+from nemo_vfm.physicalai.Cosmos.cosmos1.utils.lazy_config import LazyCall as L
+from nemo_vfm.physicalai.Cosmos.cosmos1.utils.lazy_config import LazyDict
 
 
 @dataclass

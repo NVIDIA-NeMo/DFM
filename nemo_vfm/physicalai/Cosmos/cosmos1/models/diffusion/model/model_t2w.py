@@ -18,15 +18,15 @@
 from typing import Callable, Dict, Optional, Tuple
 
 import torch
-from cosmos1.models.diffusion.conditioner import CosmosCondition
-from cosmos1.models.diffusion.diffusion.functional.batch_ops import batch_mul
-from cosmos1.models.diffusion.diffusion.modules.denoiser_scaling import EDMScaling
-from cosmos1.models.diffusion.diffusion.modules.res_sampler import COMMON_SOLVER_OPTIONS, Sampler
-from cosmos1.models.diffusion.diffusion.types import DenoisePrediction
-from cosmos1.models.diffusion.module.blocks import FourierFeatures
-from cosmos1.models.diffusion.module.pretrained_vae import BaseVAE
-from cosmos1.utils import log, misc
-from cosmos1.utils.lazy_config import instantiate as lazy_instantiate
+from nemo_vfm.physicalai.Cosmos.cosmos1.models.diffusion.conditioner import CosmosCondition
+from nemo_vfm.physicalai.Cosmos.cosmos1.models.diffusion.diffusion.functional.batch_ops import batch_mul
+from nemo_vfm.physicalai.Cosmos.cosmos1.models.diffusion.diffusion.modules.denoiser_scaling import EDMScaling
+from nemo_vfm.physicalai.Cosmos.cosmos1.models.diffusion.diffusion.modules.res_sampler import COMMON_SOLVER_OPTIONS, Sampler
+from nemo_vfm.physicalai.Cosmos.cosmos1.models.diffusion.diffusion.types import DenoisePrediction
+from nemo_vfm.physicalai.Cosmos.cosmos1.models.diffusion.module.blocks import FourierFeatures
+from nemo_vfm.physicalai.Cosmos.cosmos1.models.diffusion.module.pretrained_vae import BaseVAE
+from nemo_vfm.physicalai.Cosmos.cosmos1.utils import log, misc
+from nemo_vfm.physicalai.Cosmos.cosmos1.utils.lazy_config import instantiate as lazy_instantiate
 from torch import Tensor
 
 

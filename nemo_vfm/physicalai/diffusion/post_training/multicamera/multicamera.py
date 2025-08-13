@@ -23,7 +23,7 @@ from huggingface_hub import snapshot_download
 from lightning.pytorch.utilities.types import EVAL_DATALOADERS, TRAIN_DATALOADERS
 from nemo import lightning as nl
 from nemo.collections import llm
-from nemo.collections.diffusion.train import pretrain
+from nemo_vfm.diffusion.train import pretrain
 from nemo.collections.llm.gpt.data.mock import MockDataModule
 from nemo.collections.physicalai.datasets.dataverse_dataset.driving_dataloader.alpamayo_dataloader import (
     InfiniteDataVerse,

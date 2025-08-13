@@ -20,9 +20,9 @@ from collections import namedtuple
 import torch
 from torch import nn
 
-from cosmos1.models.autoregressive.tokenizer.modules import CausalConv3d, DecoderFactorized, EncoderFactorized
-from cosmos1.models.autoregressive.tokenizer.quantizers import FSQuantizer
-from cosmos1.utils import log
+from nemo_vfm.physicalai.Cosmos.cosmos1.models.autoregressive.tokenizer.modules import CausalConv3d, DecoderFactorized, EncoderFactorized
+from nemo_vfm.physicalai.Cosmos.cosmos1.models.autoregressive.tokenizer.quantizers import FSQuantizer
+from nemo_vfm.physicalai.Cosmos.cosmos1.utils import log
 
 
 NetworkEval = namedtuple("NetworkEval", ["reconstructions", "quant_loss", "quant_info"])

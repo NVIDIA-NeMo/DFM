@@ -17,30 +17,30 @@
 
 from enum import Enum
 
-from cosmos1.models.tokenizer.networks.configs import continuous_image_8x8 as continuous_image_8x8_dict
-from cosmos1.models.tokenizer.networks.configs import continuous_image_8x8_lowres as continuous_image_8x8_lowres_dict
-from cosmos1.models.tokenizer.networks.configs import continuous_image_16x16 as continuous_image_16x16_dict
-from cosmos1.models.tokenizer.networks.configs import (
+from nemo_vfm.physicalai.Cosmos.cosmos1.models.tokenizer.networks.configs import continuous_image_8x8 as continuous_image_8x8_dict
+from nemo_vfm.physicalai.Cosmos.cosmos1.models.tokenizer.networks.configs import continuous_image_8x8_lowres as continuous_image_8x8_lowres_dict
+from nemo_vfm.physicalai.Cosmos.cosmos1.models.tokenizer.networks.configs import continuous_image_16x16 as continuous_image_16x16_dict
+from nemo_vfm.physicalai.Cosmos.cosmos1.models.tokenizer.networks.configs import (
     continuous_image_16x16_lowres as continuous_image_16x16_lowres_dict,
 )
-from cosmos1.models.tokenizer.networks.configs import continuous_video_4x8x8 as continuous_video_4x8x8_dict
-from cosmos1.models.tokenizer.networks.configs import (
+from nemo_vfm.physicalai.Cosmos.cosmos1.models.tokenizer.networks.configs import continuous_video_4x8x8 as continuous_video_4x8x8_dict
+from nemo_vfm.physicalai.Cosmos.cosmos1.models.tokenizer.networks.configs import (
     continuous_video_4x8x8_lowres as continuous_video_4x8x8_lowres_dict,
 )
-from cosmos1.models.tokenizer.networks.configs import continuous_video_8x8x8 as continuous_video_8x8x8_dict
-from cosmos1.models.tokenizer.networks.configs import continuous_video_8x16x16 as continuous_video_8x16x16_dict
-from cosmos1.models.tokenizer.networks.configs import discrete_image_8x8 as discrete_image_8x8_dict
-from cosmos1.models.tokenizer.networks.configs import discrete_image_8x8_lowres as discrete_image_8x8_lowres_dict
-from cosmos1.models.tokenizer.networks.configs import discrete_image_16x16 as cdiscrete_image_16x16_dict
-from cosmos1.models.tokenizer.networks.configs import discrete_image_16x16_lowres as discrete_image_16x16_lowres_dict
-from cosmos1.models.tokenizer.networks.configs import discrete_video_4x8x8 as discrete_video_4x8x8_dict
-from cosmos1.models.tokenizer.networks.configs import discrete_video_4x8x8_lowres as discrete_video_4x8x8_lowres_dict
-from cosmos1.models.tokenizer.networks.configs import discrete_video_8x8x8 as discrete_video_8x8x8_dict
-from cosmos1.models.tokenizer.networks.configs import discrete_video_8x16x16 as discrete_video_8x16x16_dict
-from cosmos1.models.tokenizer.networks.continuous_image import ContinuousImageTokenizer
-from cosmos1.models.tokenizer.networks.continuous_video import CausalContinuousVideoTokenizer
-from cosmos1.models.tokenizer.networks.discrete_image import DiscreteImageTokenizer
-from cosmos1.models.tokenizer.networks.discrete_video import CausalDiscreteVideoTokenizer
+from nemo_vfm.physicalai.Cosmos.cosmos1.models.tokenizer.networks.configs import continuous_video_8x8x8 as continuous_video_8x8x8_dict
+from nemo_vfm.physicalai.Cosmos.cosmos1.models.tokenizer.networks.configs import continuous_video_8x16x16 as continuous_video_8x16x16_dict
+from nemo_vfm.physicalai.Cosmos.cosmos1.models.tokenizer.networks.configs import discrete_image_8x8 as discrete_image_8x8_dict
+from nemo_vfm.physicalai.Cosmos.cosmos1.models.tokenizer.networks.configs import discrete_image_8x8_lowres as discrete_image_8x8_lowres_dict
+from nemo_vfm.physicalai.Cosmos.cosmos1.models.tokenizer.networks.configs import discrete_image_16x16 as cdiscrete_image_16x16_dict
+from nemo_vfm.physicalai.Cosmos.cosmos1.models.tokenizer.networks.configs import discrete_image_16x16_lowres as discrete_image_16x16_lowres_dict
+from nemo_vfm.physicalai.Cosmos.cosmos1.models.tokenizer.networks.configs import discrete_video_4x8x8 as discrete_video_4x8x8_dict
+from nemo_vfm.physicalai.Cosmos.cosmos1.models.tokenizer.networks.configs import discrete_video_4x8x8_lowres as discrete_video_4x8x8_lowres_dict
+from nemo_vfm.physicalai.Cosmos.cosmos1.models.tokenizer.networks.configs import discrete_video_8x8x8 as discrete_video_8x8x8_dict
+from nemo_vfm.physicalai.Cosmos.cosmos1.models.tokenizer.networks.configs import discrete_video_8x16x16 as discrete_video_8x16x16_dict
+from nemo_vfm.physicalai.Cosmos.cosmos1.models.tokenizer.networks.continuous_image import ContinuousImageTokenizer
+from nemo_vfm.physicalai.Cosmos.cosmos1.models.tokenizer.networks.continuous_video import CausalContinuousVideoTokenizer
+from nemo_vfm.physicalai.Cosmos.cosmos1.models.tokenizer.networks.discrete_image import DiscreteImageTokenizer
+from nemo_vfm.physicalai.Cosmos.cosmos1.models.tokenizer.networks.discrete_video import CausalDiscreteVideoTokenizer
 
 
 class TokenizerConfigs(Enum):

@@ -19,14 +19,14 @@ from typing import Literal
 import huggingface_hub
 import torch
 import typer
-from cosmos1.models.autoregressive.nemo.post_training.action_control.prepare_dataset import (
+from nemo_vfm.physicalai.Cosmos.cosmos1.models.autoregressive.nemo.post_training.action_control.prepare_dataset import (
     Split,
     VideoDataset,
     download_bridge_data,
     get_annotations,
     get_default_output_prefix,
 )
-from nemo.collections.diffusion.vae.video_vae import VideoJITTokenizer
+from nemo_vfm.diffusion.vae.video_vae import VideoJITTokenizer
 from tqdm import tqdm
 
 

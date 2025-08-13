@@ -22,8 +22,8 @@ import numpy as np
 import pytest
 import torch
 from megatron.core import parallel_state
-from nemo.collections.diffusion.data.diffusion_taskencoder import BasicDiffusionTaskEncoder
-from nemo.collections.diffusion.train import multimodal_datamodule
+from nemo_vfm.diffusion.data.diffusion_taskencoder import BasicDiffusionTaskEncoder
+from nemo_vfm.diffusion.train import multimodal_datamodule
 from tqdm import tqdm
 
 

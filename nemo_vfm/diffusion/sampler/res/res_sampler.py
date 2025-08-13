@@ -24,8 +24,8 @@ from typing import Any, Callable, List, Literal, Optional, Tuple, Union
 
 import attrs
 import torch
-from nemo.collections.diffusion.sampler.res.multi_step import get_multi_step_fn, is_multi_step_fn_supported
-from nemo.collections.diffusion.sampler.res.runge_kutta import get_runge_kutta_fn, is_runge_kutta_fn_supported
+from nemo_vfm.diffusion.sampler.res.multi_step import get_multi_step_fn, is_multi_step_fn_supported
+from nemo_vfm.diffusion.sampler.res.runge_kutta import get_runge_kutta_fn, is_runge_kutta_fn_supported
 from tqdm import tqdm
 
 

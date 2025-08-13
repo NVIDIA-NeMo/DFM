@@ -20,21 +20,21 @@ import os
 import imageio
 import numpy as np
 import torch
-from cosmos1.models.autoregressive.model import AutoRegressiveModel
-from cosmos1.models.diffusion.config.ctrl.augmentors import BilateralOnlyBlurAugmentorConfig
-from cosmos1.models.diffusion.datasets.augmentors.control_input import get_augmentor_for_eval
-from cosmos1.models.diffusion.inference.inference_utils import read_video_or_image_into_frames_BCTHW
-from cosmos1.models.diffusion.prompt_upsampler.text2world_prompt_upsampler_inference import (
+from nemo_vfm.physicalai.Cosmos.cosmos1.models.autoregressive.model import AutoRegressiveModel
+from nemo_vfm.physicalai.Cosmos.cosmos1.models.diffusion.config.ctrl.augmentors import BilateralOnlyBlurAugmentorConfig
+from nemo_vfm.physicalai.Cosmos.cosmos1.models.diffusion.datasets.augmentors.control_input import get_augmentor_for_eval
+from nemo_vfm.physicalai.Cosmos.cosmos1.models.diffusion.inference.inference_utils import read_video_or_image_into_frames_BCTHW
+from nemo_vfm.physicalai.Cosmos.cosmos1.models.diffusion.prompt_upsampler.text2world_prompt_upsampler_inference import (
     create_prompt_upsampler,
     run_chat_completion,
 )
-from cosmos1.models.guardrail.common.presets import (
+from nemo_vfm.physicalai.Cosmos.cosmos1.models.guardrail.common.presets import (
     create_text_guardrail_runner,
     create_video_guardrail_runner,
     run_text_guardrail,
     run_video_guardrail,
 )
-from cosmos1.utils import log
+from nemo_vfm.physicalai.Cosmos.cosmos1.utils import log
 
 
 def get_upsampled_prompt(

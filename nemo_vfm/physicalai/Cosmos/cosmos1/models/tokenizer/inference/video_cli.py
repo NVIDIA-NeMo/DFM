@@ -41,15 +41,15 @@ from argparse import ArgumentParser, Namespace
 from typing import Any
 
 import numpy as np
-from cosmos1.models.tokenizer.inference.utils import (
+from nemo_vfm.physicalai.Cosmos.cosmos1.models.tokenizer.inference.utils import (
     get_filepaths,
     get_output_filepath,
     read_video,
     resize_video,
     write_video,
 )
-from cosmos1.models.tokenizer.inference.video_lib import CausalVideoTokenizer
-from cosmos1.models.tokenizer.networks import TokenizerConfigs
+from nemo_vfm.physicalai.Cosmos.cosmos1.models.tokenizer.inference.video_lib import CausalVideoTokenizer
+from nemo_vfm.physicalai.Cosmos.cosmos1.models.tokenizer.networks import TokenizerConfigs
 from loguru import logger as logging
 
 

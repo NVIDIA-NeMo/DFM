@@ -15,15 +15,15 @@
 
 # pylint: disable=C0115,C0116,C0301
 
-from cosmos1.models.diffusion.config.base.conditioner import (
+from nemo_vfm.physicalai.Cosmos.cosmos1.models.diffusion.config.base.conditioner import (
     BaseVideoConditionerConfig,
     VideoConditionerFpsSizePaddingConfig,
     VideoConditionerFpsSizePaddingFrameRepeatConfig,
     VideoExtendConditionerConfig,
     VideoExtendConditionerFrameRepeatConfig,
 )
-from cosmos1.models.diffusion.config.base.net import FADITV2_14B_Config, FADITV2_MultiCam_Config, FADITV2Config
-from cosmos1.models.diffusion.config.base.tokenizer import get_cosmos_diffusion_tokenizer_comp8x8x8
+from nemo_vfm.physicalai.Cosmos.cosmos1.models.diffusion.config.base.net import FADITV2_14B_Config, FADITV2_MultiCam_Config, FADITV2Config
+from nemo_vfm.physicalai.Cosmos.cosmos1.models.diffusion.config.base.tokenizer import get_cosmos_diffusion_tokenizer_comp8x8x8
 from hydra.core.config_store import ConfigStore
 
 

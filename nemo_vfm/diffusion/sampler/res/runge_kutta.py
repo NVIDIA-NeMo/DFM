@@ -15,7 +15,7 @@
 from typing import Callable, Tuple
 
 import torch
-from nemo.collections.diffusion.sampler.batch_ops import batch_mul
+from nemo_vfm.diffusion.sampler.batch_ops import batch_mul
 
 
 def phi1(t: torch.Tensor) -> torch.Tensor:

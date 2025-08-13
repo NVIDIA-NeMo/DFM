@@ -15,8 +15,8 @@
 
 import copy
 
-from cosmos1.models.diffusion.config.base.net import FADITV2_14B_Config, FADITV2Config
-from cosmos1.models.diffusion.networks.general_dit_ctrl_enc import GeneralDITEncoder
+from nemo_vfm.physicalai.Cosmos.cosmos1.models.diffusion.config.base.net import FADITV2_14B_Config, FADITV2Config
+from nemo_vfm.physicalai.Cosmos.cosmos1.models.diffusion.networks.general_dit_ctrl_enc import GeneralDITEncoder
 
 
 num_blocks = FADITV2Config["num_blocks"]

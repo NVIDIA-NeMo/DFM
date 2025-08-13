@@ -30,20 +30,20 @@ from nemo.lightning.megatron_parallel import MegatronParallel
 
 
 MegatronParallel.init_ddp = lambda self: None
-from cosmos1.models.diffusion.nemo.inference.inference_utils import process_prompt, save_video
-from cosmos1.utils import log
+from nemo_vfm.physicalai.Cosmos.cosmos1.models.diffusion.nemo.inference.inference_utils import process_prompt, save_video
+from nemo_vfm.physicalai.Cosmos.cosmos1.utils import log
 from transformers import T5EncoderModel, T5TokenizerFast
 
-from nemo.collections.diffusion.mcore_parallel_utils import Utils
-from nemo.collections.diffusion.sampler.conditioner import VideoConditioner
-from nemo.collections.diffusion.sampler.conditioner_configs import (
+from nemo_vfm.diffusion.mcore_parallel_utils import Utils
+from nemo_vfm.diffusion.sampler.conditioner import VideoConditioner
+from nemo_vfm.diffusion.sampler.conditioner_configs import (
     FPSConfig,
     ImageSizeConfig,
     NumFramesConfig,
     PaddingMaskConfig,
     TextConfig,
 )
-from nemo.collections.diffusion.sampler.cosmos.cosmos_diffusion_pipeline import CosmosDiffusionPipeline
+from nemo_vfm.diffusion.sampler.cosmos.cosmos_diffusion_pipeline import CosmosDiffusionPipeline
 
 
 EXAMPLE_PROMPT = (
@@ -154,7 +154,7 @@ def init_video_tokenizer(args):
     """
     Initializes video tokenizer based on specified video tokenizer config / path.
     """
-    from nemo.collections.diffusion.models.model import DiT7BConfig, DiT14BConfig
+    from nemo_vfm.diffusion.models.model import DiT7BConfig, DiT14BConfig
 
     vae_path = os.path.join(args.cosmos_assets_dir, args.tokenizer_dir)
     dit_config = None
@@ -244,7 +244,7 @@ def setup_diffusion_pipeline(args):
     Initialize DiT model, parallel strategy, and diffusion pipeline for inference.
     """
     # Initialize DiT model
-    from nemo.collections.diffusion.models.model import DiT7BConfig, DiT14BConfig, DiTModel
+    from nemo_vfm.diffusion.models.model import DiT7BConfig, DiT14BConfig, DiTModel
 
     dit_config = None
     if "7b" in args.nemo_checkpoint.lower():

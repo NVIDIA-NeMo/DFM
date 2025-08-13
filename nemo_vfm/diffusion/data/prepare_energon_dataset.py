@@ -105,7 +105,7 @@ def prepare_dummy_image_dataset() -> run.Partial:
     recipe = run.Partial(
         prepare,
         process_func=dummy_process_func,
-        inputs=list(str(i) + ".jpg" for i in range(10000)),
+        inputs=list(str(i) for i in range(1000)),
     )
     return recipe
 

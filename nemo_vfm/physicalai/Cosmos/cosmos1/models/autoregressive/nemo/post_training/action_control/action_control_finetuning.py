@@ -28,12 +28,12 @@ from nemo.collections import llm
 from nemo.lightning.pytorch.callbacks import ModelCheckpoint, PreemptionCallback
 from nemo.lightning.pytorch.strategies.utils import RestoreConfig
 
-from cosmos1.models.autoregressive.nemo.cosmos_action_control import (
+from nemo_vfm.physicalai.Cosmos.cosmos1.models.autoregressive.nemo.cosmos_action_control import (
     CosmosActionControlModel,
     CosmosConfigActionControl5B,
     CosmosConfigActionControl13B,
 )
-from cosmos1.models.autoregressive.nemo.post_training.action_control.action_control_ar_dataset import (
+from nemo_vfm.physicalai.Cosmos.cosmos1.models.autoregressive.nemo.post_training.action_control.action_control_ar_dataset import (
     ActionControlDataModule,
 )
 

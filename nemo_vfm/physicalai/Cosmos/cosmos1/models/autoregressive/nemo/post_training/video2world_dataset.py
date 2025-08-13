@@ -21,8 +21,8 @@ import torch
 from nemo.collections.llm.gpt.data.mock import MockDataModule
 from torch.utils.data import Dataset
 
-from cosmos1.models.autoregressive.modules.embedding import SinCosPosEmbAxisTE
-from cosmos1.models.autoregressive.nemo.cosmos import CosmosConfig
+from nemo_vfm.physicalai.Cosmos.cosmos1.models.autoregressive.modules.embedding import SinCosPosEmbAxisTE
+from nemo_vfm.physicalai.Cosmos.cosmos1.models.autoregressive.nemo.cosmos import CosmosConfig
 
 
 TOKENIZER_COMPRESSION_FACTOR = [8, 16, 16]

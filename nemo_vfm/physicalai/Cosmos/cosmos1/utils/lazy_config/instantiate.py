@@ -22,7 +22,7 @@ from typing import Any
 
 import attrs
 
-from cosmos1.utils.lazy_config.registry import _convert_target_to_string, locate
+from nemo_vfm.physicalai.Cosmos.cosmos1.utils.lazy_config.registry import _convert_target_to_string, locate
 
 
 __all__ = ["dump_dataclass", "instantiate"]

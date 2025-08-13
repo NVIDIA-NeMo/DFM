@@ -22,7 +22,7 @@ from megatron.core.distributed import DistributedDataParallelConfig
 from megatron.core.optimizer import OptimizerConfig
 from nemo import lightning as nl
 from nemo.collections import llm
-from nemo.collections.diffusion.models.flux.model import FluxModelParams, MegatronFluxModel
+from nemo_vfm.diffusion.models.flux.model import FluxModelParams, MegatronFluxModel
 from nemo.collections.llm.recipes.log.default import default_resume, tensorboard_logger
 
 

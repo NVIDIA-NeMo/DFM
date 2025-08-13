@@ -29,8 +29,8 @@ import pynvml
 import torch
 import torch.distributed as dist
 
-from cosmos1.utils import log
-from cosmos1.utils.device import Device
+from nemo_vfm.physicalai.Cosmos.cosmos1.utils import log
+from nemo_vfm.physicalai.Cosmos.cosmos1.utils.device import Device
 
 
 def init() -> int | None:

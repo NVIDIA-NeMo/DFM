@@ -30,7 +30,7 @@ import numpy as np
 import termcolor
 import torch
 
-from cosmos1.utils import distributed, log
+from nemo_vfm.physicalai.Cosmos.cosmos1.utils import distributed, log
 
 
 def to(

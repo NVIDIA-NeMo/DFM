@@ -17,10 +17,10 @@
 from typing import Union
 
 import torch
-from cosmos1.models.diffusion.conditioner import VideoExtendCondition
-from cosmos1.models.diffusion.model.model_t2w import DiffusionT2WModel
-from cosmos1.models.diffusion.model.model_v2w import DiffusionV2WModel
-from cosmos1.utils import log
+from nemo_vfm.physicalai.Cosmos.cosmos1.models.diffusion.conditioner import VideoExtendCondition
+from nemo_vfm.physicalai.Cosmos.cosmos1.models.diffusion.model.model_t2w import DiffusionT2WModel
+from nemo_vfm.physicalai.Cosmos.cosmos1.models.diffusion.model.model_v2w import DiffusionV2WModel
+from nemo_vfm.physicalai.Cosmos.cosmos1.utils import log
 from einops import rearrange
 
 

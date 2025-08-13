@@ -21,9 +21,9 @@ import os
 import imageio
 import torch
 
-from cosmos1.models.autoregressive.inference.world_generation_pipeline import ARBaseGenerationPipeline
-from cosmos1.models.autoregressive.utils.inference import add_common_arguments, load_vision_input, validate_args
-from cosmos1.utils import log
+from nemo_vfm.physicalai.Cosmos.cosmos1.models.autoregressive.inference.world_generation_pipeline import ARBaseGenerationPipeline
+from nemo_vfm.physicalai.Cosmos.cosmos1.models.autoregressive.utils.inference import add_common_arguments, load_vision_input, validate_args
+from nemo_vfm.physicalai.Cosmos.cosmos1.utils import log
 
 
 def parse_args():

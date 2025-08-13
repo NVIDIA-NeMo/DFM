@@ -28,9 +28,9 @@ from typing import Any, Callable, Mapping, Optional, Tuple
 
 import torch
 import torch.nn as nn
-from cosmos1.models.autoregressive.modules.normalization import create_norm
-from cosmos1.models.autoregressive.networks.transformer import TransformerBlock
-from cosmos1.utils import log
+from nemo_vfm.physicalai.Cosmos.cosmos1.models.autoregressive.modules.normalization import create_norm
+from nemo_vfm.physicalai.Cosmos.cosmos1.models.autoregressive.networks.transformer import TransformerBlock
+from nemo_vfm.physicalai.Cosmos.cosmos1.utils import log
 
 
 def get_vit_config(model_name: str) -> Mapping[str, Any]:

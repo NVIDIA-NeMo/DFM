@@ -18,10 +18,10 @@
 from typing import Optional
 
 import torch
-from cosmos1.models.diffusion.conditioner import DataType
-from cosmos1.models.diffusion.module.blocks import TimestepEmbedding, Timesteps
-from cosmos1.models.diffusion.networks.general_dit import GeneralDIT
-from cosmos1.utils import log
+from nemo_vfm.physicalai.Cosmos.cosmos1.models.diffusion.conditioner import DataType
+from nemo_vfm.physicalai.Cosmos.cosmos1.models.diffusion.module.blocks import TimestepEmbedding, Timesteps
+from nemo_vfm.physicalai.Cosmos.cosmos1.models.diffusion.networks.general_dit import GeneralDIT
+from nemo_vfm.physicalai.Cosmos.cosmos1.utils import log
 from einops import rearrange
 from torch import nn
 

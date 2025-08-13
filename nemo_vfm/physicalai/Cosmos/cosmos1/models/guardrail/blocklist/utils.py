@@ -16,7 +16,7 @@
 import os
 import re
 
-from cosmos1.utils import log
+from nemo_vfm.physicalai.Cosmos.cosmos1.utils import log
 
 
 def read_keyword_list_from_dir(folder_path: str) -> list[str]:

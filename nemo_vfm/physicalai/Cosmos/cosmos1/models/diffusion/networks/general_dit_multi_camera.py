@@ -17,14 +17,14 @@
 from typing import Optional, Tuple
 
 import torch
-from cosmos1.models.diffusion.conditioner import DataType
-from cosmos1.models.diffusion.module.blocks import GeneralDITTransformerBlock, PatchEmbed
-from cosmos1.models.diffusion.module.position_embedding import (
+from nemo_vfm.physicalai.Cosmos.cosmos1.models.diffusion.conditioner import DataType
+from nemo_vfm.physicalai.Cosmos.cosmos1.models.diffusion.module.blocks import GeneralDITTransformerBlock, PatchEmbed
+from nemo_vfm.physicalai.Cosmos.cosmos1.models.diffusion.module.position_embedding import (
     MultiCameraSinCosPosEmbAxis,
     MultiCameraVideoRopePosition3DEmb,
 )
-from cosmos1.models.diffusion.networks.general_dit import GeneralDIT
-from cosmos1.utils import log
+from nemo_vfm.physicalai.Cosmos.cosmos1.models.diffusion.networks.general_dit import GeneralDIT
+from nemo_vfm.physicalai.Cosmos.cosmos1.utils import log
 from einops import rearrange
 from torch import nn
 from torchvision import transforms

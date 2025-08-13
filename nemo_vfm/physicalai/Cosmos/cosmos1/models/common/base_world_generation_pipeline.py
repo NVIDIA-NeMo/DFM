@@ -22,8 +22,8 @@ from typing import Any
 
 import numpy as np
 import torch
-from cosmos1.models.common.t5_text_encoder import CosmosT5TextEncoder
-from cosmos1.models.guardrail.common import presets as guardrail_presets
+from nemo_vfm.physicalai.Cosmos.cosmos1.models.common.t5_text_encoder import CosmosT5TextEncoder
+from nemo_vfm.physicalai.Cosmos.cosmos1.models.guardrail.common import presets as guardrail_presets
 
 
 class BaseWorldGenerationPipeline(ABC):

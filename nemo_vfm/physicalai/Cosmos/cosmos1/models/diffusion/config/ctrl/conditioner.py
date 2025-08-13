@@ -13,8 +13,8 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-from cosmos1.models.diffusion.conditioner import VideoConditionerWithCtrl
-from cosmos1.models.diffusion.config.base.conditioner import (
+from nemo_vfm.physicalai.Cosmos.cosmos1.models.diffusion.conditioner import VideoConditionerWithCtrl
+from nemo_vfm.physicalai.Cosmos.cosmos1.models.diffusion.config.base.conditioner import (
     FPSConfig,
     ImageSizeConfig,
     NumFramesConfig,
@@ -22,7 +22,7 @@ from cosmos1.models.diffusion.config.base.conditioner import (
     TextConfig,
     VideoCondBoolConfig,
 )
-from cosmos1.models.diffusion.datasets.augmentors.control_input import (
+from nemo_vfm.physicalai.Cosmos.cosmos1.models.diffusion.datasets.augmentors.control_input import (
     AddControlInput,
     AddControlInputCanny,
     AddControlInputDepth,
@@ -32,8 +32,8 @@ from cosmos1.models.diffusion.datasets.augmentors.control_input import (
     AddControlInputSeg,
     AddControlInputUpscale,
 )
-from cosmos1.utils.lazy_config import LazyCall as L
-from cosmos1.utils.lazy_config import LazyDict
+from nemo_vfm.physicalai.Cosmos.cosmos1.utils.lazy_config import LazyCall as L
+from nemo_vfm.physicalai.Cosmos.cosmos1.utils.lazy_config import LazyDict
 
 
 CTRL_HINT_KEYS_SINGLE = [

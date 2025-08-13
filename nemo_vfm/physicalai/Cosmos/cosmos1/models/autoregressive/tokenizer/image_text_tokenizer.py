@@ -24,8 +24,8 @@ import transformers
 from transformers import AutoImageProcessor
 from transformers.image_utils import ImageInput, is_valid_image, load_image
 
-from cosmos1.models.autoregressive.tokenizer.text_tokenizer import TextTokenizer
-from cosmos1.utils import log
+from nemo_vfm.physicalai.Cosmos.cosmos1.models.autoregressive.tokenizer.text_tokenizer import TextTokenizer
+from nemo_vfm.physicalai.Cosmos.cosmos1.utils import log
 
 
 # Configuration for different vision-language models

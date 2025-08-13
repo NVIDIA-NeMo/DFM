@@ -20,12 +20,12 @@ import os
 import nemo_run as run
 from huggingface_hub import snapshot_download
 from nemo.collections import llm
-from nemo.collections.diffusion.models.model import (
+from nemo_vfm.diffusion.models.model import (
     DiT7BCameraCtrlConfig,
     DiT7BVideo2WorldConfig,
     DiT14BVideo2WorldConfig,
 )
-from nemo.collections.diffusion.train import (
+from nemo_vfm.diffusion.train import (
     finetune_7b_action_control,
     finetune_14b_action_control,
     pretrain,

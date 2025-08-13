@@ -19,7 +19,7 @@ import attrs
 import torch
 import torch.nn as nn
 
-from cosmos1.utils.config import make_freezable
+from nemo_vfm.physicalai.Cosmos.cosmos1.utils.config import make_freezable
 
 
 @make_freezable

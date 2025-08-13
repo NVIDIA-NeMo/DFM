@@ -5,7 +5,7 @@
 from typing import Any, List
 
 import attrs
-from nemo.collections.diffusion.sampler.conditioner import (
+from nemo_vfm.diffusion.sampler.conditioner import (
     BooleanFlag,
     ReMapkey,
     TextAttr,

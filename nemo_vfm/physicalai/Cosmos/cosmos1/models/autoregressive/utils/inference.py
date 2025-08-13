@@ -27,8 +27,8 @@ import torch
 import torchvision
 from PIL import Image
 
-from cosmos1.models.autoregressive.configs.inference.inference_config import SamplingConfig
-from cosmos1.utils import log
+from nemo_vfm.physicalai.Cosmos.cosmos1.models.autoregressive.configs.inference.inference_config import SamplingConfig
+from nemo_vfm.physicalai.Cosmos.cosmos1.utils import log
 
 
 _IMAGE_EXTENSIONS = [".png", ".jpg", ".jpeg", "webp"]

@@ -30,15 +30,15 @@ from nemo.lightning.megatron_parallel import MegatronParallel
 
 
 MegatronParallel.init_ddp = lambda self: None
-from cosmos1.models.diffusion.conditioner import DataType
-from cosmos1.models.diffusion.inference.inference_utils import read_video_or_image_into_frames_BCTHW
-from cosmos1.models.diffusion.nemo.inference.inference_utils import process_prompt, save_video
-from cosmos1.utils import log
+from nemo_vfm.physicalai.Cosmos.cosmos1.models.diffusion.conditioner import DataType
+from nemo_vfm.physicalai.Cosmos.cosmos1.models.diffusion.inference.inference_utils import read_video_or_image_into_frames_BCTHW
+from nemo_vfm.physicalai.Cosmos.cosmos1.models.diffusion.nemo.inference.inference_utils import process_prompt, save_video
+from nemo_vfm.physicalai.Cosmos.cosmos1.utils import log
 from transformers import T5EncoderModel, T5TokenizerFast
 
-from nemo.collections.diffusion.mcore_parallel_utils import Utils
-from nemo.collections.diffusion.sampler.conditioner import VideoExtendConditioner
-from nemo.collections.diffusion.sampler.conditioner_configs import (
+from nemo_vfm.diffusion.mcore_parallel_utils import Utils
+from nemo_vfm.diffusion.sampler.conditioner import VideoExtendConditioner
+from nemo_vfm.diffusion.sampler.conditioner_configs import (
     FPSConfig,
     ImageSizeConfig,
     NumFramesConfig,
@@ -46,7 +46,7 @@ from nemo.collections.diffusion.sampler.conditioner_configs import (
     TextConfig,
     VideoCondBoolConfig,
 )
-from nemo.collections.diffusion.sampler.cosmos.cosmos_extended_diffusion_pipeline import ExtendedDiffusionPipeline
+from nemo_vfm.diffusion.sampler.cosmos.cosmos_extended_diffusion_pipeline import ExtendedDiffusionPipeline
 
 
 EXAMPLE_PROMPT = (
@@ -165,7 +165,7 @@ def init_video_tokenizer(args):
     """
     Initializes video tokenizer based on specified video tokenizer config / path.
     """
-    from nemo.collections.diffusion.models.model import DiT7BConfig
+    from nemo_vfm.diffusion.models.model import DiT7BConfig
 
     vae_path = os.path.join(args.cosmos_assets_dir, args.tokenizer_dir)
     dit_config = DiT7BConfig(vae_path=vae_path)
@@ -282,7 +282,7 @@ def setup_diffusion_pipeline(args):
     Initialize DiT model, parallel strategy, and diffusion pipeline for inference.
     """
     # Initialize DiT model
-    from nemo.collections.diffusion.models.model import DiT7BVideo2WorldConfig, DiT14BVideo2WorldConfig, DiTModel
+    from nemo_vfm.diffusion.models.model import DiT7BVideo2WorldConfig, DiT14BVideo2WorldConfig, DiTModel
 
     dit_config = None
     if "7B" in args.model:

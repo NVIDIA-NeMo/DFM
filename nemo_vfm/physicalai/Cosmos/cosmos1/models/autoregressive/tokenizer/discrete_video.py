@@ -20,7 +20,7 @@ from typing import Optional
 import torch
 from einops import rearrange
 
-from cosmos1.models.autoregressive.tokenizer.quantizers import FSQuantizer
+from nemo_vfm.physicalai.Cosmos.cosmos1.models.autoregressive.tokenizer.quantizers import FSQuantizer
 
 
 # Make sure jit model output consistenly during consecutive calls

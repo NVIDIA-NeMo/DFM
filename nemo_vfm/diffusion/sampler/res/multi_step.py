@@ -21,7 +21,7 @@ Implementation of multistep methods to solve the ODE in the diffusion model.
 from typing import Callable, List, Tuple
 
 import torch
-from nemo.collections.diffusion.sampler.res.runge_kutta import reg_x0_euler_step, res_x0_rk2_step
+from nemo_vfm.diffusion.sampler.res.runge_kutta import reg_x0_euler_step, res_x0_rk2_step
 
 
 def order2_fn(

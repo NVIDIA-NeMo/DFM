@@ -21,10 +21,10 @@ from typing import List
 
 import torch
 
-from cosmos1.models.autoregressive.configs.inference.inference_config import DiffusionDecoderSamplingConfig
-from cosmos1.models.autoregressive.diffusion_decoder.model import LatentDiffusionDecoderModel
-from cosmos1.models.autoregressive.diffusion_decoder.utils import linear_blend_video_list, split_with_overlap
-from cosmos1.utils import log
+from nemo_vfm.physicalai.Cosmos.cosmos1.models.autoregressive.configs.inference.inference_config import DiffusionDecoderSamplingConfig
+from nemo_vfm.physicalai.Cosmos.cosmos1.models.autoregressive.diffusion_decoder.model import LatentDiffusionDecoderModel
+from nemo_vfm.physicalai.Cosmos.cosmos1.models.autoregressive.diffusion_decoder.utils import linear_blend_video_list, split_with_overlap
+from nemo_vfm.physicalai.Cosmos.cosmos1.utils import log
 
 
 def diffusion_decoder_process_tokens(

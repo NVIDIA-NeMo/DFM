@@ -19,11 +19,11 @@ from dataclasses import dataclass
 from typing import Callable, Dict, Optional, Tuple, Union
 
 import torch
-from cosmos1.models.diffusion.conditioner import VideoExtendCondition
-from cosmos1.models.diffusion.config.base.conditioner import VideoCondBoolConfig
-from cosmos1.models.diffusion.diffusion.functional.batch_ops import batch_mul
-from cosmos1.models.diffusion.model.model_t2w import DiffusionT2WModel
-from cosmos1.utils import log, misc
+from nemo_vfm.physicalai.Cosmos.cosmos1.models.diffusion.conditioner import VideoExtendCondition
+from nemo_vfm.physicalai.Cosmos.cosmos1.models.diffusion.config.base.conditioner import VideoCondBoolConfig
+from nemo_vfm.physicalai.Cosmos.cosmos1.models.diffusion.diffusion.functional.batch_ops import batch_mul
+from nemo_vfm.physicalai.Cosmos.cosmos1.models.diffusion.model.model_t2w import DiffusionT2WModel
+from nemo_vfm.physicalai.Cosmos.cosmos1.utils import log, misc
 from torch import Tensor
 
 

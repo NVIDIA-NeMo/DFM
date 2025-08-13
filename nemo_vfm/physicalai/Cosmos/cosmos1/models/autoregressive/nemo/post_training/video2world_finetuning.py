@@ -27,12 +27,12 @@ from nemo.collections import llm
 from nemo.lightning.pytorch.callbacks import ModelCheckpoint, PreemptionCallback
 from nemo.lightning.pytorch.strategies.utils import RestoreConfig
 
-from cosmos1.models.autoregressive.nemo.cosmos_video2world import (
+from nemo_vfm.physicalai.Cosmos.cosmos1.models.autoregressive.nemo.cosmos_video2world import (
     CosmosConfigVideo2World5B,
     CosmosConfigVideo2World13B,
     CosmosVideo2WorldModel,
 )
-from cosmos1.models.autoregressive.nemo.post_training.video2world_dataset import CosmosVideo2WorldDataModule
+from nemo_vfm.physicalai.Cosmos.cosmos1.models.autoregressive.nemo.post_training.video2world_dataset import CosmosVideo2WorldDataModule
 
 
 def main(args):

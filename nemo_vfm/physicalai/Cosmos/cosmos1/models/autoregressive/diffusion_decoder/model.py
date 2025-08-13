@@ -21,11 +21,11 @@ from typing import Callable, Dict, Optional, Tuple
 import torch
 from torch import Tensor
 
-from cosmos1.models.diffusion.conditioner import BaseVideoCondition
-from cosmos1.models.diffusion.diffusion.functional.batch_ops import batch_mul
-from cosmos1.models.diffusion.diffusion.modules.res_sampler import COMMON_SOLVER_OPTIONS
-from cosmos1.models.diffusion.model.model_t2w import DiffusionT2WModel as VideoDiffusionModel
-from cosmos1.utils.lazy_config import instantiate as lazy_instantiate
+from nemo_vfm.physicalai.Cosmos.cosmos1.models.diffusion.conditioner import BaseVideoCondition
+from nemo_vfm.physicalai.Cosmos.cosmos1.models.diffusion.diffusion.functional.batch_ops import batch_mul
+from nemo_vfm.physicalai.Cosmos.cosmos1.models.diffusion.diffusion.modules.res_sampler import COMMON_SOLVER_OPTIONS
+from nemo_vfm.physicalai.Cosmos.cosmos1.models.diffusion.model.model_t2w import DiffusionT2WModel as VideoDiffusionModel
+from nemo_vfm.physicalai.Cosmos.cosmos1.utils.lazy_config import instantiate as lazy_instantiate
 
 
 @dataclass

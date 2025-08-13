@@ -21,8 +21,8 @@ from typing import Optional
 import torch
 from einops import rearrange
 
-from cosmos1.models.autoregressive.configs.base.tokenizer import TokenizerConfig
-from cosmos1.utils.lazy_config import instantiate as lazy_instantiate
+from nemo_vfm.physicalai.Cosmos.cosmos1.models.autoregressive.configs.base.tokenizer import TokenizerConfig
+from nemo_vfm.physicalai.Cosmos.cosmos1.utils.lazy_config import instantiate as lazy_instantiate
 
 
 def update_vocab_size(

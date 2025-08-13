@@ -39,15 +39,15 @@ from argparse import ArgumentParser, Namespace
 from typing import Any
 
 import numpy as np
-from cosmos1.models.tokenizer.inference.image_lib import ImageTokenizer
-from cosmos1.models.tokenizer.inference.utils import (
+from nemo_vfm.physicalai.Cosmos.cosmos1.models.tokenizer.inference.image_lib import ImageTokenizer
+from nemo_vfm.physicalai.Cosmos.cosmos1.models.tokenizer.inference.utils import (
     get_filepaths,
     get_output_filepath,
     read_image,
     resize_image,
     write_image,
 )
-from cosmos1.models.tokenizer.networks import TokenizerConfigs
+from nemo_vfm.physicalai.Cosmos.cosmos1.models.tokenizer.networks import TokenizerConfigs
 from loguru import logger as logging
 
 

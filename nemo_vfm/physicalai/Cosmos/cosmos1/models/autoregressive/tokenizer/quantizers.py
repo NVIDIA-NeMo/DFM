@@ -21,7 +21,7 @@ import torch
 import torch.nn as nn
 from einops import rearrange
 
-from cosmos1.models.autoregressive.tokenizer.utils import default, pack_one, round_ste, unpack_one
+from nemo_vfm.physicalai.Cosmos.cosmos1.models.autoregressive.tokenizer.utils import default, pack_one, round_ste, unpack_one
 
 
 class FSQuantizer(nn.Module):

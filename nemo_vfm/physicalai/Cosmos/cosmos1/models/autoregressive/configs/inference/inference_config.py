@@ -18,7 +18,7 @@
 from typing import Any, List, Union
 
 import attrs
-from cosmos1.models.autoregressive.configs.base.model import ModelConfig, TokenizerConfig
+from nemo_vfm.physicalai.Cosmos.cosmos1.models.autoregressive.configs.base.model import ModelConfig, TokenizerConfig
 
 
 @attrs.define(slots=False)

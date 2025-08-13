@@ -14,7 +14,7 @@
 
 import nemo_run as run
 from nemo.collections import llm
-from nemo.collections.diffusion.vae.train_vae import train_vae
+from nemo_vfm.diffusion.vae.train_vae import train_vae
 
 
 @run.cli.factory(target=llm.validate)

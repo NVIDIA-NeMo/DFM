@@ -20,8 +20,8 @@ import nemo_run as run
 import torch
 from huggingface_hub import snapshot_download
 from nemo.collections import llm
-from nemo.collections.diffusion.datamodule import DiTDataModule
-from nemo.collections.diffusion.train import pretrain
+from nemo_vfm.diffusion.datamodule import DiTDataModule
+from nemo_vfm.diffusion.train import pretrain
 from nemo.collections.physicalai.diffusion.post_training.multicamera.dit_multi_camera import MultiCameraDiT7BConfig
 from nemo.lightning.pytorch.strategies.utils import RestoreConfig
 

@@ -31,8 +31,8 @@ import attrs
 import yaml
 from omegaconf import DictConfig, ListConfig, OmegaConf
 
-from cosmos1.utils.lazy_config.file_io import PathManager
-from cosmos1.utils.lazy_config.registry import _convert_target_to_string
+from nemo_vfm.physicalai.Cosmos.cosmos1.utils.lazy_config.file_io import PathManager
+from nemo_vfm.physicalai.Cosmos.cosmos1.utils.lazy_config.registry import _convert_target_to_string
 
 
 __all__ = ["LazyCall", "LazyConfig"]

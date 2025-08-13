@@ -22,8 +22,8 @@ from typing import Any, Optional
 import einops
 import numpy as np
 import torch
-from cosmos1.models.common.base_world_generation_pipeline import BaseWorldGenerationPipeline
-from cosmos1.models.diffusion.inference.inference_utils import (
+from nemo_vfm.physicalai.Cosmos.cosmos1.models.common.base_world_generation_pipeline import BaseWorldGenerationPipeline
+from nemo_vfm.physicalai.Cosmos.cosmos1.models.diffusion.inference.inference_utils import (
     generate_world_from_text,
     generate_world_from_video,
     get_condition_latent,
@@ -34,24 +34,24 @@ from cosmos1.models.diffusion.inference.inference_utils import (
     load_network_model,
     load_tokenizer_model,
 )
-from cosmos1.models.diffusion.model.model_sample_multiview_driving import (
+from nemo_vfm.physicalai.Cosmos.cosmos1.models.diffusion.model.model_sample_multiview_driving import (
     DiffusionMultiCameraT2WModel,
     DiffusionMultiCameraV2WModel,
 )
-from cosmos1.models.diffusion.model.model_t2w import DiffusionT2WModel
-from cosmos1.models.diffusion.model.model_v2w import DiffusionV2WModel
-from cosmos1.models.diffusion.prompt_upsampler.text2world_prompt_upsampler_inference import (
+from nemo_vfm.physicalai.Cosmos.cosmos1.models.diffusion.model.model_t2w import DiffusionT2WModel
+from nemo_vfm.physicalai.Cosmos.cosmos1.models.diffusion.model.model_v2w import DiffusionV2WModel
+from nemo_vfm.physicalai.Cosmos.cosmos1.models.diffusion.prompt_upsampler.text2world_prompt_upsampler_inference import (
     create_prompt_upsampler,
     run_chat_completion,
 )
-from cosmos1.models.diffusion.prompt_upsampler.video2world_prompt_upsampler_inference import (
+from nemo_vfm.physicalai.Cosmos.cosmos1.models.diffusion.prompt_upsampler.video2world_prompt_upsampler_inference import (
     create_vlm_prompt_upsampler,
     prepare_dialog,
 )
-from cosmos1.models.diffusion.prompt_upsampler.video2world_prompt_upsampler_inference import (
+from nemo_vfm.physicalai.Cosmos.cosmos1.models.diffusion.prompt_upsampler.video2world_prompt_upsampler_inference import (
     run_chat_completion as run_chat_completion_vlm,
 )
-from cosmos1.utils import log
+from nemo_vfm.physicalai.Cosmos.cosmos1.utils import log
 
 
 MODEL_NAME_DICT = {

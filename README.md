@@ -28,3 +28,36 @@ If you find our code useful, please consider citing the following papers:
   year={2025}
 }
 ```
+
+
+# How to run
+
+1. Setup the environment and mount the repo:
+```bash
+docker run --gpus all  --ipc=host --ulimit memlock=-1 --ulimit stack=6710886 -it -v ~/.cache:/root/.cache  -v  ~/code/cursor/VFM:/workspace/VFM gitlab-master.nvidia.com:5005/dl/nemo/nemo-vfm:25.02.rc3
+```
+
+2. Inside the docker container. Make the data. Use single GPU for now:
+
+```bash
+export CUDA_VISIBLE_DEVICES=0
+torchrun --nproc-per-node 1 nemo_vfm/diffusion/data/prepare_energon_dataset_butterfly.py --factory prepare_dummy_image_dataset
+```
+
+3. Step 2 will create 1000 samples of images in webdataset format. Use energon
+```bash
+energon prepare .
+```
+In this step choose to prepare the dataset.yaml interactively and use CrudeWebDataset format.
+
+
+4. The energon does not product the right dataset.yaml file, so copy the one we have
+
+```bash
+cp dataset.yaml <PATH_TO_WEBPATH>/.nv-meta/
+```
+
+5. Run training 
+```bash
+   torchrun --nproc-per-node 8 nemo/collections/diffusion/train.py --yes --factory pretrain_xl
+```

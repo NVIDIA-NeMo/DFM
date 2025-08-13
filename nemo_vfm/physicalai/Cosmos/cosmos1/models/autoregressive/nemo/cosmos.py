@@ -33,7 +33,7 @@ from nemo.lightning import OptimizerModule, io
 from nemo.lightning.base import teardown
 from torch import Tensor, nn
 
-from cosmos1.utils import log
+from nemo_vfm.physicalai.Cosmos.cosmos1.utils import log
 
 
 class RotaryEmbedding3D(RotaryEmbedding):

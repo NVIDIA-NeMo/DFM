@@ -31,7 +31,7 @@ import typer
 from einops import rearrange
 from tqdm import tqdm
 
-from cosmos1.models.autoregressive.tokenizer.discrete_video import DiscreteVideoFSQJITTokenizer
+from nemo_vfm.physicalai.Cosmos.cosmos1.models.autoregressive.tokenizer.discrete_video import DiscreteVideoFSQJITTokenizer
 
 
 logger = logging.getLogger(__name__)

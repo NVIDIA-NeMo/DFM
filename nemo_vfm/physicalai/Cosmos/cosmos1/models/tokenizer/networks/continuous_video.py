@@ -19,8 +19,8 @@
 
 from collections import OrderedDict, namedtuple
 
-from cosmos1.models.tokenizer.modules import ContinuousFormulation, Decoder3DType, Encoder3DType
-from cosmos1.models.tokenizer.modules.layers3d import CausalConv3d
+from nemo_vfm.physicalai.Cosmos.cosmos1.models.tokenizer.modules import ContinuousFormulation, Decoder3DType, Encoder3DType
+from nemo_vfm.physicalai.Cosmos.cosmos1.models.tokenizer.modules.layers3d import CausalConv3d
 from loguru import logger as logging
 from torch import nn
 

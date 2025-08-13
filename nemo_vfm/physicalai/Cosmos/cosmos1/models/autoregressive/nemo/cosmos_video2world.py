@@ -46,15 +46,15 @@ from megatron.core.transformer.transformer_layer import TransformerLayer, Transf
 from megatron.core.utils import make_viewless_tensor
 from torch import nn
 
-from cosmos1.models.autoregressive.nemo.cosmos import (
+from nemo_vfm.physicalai.Cosmos.cosmos1.models.autoregressive.nemo.cosmos import (
     CosmosConfig,
     CosmosConfig4B,
     CosmosConfig12B,
     CosmosModel,
     RotaryEmbedding3D,
 )
-from cosmos1.models.autoregressive.nemo.inference.inference_controller import CosmosInferenceWrapper
-from cosmos1.utils import log
+from nemo_vfm.physicalai.Cosmos.cosmos1.models.autoregressive.nemo.inference.inference_controller import CosmosInferenceWrapper
+from nemo_vfm.physicalai.Cosmos.cosmos1.utils import log
 
 
 if TYPE_CHECKING:

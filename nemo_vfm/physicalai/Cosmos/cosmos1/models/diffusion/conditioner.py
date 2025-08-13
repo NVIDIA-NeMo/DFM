@@ -24,9 +24,9 @@ from typing import Any, Dict, List, Optional, Tuple, Union
 
 import torch
 import torch.nn as nn
-from cosmos1.models.diffusion.diffusion.functional.batch_ops import batch_mul
-from cosmos1.utils import log
-from cosmos1.utils.lazy_config import instantiate
+from nemo_vfm.physicalai.Cosmos.cosmos1.models.diffusion.diffusion.functional.batch_ops import batch_mul
+from nemo_vfm.physicalai.Cosmos.cosmos1.utils import log
+from nemo_vfm.physicalai.Cosmos.cosmos1.utils.lazy_config import instantiate
 
 
 class BaseConditionEntry(nn.Module):

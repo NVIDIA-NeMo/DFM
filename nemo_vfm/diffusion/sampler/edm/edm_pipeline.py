@@ -18,9 +18,9 @@ import numpy as np
 import torch
 import torch.distributed
 from megatron.core import parallel_state
-from nemo.collections.diffusion.sampler.batch_ops import batch_mul
-from nemo.collections.diffusion.sampler.context_parallel import cat_outputs_cp
-from nemo.collections.diffusion.sampler.edm.edm import EDMSDE, EDMSampler, EDMScaling
+from nemo_vfm.diffusion.sampler.batch_ops import batch_mul
+from nemo_vfm.diffusion.sampler.context_parallel import cat_outputs_cp
+from nemo_vfm.diffusion.sampler.edm.edm import EDMSDE, EDMSampler, EDMScaling
 from torch import Tensor
 
 
@@ -178,6 +178,7 @@ class EDMPipeline:
         Returns:
             A tuple with the output batch and the computed loss.
         """
+        # import pdb; pdb.set_trace()
         # Get the input data to noise and denoise~(image, video) and the corresponding conditioner.
         x0_from_data_batch, x0, condition = self.get_data_and_condition(data_batch)
 

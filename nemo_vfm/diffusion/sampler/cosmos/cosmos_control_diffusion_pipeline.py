@@ -21,9 +21,9 @@ import numpy as np
 import torch
 import torch.distributed
 from megatron.core import parallel_state
-from nemo.collections.diffusion.sampler.context_parallel import cat_outputs_cp, split_inputs_cp
-from nemo.collections.diffusion.sampler.cosmos.cosmos_extended_diffusion_pipeline import ExtendedDiffusionPipeline
-from nemo.collections.diffusion.sampler.res.res_sampler import COMMON_SOLVER_OPTIONS
+from nemo_vfm.diffusion.sampler.context_parallel import cat_outputs_cp, split_inputs_cp
+from nemo_vfm.diffusion.sampler.cosmos.cosmos_extended_diffusion_pipeline import ExtendedDiffusionPipeline
+from nemo_vfm.diffusion.sampler.res.res_sampler import COMMON_SOLVER_OPTIONS
 from torch import Tensor
 
 

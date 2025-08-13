@@ -32,8 +32,8 @@ import numpy as np
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
-from cosmos1.models.tokenizer.modules.patching import Patcher, Patcher3D, UnPatcher, UnPatcher3D
-from cosmos1.models.tokenizer.modules.utils import (
+from nemo_vfm.physicalai.Cosmos.cosmos1.models.tokenizer.modules.patching import Patcher, Patcher3D, UnPatcher, UnPatcher3D
+from nemo_vfm.physicalai.Cosmos.cosmos1.models.tokenizer.modules.utils import (
     CausalNormalize,
     batch2space,
     batch2time,

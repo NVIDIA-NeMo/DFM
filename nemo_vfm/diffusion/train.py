@@ -13,7 +13,8 @@
 # limitations under the License.
 
 # pylint: disable=C0116,C0301
-
+import torch._dynamo
+torch._dynamo.config.suppress_errors = True
 import os
 
 import nemo_run as run
@@ -23,9 +24,11 @@ from megatron.core.distributed import DistributedDataParallelConfig
 from megatron.core.optimizer import OptimizerConfig
 from nemo import lightning as nl
 from nemo.collections import llm
-from nemo.collections.diffusion.data.diffusion_taskencoder import BasicDiffusionTaskEncoder
-from nemo.collections.diffusion.datamodule import DiTActionDataModule, DiTCameraCtrlDataModule, DiTDataModule
-from nemo.collections.diffusion.models.model import (
+from nemo_vfm.diffusion.data.diffusion_taskencoder import BasicDiffusionTaskEncoder
+# from nemo_vfm.diffusion.data.diffusion_taskencoder import BasicDiffusionTaskEncoder
+from nemo_vfm.diffusion.datamodule import DiTActionDataModule, DiTCameraCtrlDataModule, DiTDataModule
+# from nemo_vfm.diffusion.datamodule import DiTActionDataModule, DiTCameraCtrlDataModule, DiTDataModule
+from nemo_vfm.diffusion.models.model import (
     DiT7BConfig,
     DiT7BVideo2WorldActionConfig,
     DiT14BVideo2WorldActionConfig,
@@ -47,7 +50,7 @@ from pytorch_lightning.loggers import WandbLogger
 @run.autoconvert
 def videofolder_datamodule() -> pl.LightningDataModule:
     data_module = DiTDataModule(
-        seq_length=21760,
+        seq_length=230500,
         micro_batch_size=1,
         global_batch_size=1,
         num_val_samples=1,
@@ -78,13 +81,16 @@ def videofolder_cameractrldatamodule() -> pl.LightningDataModule:
 @run.cli.factory
 @run.autoconvert
 def multimodal_datamodule() -> pl.LightningDataModule:
-    from nemo.collections.diffusion.data.diffusion_energon_datamodule import DiffusionDataModule
+    from nemo_vfm.diffusion.data.diffusion_energon_datamodule import DiffusionDataModule
+    # from nemo_vfm.diffusion.data.diffusion_energon_datamodule import DiffusionDataModule
 
     data_module = DiffusionDataModule(
+        path="/workspace/VFM/butterfly_webdataset",
         seq_length=2048,
         task_encoder=run.Config(BasicDiffusionTaskEncoder, seq_length=2048),
         micro_batch_size=1,
-        global_batch_size=32,
+        global_batch_size=2,
+        num_workers=10,
     )
     return data_module
 
@@ -118,12 +124,13 @@ def pretrain() -> run.Partial:
                 pipeline_model_parallel_size=1,
                 context_parallel_size=1,
                 sequence_parallel=False,
+                ckpt_async_save=False,
                 pipeline_dtype=torch.bfloat16,
                 ddp=run.Config(
                     DistributedDataParallelConfig,
                     check_for_nan_in_grad=True,
                     grad_reduce_in_fp32=True,
-                    overlap_grad_reduce=True,
+                    overlap_grad_reduce=False,
                     overlap_param_gather=True,
                 ),
                 save_ckpt_format="zarr",

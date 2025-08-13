@@ -25,16 +25,16 @@ import torch
 import torchvision
 from huggingface_hub import snapshot_download
 
-from cosmos1.models.autoregressive.configs.inference.inference_config import DiffusionDecoderSamplingConfig
-from cosmos1.models.autoregressive.diffusion_decoder.inference import diffusion_decoder_process_tokens
-from cosmos1.models.autoregressive.diffusion_decoder.model import LatentDiffusionDecoderModel
-from cosmos1.models.diffusion.inference.inference_utils import (
+from nemo_vfm.physicalai.Cosmos.cosmos1.models.autoregressive.configs.inference.inference_config import DiffusionDecoderSamplingConfig
+from nemo_vfm.physicalai.Cosmos.cosmos1.models.autoregressive.diffusion_decoder.inference import diffusion_decoder_process_tokens
+from nemo_vfm.physicalai.Cosmos.cosmos1.models.autoregressive.diffusion_decoder.model import LatentDiffusionDecoderModel
+from nemo_vfm.physicalai.Cosmos.cosmos1.models.diffusion.inference.inference_utils import (
     load_network_model,
     load_tokenizer_model,
     skip_init_linear,
 )
-from cosmos1.utils import log
-from cosmos1.utils.config_helper import get_config_module, override
+from nemo_vfm.physicalai.Cosmos.cosmos1.utils import log
+from nemo_vfm.physicalai.Cosmos.cosmos1.utils.config_helper import get_config_module, override
 
 
 DATA_RESOLUTION_DEFAULT = [640, 1024]

@@ -23,7 +23,7 @@ import torch.distributed
 import torch.utils.checkpoint
 from nemo import lightning as nl
 from nemo.collections import llm
-from nemo.collections.diffusion.data.diffusion_energon_datamodule import DiffusionDataModule
+from nemo_vfm.diffusion.data.diffusion_energon_datamodule import DiffusionDataModule
 from nemo.collections.physicalai.tokenizer.tokenizer_model import MASK_KEY, VIDEO_KEY, TokenizerModel
 from nemo.collections.physicalai.tokenizer.train_tokenizer import ImageTaskEncoder
 from nemo.lightning.pytorch.callbacks import ModelCheckpoint, PreemptionCallback

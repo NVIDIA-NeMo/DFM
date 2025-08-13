@@ -26,11 +26,11 @@ import argparse
 import os
 import re
 
-from cosmos1.models.autoregressive.configs.base.model_config import create_text_model_config
-from cosmos1.models.autoregressive.model import AutoRegressiveModel
-from cosmos1.models.diffusion.prompt_upsampler.inference import chat_completion
-from cosmos1.models.guardrail.common import presets as guardrail_presets
-from cosmos1.utils import log
+from nemo_vfm.physicalai.Cosmos.cosmos1.models.autoregressive.configs.base.model_config import create_text_model_config
+from nemo_vfm.physicalai.Cosmos.cosmos1.models.autoregressive.model import AutoRegressiveModel
+from nemo_vfm.physicalai.Cosmos.cosmos1.models.diffusion.prompt_upsampler.inference import chat_completion
+from nemo_vfm.physicalai.Cosmos.cosmos1.models.guardrail.common import presets as guardrail_presets
+from nemo_vfm.physicalai.Cosmos.cosmos1.utils import log
 
 
 def create_prompt_upsampler(checkpoint_dir: str) -> AutoRegressiveModel:

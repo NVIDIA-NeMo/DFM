@@ -27,30 +27,30 @@ from einops import rearrange, repeat
 from megatron.core import InferenceParams, parallel_state, tensor_parallel
 from megatron.core.dist_checkpointing.mapping import ShardedStateDict
 from megatron.core.packed_seq_params import PackedSeqParams
-from nemo.collections.diffusion.models.dit.dit_model_7b import (
+from nemo_vfm.diffusion.models.dit.dit_model_7b import (
     DiTCrossAttentionModel7B,
     PatchEmbed,
     cat_outputs_cp,
     get_1d_sincos_pos_embed_from_grid,
     split_inputs_cp,
 )
-from nemo.collections.diffusion.models.model import DiT7BConfig, DiTModel, dynamic_import
-from nemo.collections.diffusion.sampler.conditioner import (
+from nemo_vfm.diffusion.models.model import DiT7BConfig, DiTModel, dynamic_import
+from nemo_vfm.diffusion.sampler.conditioner import (
     AbstractEmbModel,
     DataType,
     Edify4Condition,
     TrainingOnlyEmbModel,
     VideoConditioner,
 )
-from nemo.collections.diffusion.sampler.conditioner_configs import (
+from nemo_vfm.diffusion.sampler.conditioner_configs import (
     FPSConfig,
     ImageSizeConfig,
     NumFramesConfig,
     PaddingMaskConfig,
     TextConfig,
 )
-from nemo.collections.diffusion.sampler.cosmos.cosmos_diffusion_pipeline import CosmosDiffusionPipeline
-from nemo.collections.diffusion.sampler.res.res_sampler import COMMON_SOLVER_OPTIONS
+from nemo_vfm.diffusion.sampler.cosmos.cosmos_diffusion_pipeline import CosmosDiffusionPipeline
+from nemo_vfm.diffusion.sampler.res.res_sampler import COMMON_SOLVER_OPTIONS
 from torch import Tensor, nn
 from torch.distributed import ProcessGroup, get_process_group_ranks
 from torchvision import transforms

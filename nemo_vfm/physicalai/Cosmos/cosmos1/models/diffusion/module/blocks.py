@@ -20,8 +20,8 @@ from typing import Optional
 
 import numpy as np
 import torch
-from cosmos1.models.diffusion.module.attention import Attention, GPT2FeedForward
-from cosmos1.utils import log
+from nemo_vfm.physicalai.Cosmos.cosmos1.models.diffusion.module.attention import Attention, GPT2FeedForward
+from nemo_vfm.physicalai.Cosmos.cosmos1.utils import log
 from einops import rearrange, repeat
 from einops.layers.torch import Rearrange
 from torch import nn

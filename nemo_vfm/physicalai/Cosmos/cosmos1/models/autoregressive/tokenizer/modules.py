@@ -32,8 +32,8 @@ import torch
 import torch.nn as nn
 import torch.nn.functional as F
 
-from cosmos1.models.autoregressive.tokenizer.patching import Patcher3D, UnPatcher3D
-from cosmos1.models.autoregressive.tokenizer.utils import (
+from nemo_vfm.physicalai.Cosmos.cosmos1.models.autoregressive.tokenizer.patching import Patcher3D, UnPatcher3D
+from nemo_vfm.physicalai.Cosmos.cosmos1.models.autoregressive.tokenizer.utils import (
     CausalNormalize,
     batch2space,
     batch2time,
@@ -44,7 +44,7 @@ from cosmos1.models.autoregressive.tokenizer.utils import (
     space2batch,
     time2batch,
 )
-from cosmos1.utils import log
+from nemo_vfm.physicalai.Cosmos.cosmos1.utils import log
 
 
 class CausalConv3d(nn.Module):

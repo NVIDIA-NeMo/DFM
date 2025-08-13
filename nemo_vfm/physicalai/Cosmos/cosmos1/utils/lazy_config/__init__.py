@@ -3,9 +3,9 @@ import os
 
 from omegaconf import DictConfig, OmegaConf
 
-from cosmos1.utils.lazy_config.instantiate import instantiate
-from cosmos1.utils.lazy_config.lazy import LazyCall, LazyConfig
-from cosmos1.utils.lazy_config.omegaconf_patch import to_object
+from nemo_vfm.physicalai.Cosmos.cosmos1.utils.lazy_config.instantiate import instantiate
+from nemo_vfm.physicalai.Cosmos.cosmos1.utils.lazy_config.lazy import LazyCall, LazyConfig
+from nemo_vfm.physicalai.Cosmos.cosmos1.utils.lazy_config.omegaconf_patch import to_object
 
 
 OmegaConf.to_object = to_object

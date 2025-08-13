@@ -80,7 +80,7 @@ class ActionControlDiffusionDataset(Dataset):
             fps: FPS of the video in Hz.
             num_frames: Number of frames to use in each video.
         """
-        from cosmos1.models.autoregressive.nemo.post_training.action_control.action_control_dataset import (
+        from nemo_vfm.physicalai.Cosmos.cosmos1.models.autoregressive.nemo.post_training.action_control.action_control_dataset import (
             ActionControlDataset,
         )
 

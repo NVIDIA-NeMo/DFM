@@ -19,17 +19,17 @@ from typing import Any, Dict, Optional
 
 import torch
 import torch.nn as nn
-from cosmos1.models.autoregressive.modules.attention import Attention
-from cosmos1.models.autoregressive.modules.embedding import (
+from nemo_vfm.physicalai.Cosmos.cosmos1.models.autoregressive.modules.attention import Attention
+from nemo_vfm.physicalai.Cosmos.cosmos1.models.autoregressive.modules.embedding import (
     RotaryPositionEmbeddingPytorchV1,
     RotaryPositionEmbeddingPytorchV2,
     SinCosPosEmbAxisTE,
 )
-from cosmos1.models.autoregressive.modules.mlp import MLP
-from cosmos1.models.autoregressive.modules.normalization import create_norm
-from cosmos1.models.autoregressive.utils.checkpoint import process_state_dict, substrings_to_ignore
-from cosmos1.models.autoregressive.utils.misc import maybe_convert_to_namespace
-from cosmos1.utils import log
+from nemo_vfm.physicalai.Cosmos.cosmos1.models.autoregressive.modules.mlp import MLP
+from nemo_vfm.physicalai.Cosmos.cosmos1.models.autoregressive.modules.normalization import create_norm
+from nemo_vfm.physicalai.Cosmos.cosmos1.models.autoregressive.utils.checkpoint import process_state_dict, substrings_to_ignore
+from nemo_vfm.physicalai.Cosmos.cosmos1.models.autoregressive.utils.misc import maybe_convert_to_namespace
+from nemo_vfm.physicalai.Cosmos.cosmos1.utils import log
 from torch.nn.modules.module import _IncompatibleKeys
 
 

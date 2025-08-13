@@ -22,17 +22,17 @@ A general implementation of adaln-modulated VIT-like~(DiT) transformer for video
 from typing import List, Optional, Tuple
 
 import torch
-from cosmos1.models.diffusion.conditioner import DataType
-from cosmos1.models.diffusion.module.attention import get_normalization
-from cosmos1.models.diffusion.module.blocks import (
+from nemo_vfm.physicalai.Cosmos.cosmos1.models.diffusion.conditioner import DataType
+from nemo_vfm.physicalai.Cosmos.cosmos1.models.diffusion.module.attention import get_normalization
+from nemo_vfm.physicalai.Cosmos.cosmos1.models.diffusion.module.blocks import (
     FinalLayer,
     GeneralDITTransformerBlock,
     PatchEmbed,
     TimestepEmbedding,
     Timesteps,
 )
-from cosmos1.models.diffusion.module.position_embedding import LearnablePosEmbAxis, VideoRopePosition3DEmb
-from cosmos1.utils import log
+from nemo_vfm.physicalai.Cosmos.cosmos1.models.diffusion.module.position_embedding import LearnablePosEmbAxis, VideoRopePosition3DEmb
+from nemo_vfm.physicalai.Cosmos.cosmos1.utils import log
 from einops import rearrange
 from torch import nn
 from torchvision import transforms

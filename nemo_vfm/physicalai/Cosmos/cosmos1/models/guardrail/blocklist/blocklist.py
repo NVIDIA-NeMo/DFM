@@ -24,9 +24,9 @@ from difflib import SequenceMatcher
 import nltk
 from better_profanity import profanity
 
-from cosmos1.models.guardrail.blocklist.utils import read_keyword_list_from_dir, to_ascii
-from cosmos1.models.guardrail.common.core import ContentSafetyGuardrail, GuardrailRunner
-from cosmos1.utils import log, misc
+from nemo_vfm.physicalai.Cosmos.cosmos1.models.guardrail.blocklist.utils import read_keyword_list_from_dir, to_ascii
+from nemo_vfm.physicalai.Cosmos.cosmos1.models.guardrail.common.core import ContentSafetyGuardrail, GuardrailRunner
+from nemo_vfm.physicalai.Cosmos.cosmos1.utils import log, misc
 
 
 DEFAULT_CHECKPOINT_DIR = "checkpoints/Cosmos-1.0-Guardrail/blocklist"

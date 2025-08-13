@@ -21,8 +21,8 @@ from typing import Optional, Union
 import torch
 from torch import nn
 
-from cosmos1.models.autoregressive.modules.embedding import RotaryPositionEmbedding
-from cosmos1.models.autoregressive.modules.normalization import create_norm
+from nemo_vfm.physicalai.Cosmos.cosmos1.models.autoregressive.modules.embedding import RotaryPositionEmbedding
+from nemo_vfm.physicalai.Cosmos.cosmos1.models.autoregressive.modules.normalization import create_norm
 
 
 class Attention(nn.Module):

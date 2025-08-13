@@ -27,7 +27,7 @@ from nemo.collections import llm
 from nemo.lightning.pytorch.callbacks import ModelCheckpoint, PreemptionCallback
 from nemo.lightning.pytorch.strategies.utils import RestoreConfig
 
-from cosmos1.models.autoregressive.nemo.cosmos import CosmosConfig4B, CosmosConfig12B, CosmosModel
+from nemo_vfm.physicalai.Cosmos.cosmos1.models.autoregressive.nemo.cosmos import CosmosConfig4B, CosmosConfig12B, CosmosModel
 
 
 def main(args):

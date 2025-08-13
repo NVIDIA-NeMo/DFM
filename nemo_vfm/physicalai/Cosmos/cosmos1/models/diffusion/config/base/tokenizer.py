@@ -16,8 +16,8 @@
 # pylint: disable=C0115,C0116,C0301
 
 import omegaconf
-from cosmos1.models.diffusion.module.pretrained_vae import JITVAE, JointImageVideoSharedJITTokenizer, VideoJITTokenizer
-from cosmos1.utils.lazy_config import LazyCall as L
+from nemo_vfm.physicalai.Cosmos.cosmos1.models.diffusion.module.pretrained_vae import JITVAE, JointImageVideoSharedJITTokenizer, VideoJITTokenizer
+from nemo_vfm.physicalai.Cosmos.cosmos1.utils.lazy_config import LazyCall as L
 
 
 TOKENIZER_OPTIONS = {}

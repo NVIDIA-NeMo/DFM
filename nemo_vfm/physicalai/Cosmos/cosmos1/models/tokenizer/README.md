@@ -99,7 +99,7 @@ For each, the same command works for both continuous and discrete tokenization. 
 
 ```python
 import torch
-from cosmos1.models.tokenizer.inference.video_lib import CausalVideoTokenizer
+from nemo_vfm.physicalai.Cosmos.cosmos1.models.tokenizer.inference.video_lib import CausalVideoTokenizer
 
 model_name = "Cosmos-0.1-Tokenizer-CV4x8x8"
 input_tensor = torch.randn(1, 3, 9, 512, 512).to('cuda').to(torch.bfloat16)  # [B, C, T, H, W]
@@ -117,7 +117,7 @@ The `latent` will have the shape `(1, 16, 3, 64, 64)`, where the first of the th
 ### Encoding into Discrete Tokens
 ```python
 import torch
-from cosmos1.models.tokenizer.inference.video_lib import CausalVideoTokenizer
+from nemo_vfm.physicalai.Cosmos.cosmos1.models.tokenizer.inference.video_lib import CausalVideoTokenizer
 
 model_name = "Cosmos-0.1-Tokenizer-DV4x8x8"
 input_tensor = torch.randn(1, 3, 9, 512, 512).to('cuda').to(torch.bfloat16)  # [B, C, T, H, W]

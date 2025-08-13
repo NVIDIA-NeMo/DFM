@@ -15,7 +15,7 @@
 import lightning.pytorch as pl
 import torch
 from lightning.pytorch.utilities.types import EVAL_DATALOADERS, TRAIN_DATALOADERS
-from nemo.collections.diffusion.models.model import DiTConfig
+from nemo_vfm.diffusion.models.model import DiTConfig
 from nemo.lightning.pytorch.plugins import MegatronDataSampler
 from torch.utils.data import DataLoader
 

@@ -33,8 +33,8 @@ import numpy as np
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
-from cosmos1.models.tokenizer.modules.patching import Patcher, UnPatcher
-from cosmos1.models.tokenizer.modules.utils import Normalize, nonlinearity
+from nemo_vfm.physicalai.Cosmos.cosmos1.models.tokenizer.modules.patching import Patcher, UnPatcher
+from nemo_vfm.physicalai.Cosmos.cosmos1.models.tokenizer.modules.utils import Normalize, nonlinearity
 from loguru import logger as logging
 
 

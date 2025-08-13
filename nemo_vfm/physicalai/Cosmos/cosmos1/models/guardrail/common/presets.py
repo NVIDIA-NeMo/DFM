@@ -17,12 +17,12 @@ import os
 
 import numpy as np
 
-from cosmos1.models.guardrail.aegis.aegis import Aegis
-from cosmos1.models.guardrail.blocklist.blocklist import Blocklist
-from cosmos1.models.guardrail.common.core import GuardrailRunner
-from cosmos1.models.guardrail.face_blur_filter.face_blur_filter import RetinaFaceFilter
-from cosmos1.models.guardrail.video_content_safety_filter.video_content_safety_filter import VideoContentSafetyFilter
-from cosmos1.utils import log
+from nemo_vfm.physicalai.Cosmos.cosmos1.models.guardrail.aegis.aegis import Aegis
+from nemo_vfm.physicalai.Cosmos.cosmos1.models.guardrail.blocklist.blocklist import Blocklist
+from nemo_vfm.physicalai.Cosmos.cosmos1.models.guardrail.common.core import GuardrailRunner
+from nemo_vfm.physicalai.Cosmos.cosmos1.models.guardrail.face_blur_filter.face_blur_filter import RetinaFaceFilter
+from nemo_vfm.physicalai.Cosmos.cosmos1.models.guardrail.video_content_safety_filter.video_content_safety_filter import VideoContentSafetyFilter
+from nemo_vfm.physicalai.Cosmos.cosmos1.utils import log
 
 
 def create_text_guardrail_runner(checkpoint_dir: str) -> GuardrailRunner:

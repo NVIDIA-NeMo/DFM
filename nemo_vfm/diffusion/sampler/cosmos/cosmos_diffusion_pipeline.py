@@ -22,12 +22,12 @@ import torch
 import torch.distributed
 from einops import rearrange
 from megatron.core import parallel_state
-from nemo.collections.diffusion.sampler.batch_ops import *
-from nemo.collections.diffusion.sampler.conditioner import BaseVideoCondition, DataType, Edify4Condition
-from nemo.collections.diffusion.sampler.context_parallel import cat_outputs_cp, split_inputs_cp
-from nemo.collections.diffusion.sampler.edm.edm import EDMSDE, EDMSampler, EDMScaling
-from nemo.collections.diffusion.sampler.edm.edm_pipeline import EDMPipeline
-from nemo.collections.diffusion.sampler.res.res_sampler import COMMON_SOLVER_OPTIONS, RESSampler
+from nemo_vfm.diffusion.sampler.batch_ops import *
+from nemo_vfm.diffusion.sampler.conditioner import BaseVideoCondition, DataType, Edify4Condition
+from nemo_vfm.diffusion.sampler.context_parallel import cat_outputs_cp, split_inputs_cp
+from nemo_vfm.diffusion.sampler.edm.edm import EDMSDE, EDMSampler, EDMScaling
+from nemo_vfm.diffusion.sampler.edm.edm_pipeline import EDMPipeline
+from nemo_vfm.diffusion.sampler.res.res_sampler import COMMON_SOLVER_OPTIONS, RESSampler
 from torch import Tensor
 
 

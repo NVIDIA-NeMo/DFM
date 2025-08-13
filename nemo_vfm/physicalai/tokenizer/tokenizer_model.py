@@ -22,9 +22,9 @@ from typing import Optional
 import lightning.pytorch as L
 import torch
 import wandb
-from cosmos1.models.tokenizer.networks.configs import continuous_video, discrete_video
-from cosmos1.models.tokenizer.networks.continuous_video import CausalContinuousVideoTokenizer
-from cosmos1.models.tokenizer.networks.discrete_video import CausalDiscreteVideoTokenizer
+from nemo_vfm.physicalai.Cosmos.cosmos1.models.tokenizer.networks.configs import continuous_video, discrete_video
+from nemo_vfm.physicalai.Cosmos.cosmos1.models.tokenizer.networks.continuous_video import CausalContinuousVideoTokenizer
+from nemo_vfm.physicalai.Cosmos.cosmos1.models.tokenizer.networks.discrete_video import CausalDiscreteVideoTokenizer
 from einops import rearrange
 from nemo.collections.llm import fn
 from nemo.collections.physicalai.tokenizer.losses.config import VideoLoss

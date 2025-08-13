@@ -20,7 +20,7 @@
 from collections import OrderedDict, namedtuple
 
 import torch
-from cosmos1.models.tokenizer.modules import ContinuousFormulation, DecoderType, EncoderType
+from nemo_vfm.physicalai.Cosmos.cosmos1.models.tokenizer.modules import ContinuousFormulation, DecoderType, EncoderType
 from loguru import logger as logging
 from torch import nn
 

@@ -18,17 +18,17 @@
 import copy
 from typing import Callable, List, Optional
 
-from cosmos1.models.autoregressive.configs.base.model import ModelConfig
-from cosmos1.models.autoregressive.configs.base.tokenizer import (
+from nemo_vfm.physicalai.Cosmos.cosmos1.models.autoregressive.configs.base.model import ModelConfig
+from nemo_vfm.physicalai.Cosmos.cosmos1.models.autoregressive.configs.base.tokenizer import (
     TextTokenizerConfig,
     TokenizerConfig,
     VideoTokenizerConfig,
     create_discrete_video_fsq_tokenizer_state_dict_config,
 )
-from cosmos1.models.autoregressive.tokenizer.image_text_tokenizer import ImageTextTokenizer
-from cosmos1.models.autoregressive.tokenizer.text_tokenizer import TextTokenizer
-from cosmos1.utils import log
-from cosmos1.utils.lazy_config import LazyCall as L
+from nemo_vfm.physicalai.Cosmos.cosmos1.models.autoregressive.tokenizer.image_text_tokenizer import ImageTextTokenizer
+from nemo_vfm.physicalai.Cosmos.cosmos1.models.autoregressive.tokenizer.text_tokenizer import TextTokenizer
+from nemo_vfm.physicalai.Cosmos.cosmos1.utils import log
+from nemo_vfm.physicalai.Cosmos.cosmos1.utils.lazy_config import LazyCall as L
 
 
 # Common architecture specifications

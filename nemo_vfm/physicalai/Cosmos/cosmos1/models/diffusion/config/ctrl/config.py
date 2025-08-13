@@ -18,19 +18,19 @@
 from typing import Any, List
 
 import attrs
-from cosmos1.models.diffusion.config.ctrl.model import CtrlModelConfig
+from nemo_vfm.physicalai.Cosmos.cosmos1.models.diffusion.config.ctrl.model import CtrlModelConfig
 
-# from cosmos1.models.diffusion.config.base.model import DefaultModelConfig
-from cosmos1.models.diffusion.config.ctrl.registry import register_configs
-from cosmos1.models.diffusion.model.model_ctrl import VideoDiffusionModelWithCtrl
-from cosmos1.utils import config
-from cosmos1.utils.config_helper import import_all_modules_from_package
-from cosmos1.utils.lazy_config import PLACEHOLDER, LazyDict
-from cosmos1.utils.lazy_config import LazyCall as L
+# from nemo_vfm.physicalai.Cosmos.cosmos1.models.diffusion.config.base.model import DefaultModelConfig
+from nemo_vfm.physicalai.Cosmos.cosmos1.models.diffusion.config.ctrl.registry import register_configs
+from nemo_vfm.physicalai.Cosmos.cosmos1.models.diffusion.model.model_ctrl import VideoDiffusionModelWithCtrl
+from nemo_vfm.physicalai.Cosmos.cosmos1.utils import config
+from nemo_vfm.physicalai.Cosmos.cosmos1.utils.config_helper import import_all_modules_from_package
+from nemo_vfm.physicalai.Cosmos.cosmos1.utils.lazy_config import PLACEHOLDER, LazyDict
+from nemo_vfm.physicalai.Cosmos.cosmos1.utils.lazy_config import LazyCall as L
 
 
 # import cosmos1.models.diffusion.config.config as base_config
-# from cosmos1.models.diffusion.checkpointers.ema_fsdp_checkpointer import CheckpointConfig
+# from nemo_vfm.physicalai.Cosmos.cosmos1.models.diffusion.checkpointers.ema_fsdp_checkpointer import CheckpointConfig
 
 
 @attrs.define(slots=False)

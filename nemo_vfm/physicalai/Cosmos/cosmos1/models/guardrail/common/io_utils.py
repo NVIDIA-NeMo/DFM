@@ -21,7 +21,7 @@ from dataclasses import dataclass
 import imageio
 import numpy as np
 
-from cosmos1.utils import log
+from nemo_vfm.physicalai.Cosmos.cosmos1.utils import log
 
 
 @dataclass

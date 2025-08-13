@@ -23,25 +23,25 @@ import numpy as np
 import torch
 from einops import rearrange
 
-from cosmos1.models.autoregressive.configs.base.model_config import create_video2world_model_config
-from cosmos1.models.autoregressive.configs.base.tokenizer import TokenizerConfig
-from cosmos1.models.autoregressive.configs.inference.inference_config import (
+from nemo_vfm.physicalai.Cosmos.cosmos1.models.autoregressive.configs.base.model_config import create_video2world_model_config
+from nemo_vfm.physicalai.Cosmos.cosmos1.models.autoregressive.configs.base.tokenizer import TokenizerConfig
+from nemo_vfm.physicalai.Cosmos.cosmos1.models.autoregressive.configs.inference.inference_config import (
     DataShapeConfig,
     DiffusionDecoderSamplingConfig,
     InferenceConfig,
     SamplingConfig,
 )
-from cosmos1.models.autoregressive.diffusion_decoder.inference import diffusion_decoder_process_tokens
-from cosmos1.models.autoregressive.diffusion_decoder.model import LatentDiffusionDecoderModel
-from cosmos1.models.autoregressive.model import AutoRegressiveModel
-from cosmos1.models.autoregressive.utils.inference import _SUPPORTED_CONTEXT_LEN, prepare_video_batch_for_saving
-from cosmos1.models.common.base_world_generation_pipeline import BaseWorldGenerationPipeline
-from cosmos1.models.diffusion.inference.inference_utils import (
+from nemo_vfm.physicalai.Cosmos.cosmos1.models.autoregressive.diffusion_decoder.inference import diffusion_decoder_process_tokens
+from nemo_vfm.physicalai.Cosmos.cosmos1.models.autoregressive.diffusion_decoder.model import LatentDiffusionDecoderModel
+from nemo_vfm.physicalai.Cosmos.cosmos1.models.autoregressive.model import AutoRegressiveModel
+from nemo_vfm.physicalai.Cosmos.cosmos1.models.autoregressive.utils.inference import _SUPPORTED_CONTEXT_LEN, prepare_video_batch_for_saving
+from nemo_vfm.physicalai.Cosmos.cosmos1.models.common.base_world_generation_pipeline import BaseWorldGenerationPipeline
+from nemo_vfm.physicalai.Cosmos.cosmos1.models.diffusion.inference.inference_utils import (
     load_model_by_config,
     load_network_model,
     load_tokenizer_model,
 )
-from cosmos1.utils import log, misc
+from nemo_vfm.physicalai.Cosmos.cosmos1.utils import log, misc
 
 
 def detect_model_size_from_ckpt_path(ckpt_path: str) -> str:

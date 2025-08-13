@@ -17,7 +17,7 @@ from typing import List, Tuple, Union
 
 import torch
 import transformers
-from cosmos1.utils import log
+from nemo_vfm.physicalai.Cosmos.cosmos1.utils import log
 from transformers import T5EncoderModel, T5TokenizerFast
 
 

@@ -33,8 +33,8 @@ from megatron.core.transformer.transformer_config import TransformerConfig
 from megatron.energon import DefaultTaskEncoder, ImageSample
 from nemo import lightning as nl
 from nemo.collections import llm
-from nemo.collections.diffusion.data.diffusion_energon_datamodule import DiffusionDataModule
-from nemo.collections.diffusion.train import pretrain
+from nemo_vfm.diffusion.data.diffusion_energon_datamodule import DiffusionDataModule
+from nemo_vfm.diffusion.train import pretrain
 from nemo.collections.llm.gpt.model.base import GPTModel
 from nemo.lightning.io.mixin import IOMixin
 from nemo.lightning.megatron_parallel import DataT, MegatronLossReduction, ReductionT

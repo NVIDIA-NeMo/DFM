@@ -31,11 +31,11 @@ from megatron.core.packed_seq_params import PackedSeqParams
 from megatron.core.transformer.transformer_block import TransformerBlock
 from megatron.core.transformer.transformer_config import TransformerConfig
 from megatron.core.utils import make_sharded_tensor_for_checkpoint
-from nemo.collections.diffusion.models.dit.action_control.action_control_layers import ActionControlTorchMlp
-from nemo.collections.diffusion.models.dit.cosmos_layer_spec import (
+from nemo_vfm.diffusion.models.dit.action_control.action_control_layers import ActionControlTorchMlp
+from nemo_vfm.diffusion.models.dit.cosmos_layer_spec import (
     get_dit_adaln_block_with_transformer_engine_spec as DiTLayerWithAdaLNspec,
 )
-from nemo.collections.diffusion.sampler.conditioner import DataType
+from nemo_vfm.diffusion.sampler.conditioner import DataType
 from torch import Tensor
 from torch.autograd import Function
 from torch.distributed import ProcessGroup, all_gather, get_process_group_ranks, get_world_size

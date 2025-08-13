@@ -14,6 +14,7 @@
 
 # pylint: disable=C0115,C0116,C0301
 
+from calendar import c
 import importlib
 import os
 import warnings
@@ -28,13 +29,13 @@ from einops import rearrange
 from megatron.core import parallel_state
 from megatron.core.packed_seq_params import PackedSeqParams
 from megatron.core.transformer.transformer_config import TransformerConfig
-from nemo.collections.diffusion.models.dit_llama.dit_llama_model import DiTLlamaModel
-from nemo.collections.diffusion.sampler.conditioner import (
+from nemo_vfm.diffusion.models.dit_llama.dit_llama_model import DiTLlamaModel
+from nemo_vfm.diffusion.sampler.conditioner import (
     VideoConditioner,
     VideoExtendConditioner,
     VideoExtendConditionerControl,
 )
-from nemo.collections.diffusion.sampler.conditioner_configs import (
+from nemo_vfm.diffusion.sampler.conditioner_configs import (
     ActionControlConfig,
     FPSConfig,
     ImageSizeConfig,
@@ -43,10 +44,10 @@ from nemo.collections.diffusion.sampler.conditioner_configs import (
     TextConfig,
     VideoCondBoolConfig,
 )
-from nemo.collections.diffusion.sampler.cosmos.cosmos_control_diffusion_pipeline import CosmosControlDiffusionPipeline
-from nemo.collections.diffusion.sampler.cosmos.cosmos_diffusion_pipeline import CosmosDiffusionPipeline
-from nemo.collections.diffusion.sampler.cosmos.cosmos_extended_diffusion_pipeline import ExtendedDiffusionPipeline
-from nemo.collections.diffusion.sampler.edm.edm_pipeline import EDMPipeline
+from nemo_vfm.diffusion.sampler.cosmos.cosmos_control_diffusion_pipeline import CosmosControlDiffusionPipeline
+from nemo_vfm.diffusion.sampler.cosmos.cosmos_diffusion_pipeline import CosmosDiffusionPipeline
+from nemo_vfm.diffusion.sampler.cosmos.cosmos_extended_diffusion_pipeline import ExtendedDiffusionPipeline
+from nemo_vfm.diffusion.sampler.edm.edm_pipeline import EDMPipeline
 from nemo.collections.llm.gpt.model.base import GPTModel
 from nemo.lightning import io
 from nemo.lightning.megatron_parallel import MaskedTokenLossReduction, MegatronLossReduction
@@ -172,7 +173,7 @@ class DiTConfig(TransformerConfig, io.IOMixin):
     bf16: bool = True
     params_dtype: torch.dtype = torch.bfloat16
 
-    vae_module: str = "nemo.collections.diffusion.vae.diffusers_vae.AutoencoderKLVAE"
+    vae_module: str = "nemo_vfm.diffusion.vae.diffusers_vae.AutoencoderKLVAE"
     vae_path: str = None
     sigma_data: float = 0.5
 
@@ -182,6 +183,7 @@ class DiTConfig(TransformerConfig, io.IOMixin):
     forward_step_fn = dit_forward_step
 
     replicated_t_embedder = True
+    qkv_format: str = 'sbhd'
 
     @override
     def configure_model(self, tokenizer=None) -> DiTCrossAttentionModel:
@@ -277,7 +279,7 @@ class DiT7BConfig(DiTConfig):
     attention_dropout: float = 0
     bf16: bool = True
     params_dtype: torch.dtype = torch.bfloat16
-    vae_module: str = "nemo.collections.diffusion.vae.video_vae.video_vae3_512"
+    vae_module: str = "nemo_vfm.diffusion.vae.video_vae.video_vae3_512"
     vae_path: str = None
     sigma_data: float = 0.5
     loss_add_logvar: bool = True
@@ -399,7 +401,7 @@ class DiT7BActionConfig(DiTConfig):
     attention_dropout: float = 0
     bf16: bool = True
     params_dtype: torch.dtype = torch.bfloat16
-    vae_module: str = "nemo.collections.diffusion.vae.video_vae.video_vae3_512"
+    vae_module: str = "nemo_vfm.diffusion.vae.video_vae.video_vae3_512"
     vae_path: str = None
     sigma_data: float = 0.5
     loss_add_logvar: bool = True
@@ -457,7 +459,7 @@ class DiT14BConfig(DiTConfig):
     attention_dropout: float = 0
     bf16: bool = True
     params_dtype: torch.dtype = torch.bfloat16
-    vae_module: str = "nemo.collections.diffusion.vae.video_vae.video_vae3_512"
+    vae_module: str = "nemo_vfm.diffusion.vae.video_vae.video_vae3_512"
     vae_path: str = None
     sigma_data: float = 0.5
     loss_add_logvar: bool = True
@@ -514,7 +516,7 @@ class DiT14BActionConfig(DiTConfig):
     attention_dropout: float = 0
     bf16: bool = True
     params_dtype: torch.dtype = torch.bfloat16
-    vae_module: str = "nemo.collections.diffusion.vae.video_vae.video_vae3_512"
+    vae_module: str = "nemo_vfm.diffusion.vae.video_vae.video_vae3_512"
     vae_path: str = None
     sigma_data: float = 0.5
     loss_add_logvar: bool = True
@@ -676,6 +678,7 @@ class DiTModel(GPTModel):
         return self.module.forward(*args, **kwargs)
 
     def forward_step(self, batch) -> torch.Tensor:
+        # import pdb; pdb.set_trace()
         if hasattr(self.config, "model_name"):
             if "cosmos" in getattr(self.config, "model_name"):
                 data_batch = {
@@ -697,12 +700,11 @@ class DiTModel(GPTModel):
         else:
             if parallel_state.is_pipeline_last_stage():
                 output_batch, loss = self.diffusion_pipeline.training_step(batch, 0)
-                loss = torch.mean(loss, dim=1)
+                loss = torch.mean(loss, dim=-1)
                 return loss
             else:
                 output_tensor = self.diffusion_pipeline.training_step(batch, 0)
-                return output_tensor
-
+   
     def training_step(self, batch, batch_idx=None) -> torch.Tensor:
         # In mcore the loss-function is part of the forward-pass (when labels are provided)
         return self.forward_step(batch)

@@ -20,7 +20,7 @@ from abc import ABC, abstractmethod
 import torch
 from einops import rearrange
 from huggingface_hub import snapshot_download
-from nemo.collections.diffusion.vae.pretrained_vae import JITVAE, BaseVAE
+from nemo_vfm.diffusion.vae.pretrained_vae import JITVAE, BaseVAE
 from torch.nn.modules import Module
 
 

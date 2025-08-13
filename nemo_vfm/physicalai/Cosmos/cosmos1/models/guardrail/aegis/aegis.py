@@ -21,9 +21,9 @@ import torch
 from peft import PeftModel
 from transformers import AutoModelForCausalLM, AutoTokenizer
 
-from cosmos1.models.guardrail.aegis.categories import UNSAFE_CATEGORIES
-from cosmos1.models.guardrail.common.core import ContentSafetyGuardrail, GuardrailRunner
-from cosmos1.utils import log, misc
+from nemo_vfm.physicalai.Cosmos.cosmos1.models.guardrail.aegis.categories import UNSAFE_CATEGORIES
+from nemo_vfm.physicalai.Cosmos.cosmos1.models.guardrail.common.core import ContentSafetyGuardrail, GuardrailRunner
+from nemo_vfm.physicalai.Cosmos.cosmos1.utils import log, misc
 
 
 SAFE = misc.Color.green("SAFE")

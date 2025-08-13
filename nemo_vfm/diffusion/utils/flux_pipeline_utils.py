@@ -14,8 +14,8 @@
 
 
 from megatron.core.transformer.utils import openai_gelu
-from nemo.collections.diffusion.models.flux.model import ClipConfig, FluxConfig, FluxModelParams, T5Config
-from nemo.collections.diffusion.vae.autoencoder import AutoEncoderConfig
+from nemo_vfm.diffusion.models.flux.model import ClipConfig, FluxConfig, FluxModelParams, T5Config
+from nemo_vfm.diffusion.vae.autoencoder import AutoEncoderConfig
 
 
 configs = {

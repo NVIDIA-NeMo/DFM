@@ -25,19 +25,19 @@ import torch
 from safetensors.torch import load_file
 from torch.nn.modules.module import _IncompatibleKeys
 
-from cosmos1.models.autoregressive.configs.base.model import ModelConfig
-from cosmos1.models.autoregressive.configs.base.tokenizer import TokenizerConfig
-from cosmos1.models.autoregressive.modules.mm_projector import MultimodalProjector
-from cosmos1.models.autoregressive.networks.transformer import Transformer
-from cosmos1.models.autoregressive.networks.vit import VisionTransformer, get_vit_config
-from cosmos1.models.autoregressive.tokenizer.tokenizer import DiscreteMultimodalTokenizer, update_vocab_size
-from cosmos1.models.autoregressive.utils.checkpoint import (
+from nemo_vfm.physicalai.Cosmos.cosmos1.models.autoregressive.configs.base.model import ModelConfig
+from nemo_vfm.physicalai.Cosmos.cosmos1.models.autoregressive.configs.base.tokenizer import TokenizerConfig
+from nemo_vfm.physicalai.Cosmos.cosmos1.models.autoregressive.modules.mm_projector import MultimodalProjector
+from nemo_vfm.physicalai.Cosmos.cosmos1.models.autoregressive.networks.transformer import Transformer
+from nemo_vfm.physicalai.Cosmos.cosmos1.models.autoregressive.networks.vit import VisionTransformer, get_vit_config
+from nemo_vfm.physicalai.Cosmos.cosmos1.models.autoregressive.tokenizer.tokenizer import DiscreteMultimodalTokenizer, update_vocab_size
+from nemo_vfm.physicalai.Cosmos.cosmos1.models.autoregressive.utils.checkpoint import (
     get_partial_state_dict,
     process_state_dict,
     substrings_to_ignore,
 )
-from cosmos1.models.autoregressive.utils.sampling import decode_n_tokens, decode_one_token, prefill
-from cosmos1.utils import log, misc
+from nemo_vfm.physicalai.Cosmos.cosmos1.models.autoregressive.utils.sampling import decode_n_tokens, decode_one_token, prefill
+from nemo_vfm.physicalai.Cosmos.cosmos1.utils import log, misc
 
 
 class AutoRegressiveModel(torch.nn.Module):

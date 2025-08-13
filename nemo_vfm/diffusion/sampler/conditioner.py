@@ -14,7 +14,7 @@ import numpy as np
 import torch
 from einops import reduce
 from einops.layers.torch import Rearrange
-from nemo.collections.diffusion.sampler.batch_ops import batch_mul
+from nemo_vfm.diffusion.sampler.batch_ops import batch_mul
 from torch import nn
 
 

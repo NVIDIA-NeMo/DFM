@@ -25,12 +25,12 @@ import imageio
 import numpy as np
 import torch
 import torchvision.transforms.functional as transforms_F
-from cosmos1.models.diffusion.model.model_sample_multiview_driving import DiffusionMultiCameraV2WModel
-from cosmos1.models.diffusion.model.model_t2w import DiffusionT2WModel
-from cosmos1.models.diffusion.model.model_v2w import DiffusionV2WModel
-from cosmos1.utils import log, misc
-from cosmos1.utils.config_helper import get_config_module, override
-from cosmos1.utils.io import load_from_fileobj
+from nemo_vfm.physicalai.Cosmos.cosmos1.models.diffusion.model.model_sample_multiview_driving import DiffusionMultiCameraV2WModel
+from nemo_vfm.physicalai.Cosmos.cosmos1.models.diffusion.model.model_t2w import DiffusionT2WModel
+from nemo_vfm.physicalai.Cosmos.cosmos1.models.diffusion.model.model_v2w import DiffusionV2WModel
+from nemo_vfm.physicalai.Cosmos.cosmos1.utils import log, misc
+from nemo_vfm.physicalai.Cosmos.cosmos1.utils.config_helper import get_config_module, override
+from nemo_vfm.physicalai.Cosmos.cosmos1.utils.io import load_from_fileobj
 
 
 TORCH_VERSION: Tuple[int, ...] = tuple(int(x) for x in torch.__version__.split(".")[:2])
