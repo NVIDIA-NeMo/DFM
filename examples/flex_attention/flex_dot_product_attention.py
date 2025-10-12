@@ -6,28 +6,45 @@ from typing import Optional, Tuple
 
 import torch
 from torch import Tensor
-from torch.nn.attention.flex_attention import flex_attention
+from torch.nn.attention.flex_attention import create_block_mask, flex_attention
 
-from megatron.core import parallel_state, tensor_parallel
+from megatron.core import tensor_parallel
 from megatron.core.dist_checkpointing.mapping import ShardedStateDict
 from megatron.core.packed_seq_params import PackedSeqParams
 from megatron.core.process_groups_config import ProcessGroupCollection
 from megatron.core.transformer.enums import AttnMaskType
 from megatron.core.transformer.module import MegatronModule
 from megatron.core.transformer.transformer_config import TransformerConfig
-from megatron.core.transformer.utils import (
-    attention_mask_func,
-    is_layer_window_attention,
-    make_sharded_tensors_for_checkpoint,
-)
+from megatron.core.transformer.utils import is_layer_window_attention
 from megatron.core.utils import divide
+
+
+# Fused flex attention implementation (similar to mask.py)
+@torch.compile(fullgraph=True, mode="max-autotune-no-cudagraphs", dynamic=False)
+def fused_flex_attention(q, k, v, score_mod=None, block_mask=None):
+    """Compiled flex attention for better performance."""
+    return flex_attention(q, k, v, score_mod=score_mod, block_mask=block_mask)
 
 
 class FlexDotProductAttention(MegatronModule):
     """
     FlexAttention-based attention implementation that provides flexible attention patterns
     through PyTorch's FlexAttention API. This allows for easy implementation of various
-    attention variants like causal attention, sliding window, etc.
+    attention variants like causal attention, sliding window, block diffusion, etc.
+    
+    Supported attention patterns:
+    - No mask (full attention)
+    - Causal (autoregressive)
+    - Sliding window
+    - Causal + sliding window
+    - Block diffusion (for diffusion language models)
+    
+    Block Diffusion Attention:
+    The block diffusion pattern is designed for diffusion language models and splits
+    the sequence into xt (noisy) and x0 (clean) tokens. It implements three masks:
+    - Block Diagonal (M_BD): Self-attention within blocks
+    - Offset Block-Causal (M_OBC): Cross-attention from xt to x0
+    - Block-Causal (M_BC): Causal attention within x0
     
     We use the following notation:
      h: hidden size
@@ -103,8 +120,104 @@ class FlexDotProductAttention(MegatronModule):
         ):
             self.window_size = self.config.window_size
 
+        # Block diffusion parameters
+        self.block_size = getattr(config, 'block_size', 2)
+        self.seq_length = getattr(config, 'seq_length', 4096)
+        self.use_fused_attention = getattr(config, 'use_fused_flex_attention', False)
+        
+        # Precompute block masks if using block diffusion
+        self.block_diff_mask = None
+        if self.block_size is not None and self.seq_length is not None:
+            self.block_diff_mask = self._compute_block_mask(
+                mode='block_diff', 
+                block_size=self.block_size
+            )
+
+        # Set torch dynamo cache size for better compilation performance
+        import torch._dynamo.config as dcfg
+        dcfg.cache_size_limit = 512
+
         # Score modification functions for different attention types
         self._setup_score_mod_functions()
+
+        self.use_block_diffusion_attention()
+
+    def _compute_block_mask(self, mode: str, block_size: int = None, q_len: int = None):
+        """
+        Compute block mask for different attention patterns.
+        Following the pattern from mask.py.
+        
+        Args:
+            mode: Attention mode ('block_diff', 'causal', 'bidirectional', etc.)
+            block_size: Block size for block-based attention
+            q_len: Query length (defaults to seq_length or 2*seq_length for block_diff)
+        """
+        def block_diff_mask(block_size, b, h, q_idx, kv_idx, n):
+            """
+            Constructs the specialized block diffusion attention mask for training
+            composed of three masks:
+            - **Block Diagonal Mask (M_BD)**: Self-attention within noised blocks
+            - **Offset Block Causal Mask (M_OBC)**: Cross-attention for conditional context
+            - **Block Causal Mask (M_BC)**: Attention to update x0
+
+            Args:
+                block_size: Defines the block structure.
+                b, h: Batch and head indices (ignored for mask logic).
+                q_idx, kv_idx: Query and Key indices.
+                n: Half sequence length (total sequence is 2*n for xt + x0)
+
+            Returns:
+                A boolean attention mask.
+            """
+            # Indicate whether token belongs to xt or x0
+            x0_flag_q = (q_idx >= n)
+            x0_flag_kv = (kv_idx >= n)
+
+            # Compute block indices
+            block_q = torch.where(x0_flag_q == 1,
+                                    (q_idx - n) // block_size,
+                                    q_idx // block_size)
+            block_kv = torch.where(x0_flag_kv == 1,
+                                    (kv_idx - n) // block_size,
+                                    kv_idx // block_size)
+
+            # **1. Block Diagonal Mask (M_BD) **
+            block_diagonal = (block_q == block_kv) & (x0_flag_q == x0_flag_kv)
+
+            # **2. Offset Block-Causal Mask (M_OBC) **
+            offset_block_causal = (
+                (block_q > block_kv)
+                & (x0_flag_kv == 1)
+                & (x0_flag_q == 0)
+            )
+
+            # **3. Block-Causal Mask (M_BC) **
+            block_causal = (block_q >= block_kv) & (x0_flag_kv == 1) & (x0_flag_q == 1)
+
+            # **4. Combine Masks **
+            return block_diagonal | offset_block_causal | block_causal
+
+        if mode == 'block_diff':
+            assert block_size is not None, "block_size must be provided for block_diff mode"
+            attn_mask = lambda b, h, q, kv: block_diff_mask(block_size, b, h, q, kv, self.seq_length)
+        else:
+            raise ValueError(f"Unknown attention mode: {mode}")
+
+        # Determine query/key length
+        if q_len is not None:
+            Q_LEN = q_len
+        else:
+            if mode == 'block_diff':
+                Q_LEN = self.seq_length * 2  # doubled for xt + x0
+            else:
+                Q_LEN = self.seq_length
+
+        # Create block mask
+        block_mask = create_block_mask(
+            attn_mask, B=None, H=None, Q_LEN=Q_LEN, KV_LEN=Q_LEN
+        )
+
+        return block_mask
 
     def _setup_score_mod_functions(self):
         """Setup score modification functions for different attention patterns."""
@@ -140,6 +253,7 @@ class FlexDotProductAttention(MegatronModule):
             return torch.where(combined_mask, scaled_score, torch.tensor(float('-inf'), device=score.device, dtype=score.dtype))
 
         # Map attention mask types to score mod functions
+        # Note: For block_diff, we use block_mask instead of score_mod
         self.score_mod_functions = {
             AttnMaskType.no_mask: noop_score_mod,
             AttnMaskType.causal: causal_score_mod,
@@ -150,6 +264,41 @@ class FlexDotProductAttention(MegatronModule):
     def _get_score_mod_function(self):
         """Get the appropriate score modification function based on attention mask type."""
         return self.score_mod_functions.get(self.attn_mask_type, self.score_mod_functions[AttnMaskType.no_mask])
+    
+    def set_block_diffusion_params(self, block_size: int = None, seq_length: int = None):
+        """
+        Update block diffusion parameters dynamically and recompute block mask.
+        
+        Args:
+            block_size: Size of each block for block diffusion attention
+            seq_length: Length of the sequence (will be doubled for block diffusion: xt + x0)
+        """
+        recompute = False
+        if block_size is not None and block_size != self.block_size:
+            self.block_size = block_size
+            recompute = True
+        if seq_length is not None and seq_length != self.seq_length:
+            self.seq_length = seq_length
+            recompute = True
+        
+        # Recompute block mask if parameters changed
+        if recompute and self.block_size is not None and self.seq_length is not None:
+            self.block_diff_mask = self._compute_block_mask(
+                mode='block_diff',
+                block_size=self.block_size
+            )
+    
+    def use_block_diffusion_attention(self):
+        """
+        Switch to block diffusion attention pattern.
+        Ensures block mask is computed if not already done.
+        """
+        self.attn_mask_type = 'block_diff'
+        if self.block_diff_mask is None and self.block_size is not None and self.seq_length is not None:
+            self.block_diff_mask = self._compute_block_mask(
+                mode='block_diff',
+                block_size=self.block_size
+            )
 
     def forward(
         self,
@@ -179,11 +328,32 @@ class FlexDotProductAttention(MegatronModule):
         key = key.transpose(1, 2)      # [b, np, sk, hn]
         value = value.transpose(1, 2)  # [b, np, sk, hn]
 
-        # Get the appropriate score modification function
-        score_mod = self._get_score_mod_function()
+        # Determine whether to use block_mask or score_mod
+        block_mask = None
+        score_mod = None
+        
+        if self.attn_mask_type == 'block_diff':
+            # Use block_mask for block diffusion
+            if self.block_diff_mask is None or sq != self.block_diff_mask.shape[-2]:
+                # Compute or recompute block mask for different sequence length
+                assert self.block_size is not None and self.seq_length is not None, \
+                    "block_size and seq_length must be set for block_diff attention"
+                block_mask = self._compute_block_mask(
+                    mode='block_diff',
+                    block_size=self.block_size,
+                    q_len=sq
+                )
+            else:
+                block_mask = self.block_diff_mask
+        else:
+            # Use score_mod for other attention patterns
+            score_mod = self._get_score_mod_function()
 
-        # Apply FlexAttention
-        context = flex_attention(query, key, value, score_mod=score_mod)
+        # Apply FlexAttention (fused or standard)
+        if self.use_fused_attention:
+            context = fused_flex_attention(query, key, value, score_mod=score_mod, block_mask=block_mask)
+        else:
+            context = flex_attention(query, key, value, score_mod=score_mod, block_mask=block_mask)
 
         # Apply dropout
         if not self.config.sequence_parallel:

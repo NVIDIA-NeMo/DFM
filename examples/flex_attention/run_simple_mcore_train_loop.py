@@ -18,7 +18,7 @@ from megatron.core.datasets.gpt_dataset import GPTDatasetConfig, MockGPTDataset
 from megatron.training.tokenizer.tokenizer import _NullTokenizer
 
 
-_SEQUENCE_LENGTH = 64
+_SEQUENCE_LENGTH = 8192
 
 
 def initialize_distributed(tensor_model_parallel_size=1, pipeline_model_parallel_size=1):
