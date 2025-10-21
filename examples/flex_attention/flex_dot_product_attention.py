@@ -20,7 +20,7 @@ from megatron.core.utils import divide
 
 
 # Fused flex attention implementation (similar to mask.py)
-@torch.compile(fullgraph=True, mode="max-autotune-no-cudagraphs", dynamic=False)
+# @torch.compile(fullgraph=True, mode="max-autotune-no-cudagraphs", dynamic=False)
 def fused_flex_attention(q, k, v, score_mod=None, block_mask=None):
     """Compiled flex attention for better performance."""
     return flex_attention(q, k, v, score_mod=score_mod, block_mask=block_mask)
@@ -123,7 +123,7 @@ class FlexDotProductAttention(MegatronModule):
         # Block diffusion parameters
         self.block_size = getattr(config, 'block_size', 2)
         self.seq_length = getattr(config, 'seq_length', 4096)
-        self.use_fused_attention = getattr(config, 'use_fused_flex_attention', False)
+        self.use_fused_attention = getattr(config, 'use_fused_flex_attention', True)
         
         # Precompute block masks if using block diffusion
         self.block_diff_mask = None

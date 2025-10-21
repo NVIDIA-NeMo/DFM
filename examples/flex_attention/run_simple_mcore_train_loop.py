@@ -38,7 +38,7 @@ def model_provider():
 
     transformer_config = TransformerConfig(
         num_layers=2, 
-        hidden_size=16, 
+        hidden_size=64, 
         num_attention_heads=4, 
         use_cpu_initialization=True, 
         pipeline_dtype=torch.float32,
