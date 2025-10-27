@@ -12,18 +12,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-from __future__ import annotations
-
-from nemo_automodel.components.config._arg_parser import parse_args_and_load_config
-from Automodel.recipes.finetune import TrainWan21DiffusionRecipe
-
-
-def main(default_config_path="/opt/DFM/dfm/examples/Automodel/finetune/wan2_1_t2v_flow.yaml"):
-    cfg = parse_args_and_load_config(default_config_path)
-    recipe = TrainWan21DiffusionRecipe(cfg)
-    recipe.setup()
-    recipe.run_train_validation_loop()
-
-
-if __name__ == "__main__":
-    main()
+__all__ = [
+    "training_step_t2v",
+    "time_shift_utils",
+]
