@@ -7,54 +7,18 @@ on:
 
 jobs:
   linting:
-    name: "Domain: ${{ matrix.domain }}"
+    name: "Code Linting"
     runs-on: ubuntu-latest
-    strategy:
-      fail-fast: false
-      matrix:
-        domain: [speech, other]
-    env:
-      DOMAIN: ${{ matrix.domain }}
     steps:
       - name: Checkout
         uses: actions/checkout@v4
-
-      - name: Select filter
-        id: filter
-        run: |
-          if [[ "$DOMAIN" == "speech" ]]; then
-            FILTER=$(jq -crn '[
-              "nemo/collections/common/data/lhotse/*.py",
-              "nemo/collections/asr/**/*.py",
-              "nemo/collections/tts/**/*.py",
-              "nemo/collections/audio/**/*.py",
-              "nemo/collections/multimodal/speech_llm/**/*.py",
-              "nemo/collections/speechlm/**/*.py",
-              "nemo/collections/speechlm2/**/*.py"
-            ] | join(",")')
-
-          else
-            FILTER=$(jq -crn '[
-              "nemo/**/*.py",
-              "!nemo/collections/common/data/lhotse/*.py",
-              "!nemo/collections/asr/**/*.py",
-              "!nemo/collections/tts/**/*.py",
-              "!nemo/collections/audio/**/*.py",
-              "!nemo/collections/multimodal/speech_llm/**/*.py",
-              "!nemo/collections/speechlm/**/*.py",
-              "!nemo/collections/speechlm2/**/*.py"
-            ] | join(",")')
-          fi
-
-          echo "main=$FILTER" | tee -a "$GITHUB_OUTPUT"
 
       - name: Get changed files
         id: changed-files
         uses: step-security/changed-files@v45.0.1
         with:
-          files: ${{ steps.filter.outputs.main }}
-          files_separator: ","
-          separator: " "
+          files: |
+            **/*.py
 
       - name: Run PyLint
         id: pylint
@@ -64,7 +28,7 @@ jobs:
           SKIP_LINTING: ${{ contains(github.event.pull_request.labels.*.name, 'skip-linting') }}
         run: |
           if [[ -z "$CHANGED_FILES" ]]; then
-            echo Nothing to lint.
+            echo "Nothing to lint."
             echo "exit-code=0" | tee -a "$GITHUB_OUTPUT"
             exit 0
           fi
@@ -81,7 +45,7 @@ jobs:
 
           pip install pylint
           set +e
-          pylint $ADDITIONAL_PYLINT_ARGS --output "pylintrc.$DOMAIN.txt" --rcfile ".pylintrc.$DOMAIN" ${CHANGED_FILES[@]}
+          pylint $ADDITIONAL_PYLINT_ARGS --output pylintrc.txt --rcfile .pylintrc ${CHANGED_FILES[@]}
           echo "exit-code=$?" | tee -a "$GITHUB_OUTPUT"
 
       - name: Run flake8
@@ -91,7 +55,7 @@ jobs:
           SKIP_LINTING: ${{ contains(github.event.pull_request.labels.*.name, 'skip-linting') }}
         run: |
           if [[ -z "$CHANGED_FILES" ]]; then
-            echo Nothing to lint.
+            echo "Nothing to lint."
             echo "exit-code=0" | tee -a "$GITHUB_OUTPUT"
             exit 0
           fi
@@ -104,7 +68,7 @@ jobs:
 
           pip install flake8
           set +e
-          flake8 $ADDITIONAL_FLAKE8_ARGS --output "flake8.$DOMAIN.txt" --config ".flake8.$DOMAIN" ${CHANGED_FILES[@]}
+          flake8 $ADDITIONAL_FLAKE8_ARGS --output flake8.txt --config .flake8 ${CHANGED_FILES[@]}
           echo "exit-code=$?" | tee -a "$GITHUB_OUTPUT"
 
       - name: Summary
@@ -112,48 +76,20 @@ jobs:
           PYLINT: ${{ steps.pylint.outputs.exit-code == 0 }}
           FLAKE8: ${{ steps.flake8.outputs.exit-code == 0 }}
         run: |
-
           if [[ "$PYLINT" != "true" ]]; then
             echo "Pylint output:" | tee -a $GITHUB_STEP_SUMMARY
-
             echo '```' | tee -a $GITHUB_STEP_SUMMARY
-            cat pylintrc.$DOMAIN.txt | tee -a $GITHUB_STEP_SUMMARY
+            cat pylintrc.txt | tee -a $GITHUB_STEP_SUMMARY
             echo '```' | tee -a $GITHUB_STEP_SUMMARY
           fi
 
           if [[ "$FLAKE8" != "true" ]]; then
             echo "Flake8 output:" | tee -a $GITHUB_STEP_SUMMARY
-
             echo '```' | tee -a $GITHUB_STEP_SUMMARY
-            cat flake8.$DOMAIN.txt | tee -a $GITHUB_STEP_SUMMARY
+            cat flake8.txt | tee -a $GITHUB_STEP_SUMMARY
             echo '```' | tee -a $GITHUB_STEP_SUMMARY
           fi
 
           if [[ "$PYLINT" != "true" ||  "$FLAKE8" != "true" ]]; then
-            echo "The following directories got scanned:" | tee -a $GITHUB_STEP_SUMMARY
-
-            echo '```' | tee -a $GITHUB_STEP_SUMMARY
-            echo ${{ steps.filter.outputs.main }} | tee -a $GITHUB_STEP_SUMMARY
-            echo '```' | tee -a $GITHUB_STEP_SUMMARY
-
-            exit 1
-          fi
-
-  Nemo_Linting_Test:
-    needs: linting
-    runs-on: ubuntu-latest
-    if: always()
-    steps:
-      - name: Main
-        env:
-          RESULTS: ${{ toJson(needs.linting) }}
-        run: |
-          RESULT=$(echo "$RESULTS" | jq -r '.result')
-
-          if [[ "$RESULT" == "success" ]]; then
-            echo "All passed."
-            exit 0
-          else
-            echo "Some linting domains failed."
             exit 1
           fi
