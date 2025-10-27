@@ -44,6 +44,12 @@ extensions = [
 templates_path = ["_templates"]
 exclude_patterns = ["_build", "Thumbs.db", ".DS_Store"]
 
+# Suppress warnings for cross-references and autodoc issues
+suppress_warnings = [
+    "myst.xref_missing",  # Missing cross-references in included README
+    "autodoc2",  # Autodoc2 warnings during API doc generation
+]
+
 # -- Options for MyST Parser (Markdown) --------------------------------------
 # MyST Parser settings
 myst_enable_extensions = [
@@ -92,3 +98,9 @@ html_theme_options = {
     },
 }
 html_extra_path = ["project.json", "versions1.json"]
+
+# Github links can get rate limited from Github Actions
+linkcheck_ignore = [
+    ".*github\\.com.*",
+    ".*githubusercontent\\.com.*",
+]
