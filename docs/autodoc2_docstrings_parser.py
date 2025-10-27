@@ -30,4 +30,3 @@ class NapoleonParser(MystParser):
 
 
 Parser = NapoleonParser
-
