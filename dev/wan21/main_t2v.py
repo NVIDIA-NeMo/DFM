@@ -4,7 +4,7 @@
 
 import argparse
 
-from dist_utils import print0
+from dist_utils import print0, init_dist
 from trainer_t2v import WanT2VTrainer
 
 
@@ -187,6 +187,7 @@ def print_config_summary(args):
 
 def main():
     args = parse_args()
+    rank, world_size, local_rank, pg_local = init_dist()
     
     # Apply mode-specific defaults
     args = apply_mode_defaults(args)
