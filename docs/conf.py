@@ -47,7 +47,9 @@ exclude_patterns = ["_build", "Thumbs.db", ".DS_Store"]
 # Suppress warnings for cross-references and autodoc issues
 suppress_warnings = [
     "myst.xref_missing",  # Missing cross-references in included README
+    "myst.header",  # Header level warnings from autodoc2 generated files
     "autodoc2",  # Autodoc2 warnings during API doc generation
+    "toc.not_included",  # Autodoc2 index not included in main toctree
 ]
 
 # -- Options for MyST Parser (Markdown) --------------------------------------
