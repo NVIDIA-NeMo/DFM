@@ -1,4 +1,4 @@
-# training_step_t2v.py - Manual Flow Matching (DO NOT use scheduler.add_noise)
+# training_step_t2v.py - Manual Flow Matching (FIXED VERSION)
 
 import os
 from typing import Dict, Tuple
@@ -26,7 +26,7 @@ def step_fsdp_transformer_t2v(
     """
     Pure flow matching training - DO NOT use scheduler.add_noise().
     
-    The scheduler's add_noise() uses alpha_t/sigma_t which explodes at low timesteps.
+    FIXED: The scheduler's add_noise() uses alpha_t/sigma_t which explodes at low timesteps.
     We use simple flow matching: x_t = (1-σ)x_0 + σ*ε
     """
     debug_mode = os.environ.get("DEBUG_TRAINING", "0") == "1"
@@ -86,13 +86,13 @@ def step_fsdp_transformer_t2v(
         sampling_method = "uniform_no_shift"
 
     # ========================================================================
-    # Manual Flow Matching Noise Addition
+    # Manual Flow Matching Noise Addition (FIXED - NO SCHEDULER!)
     # ========================================================================
     
     # Generate noise
     noise = torch.randn_like(video_latents, dtype=torch.float32)
     
-    # CRITICAL: Manual flow matching (NOT scheduler.add_noise!)
+    # CRITICAL FIX: Manual flow matching (NOT scheduler.add_noise!)
     # x_t = (1 - σ) * x_0 + σ * ε
     sigma_reshaped = sigma.view(-1, 1, 1, 1, 1)
     noisy_latents = (
@@ -108,9 +108,9 @@ def step_fsdp_transformer_t2v(
     # ====================================================================
     if detailed_log or debug_mode:
         print0("\n" + "="*80)
-        print0(f"[STEP {global_step}] MANUAL FLOW MATCHING")
+        print0(f"[STEP {global_step}] MANUAL FLOW MATCHING (FIXED)")
         print0("="*80)
-        print0(f"[WARNING] NOT using scheduler.add_noise() - it explodes!")
+        print0(f"[FIXED] NOT using scheduler.add_noise() - preventing explosion!")
         print0(f"[INFO] Using manual: x_t = (1-σ)x_0 + σ*ε")
         print0("")
         print0(f"[SAMPLING] Method: {sampling_method}")

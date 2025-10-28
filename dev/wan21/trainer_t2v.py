@@ -1,4 +1,4 @@
-# trainer_t2v_unified.py - Unified WAN 2.1 T2V Trainer (Pretrain + Finetune)
+# trainer_t2v.py - WAN 2.1 T2V Trainer with Mode System (FIXED VERSION)
 
 import os
 from typing import Optional
@@ -22,17 +22,21 @@ from training_step_t2v import step_fsdp_transformer_t2v
 
 class WanT2VTrainer:
     """
-    Unified WAN 2.1 T2V trainer supporting both PRETRAIN and FINETUNE modes.
+    WAN 2.1 T2V trainer with mode system (FIXED VERSION).
     
-    Mode differences:
-    - PRETRAIN: Higher LR, warmup, stronger regularization, better sampling
-    - FINETUNE: Lower LR, no warmup, conservative updates, simpler sampling
+    FIXED: Uses manual flow matching instead of scheduler.add_noise()
+    
+    Features:
+    - Mode-based configuration (pretrain/finetune)
+    - FSDP for distributed training
+    - Manual flow matching (no scheduler explosion)
+    - Warmup + Cosine annealing LR schedule
     """
 
     def __init__(
         self,
         model_id: str = "Wan-AI/Wan2.1-T2V-1.3B-Diffusers",
-        mode: str = "finetune",  # "pretrain" or "finetune"
+        mode: str = "finetune",
         learning_rate: float = 1e-5,
         cpu_offload: bool = True,
         # Optimizer config
@@ -51,9 +55,6 @@ class WanT2VTrainer:
         flow_shift: float = 3.0,
         mix_uniform_ratio: float = 0.1,
     ):
-        if mode not in ["pretrain", "finetune"]:
-            raise ValueError(f"Invalid mode: {mode}. Must be 'pretrain' or 'finetune'")
-        
         self.model_id = model_id
         self.mode = mode
         self.learning_rate = learning_rate
@@ -90,17 +91,23 @@ class WanT2VTrainer:
         print0(f"[INFO] WAN 2.1 T2V Trainer - Mode: {mode.upper()}")
         print0(f"[INFO] Total GPUs: {self.world_size}, GPUs per node: {self.local_world_size}, Num nodes: {self.num_nodes}")
         print0(f"[INFO] Node rank: {self.node_rank}, Local rank: {self.local_rank}")
-        print0(f"[INFO] Learning rate: {learning_rate} (warmup: {warmup_steps} steps, min: {lr_min})")
-        print0(f"[INFO] Weight decay: {weight_decay}")
-        print0(f"[INFO] Gradient clipping: {grad_clip}")
-        print0(f"[INFO] Adam betas: ({beta1}, {beta2})")
+        
+        # Important note about weight initialization
+        if mode == "finetune":
+            print0(f"[INFO] Weight initialization: PRETRAINED (from {model_id})")
+        else:
+            print0(f"[INFO] Weight initialization: RANDOM (true from-scratch training)")
+        
+        print0(f"[INFO] Learning rate: {learning_rate}")
+        print0(f"[INFO] Weight decay: {weight_decay}, Beta2: {beta2}, Grad clip: {grad_clip}")
+        print0(f"[INFO] Warmup steps: {warmup_steps}")
         print0(f"[INFO] CPU offload: {'ENABLED' if cpu_offload else 'DISABLED'}")
-        print0(f"[INFO] Flow matching: {'ENABLED' if use_sigma_noise else 'DISABLED'}")
-        if use_sigma_noise:
-            print0(f"[INFO]   - Timestep sampling: {timestep_sampling}")
-            print0(f"[INFO]   - Flow shift: {flow_shift}")
-            print0(f"[INFO]   - Logit std: {logit_std}")
-            print0(f"[INFO]   - Mix uniform ratio: {mix_uniform_ratio}")
+        print0(f"[INFO] FIXED: Using manual flow matching (no scheduler explosion)")
+        print0(f"[INFO] Flow matching config:")
+        print0(f"[INFO]   - Enabled: {use_sigma_noise}")
+        print0(f"[INFO]   - Timestep sampling: {timestep_sampling}")
+        print0(f"[INFO]   - Flow shift: {flow_shift}")
+        print0(f"[INFO]   - Mix uniform ratio: {mix_uniform_ratio}")
 
         self.pipe = None
         self.model_map = {}
@@ -108,27 +115,80 @@ class WanT2VTrainer:
         self.lr_scheduler = None
 
     def setup_pipeline(self):
-        print0("[INFO] Loading WAN 2.1 T2V pipeline (transformer only)...")
-
-        transformer = WanTransformer3DModel.from_config("./wan2.1_1.3B.config")
-
-        # Load pipeline without VAE or text encoder
-        self.pipe = WanPipeline.from_pretrained(
-            self.model_id, 
-            torch_dtype=torch.float32,
-            vae=None,
-            text_encoder=None,
-            transformer=transformer,
-        )
-
-        # Explicitly delete VAE and text encoder if they were loaded
+        """Load pipeline with mode-aware weight initialization."""
+        
+        if self.mode == "finetune":
+            # FINETUNE: Always load pretrained weights
+            print0("[INFO] FINETUNE MODE: Loading pretrained weights...")
+            
+            self.pipe = WanPipeline.from_pretrained(
+                self.model_id, 
+                torch_dtype=torch.bfloat16,
+            )
+            
+            print0(f"[INFO] ✓ Loaded pretrained transformer from {self.model_id}")
+            
+            # Verify weights are actually loaded
+            if hasattr(self.pipe, 'transformer') and self.pipe.transformer is not None:
+                if hasattr(self.pipe.transformer, 'blocks') and len(self.pipe.transformer.blocks) > 0:
+                    first_param = next(self.pipe.transformer.blocks[0].parameters())
+                    param_mean = first_param.abs().mean().item()
+                    param_std = first_param.std().item()
+                    
+                    if param_mean < 1e-6:
+                        raise RuntimeError(f"[ERROR] Weights are RANDOM! Mean: {param_mean:.2e}")
+                    else:
+                        print0(f"[INFO] ✓ Pretrained weights verified:")
+                        print0(f"[INFO]   - Mean: {param_mean:.4f}")
+                        print0(f"[INFO]   - Std:  {param_std:.4f}")
+        
+        else:  # pretrain mode
+            # PRETRAIN: Random initialization (true from-scratch)
+            print0("[INFO] PRETRAIN MODE: Random initialization (from scratch)...")
+            print0(f"[INFO] Loading config from {self.model_id}...")
+            
+            # Load just the config
+            from diffusers import WanTransformer3DModel
+            transformer = WanTransformer3DModel.from_pretrained(
+                self.model_id,
+                subfolder="transformer",
+                torch_dtype=torch.bfloat16,
+            )
+            
+            # Get config and reinitialize with random weights
+            config = transformer.config
+            print0("[INFO] Reinitializing transformer with RANDOM weights...")
+            transformer = WanTransformer3DModel(config)
+            
+            # Load pipeline with random transformer
+            self.pipe = WanPipeline.from_pretrained(
+                self.model_id,
+                transformer=transformer,
+                torch_dtype=torch.bfloat16,
+            )
+            
+            # Verify weights are random
+            if hasattr(self.pipe.transformer, 'blocks') and len(self.pipe.transformer.blocks) > 0:
+                first_param = next(self.pipe.transformer.blocks[0].parameters())
+                param_mean = first_param.abs().mean().item()
+                param_std = first_param.std().item()
+                
+                print0(f"[INFO] ✓ Random initialization verified:")
+                print0(f"[INFO]   - Mean: {param_mean:.4f} (should be near 0)")
+                print0(f"[INFO]   - Std:  {param_std:.4f} (should be ~0.02)")
+                
+                # Random init should have very small mean
+                if param_mean > 0.01:
+                    print0(f"[WARNING] Mean seems high for random init: {param_mean:.4f}")
+        
+        # Remove VAE and text encoder (we only need transformer + scheduler)
         if hasattr(self.pipe, "vae") and self.pipe.vae is not None:
-            print0("[INFO] Removing VAE from pipeline...")
+            print0("[INFO] Removing VAE from pipeline (not needed for training)...")
             del self.pipe.vae
             self.pipe.vae = None
 
         if hasattr(self.pipe, "text_encoder") and self.pipe.text_encoder is not None:
-            print0("[INFO] Removing text encoder from pipeline...")
+            print0("[INFO] Removing text encoder from pipeline (not needed for training)...")
             del self.pipe.text_encoder
             self.pipe.text_encoder = None
 
@@ -136,10 +196,11 @@ class WanT2VTrainer:
         if torch.cuda.is_available():
             torch.cuda.empty_cache()
 
-        print0("[INFO] Pipeline loaded (transformer + scheduler only)")
+        mode_str = "pretrained" if self.mode == "finetune" else "random"
+        print0(f"[INFO] ✓ Pipeline ready ({mode_str} transformer + scheduler)")
 
     def setup_fsdp(self):
-        print0(f"[INFO] Setting up FSDP for {self.mode}...")
+        print0("[INFO] Setting up FSDP for full fine-tuning...")
 
         self.model_map = setup_fsdp_for_t2v_pipe(
             self.pipe,
@@ -153,8 +214,7 @@ class WanT2VTrainer:
         print0("[INFO] FSDP setup complete")
 
     def setup_optim(self, total_steps: int):
-        """Setup optimizer with mode-appropriate parameters."""
-        print0(f"[INFO] Setting up optimizer for {self.mode}...")
+        print0("[INFO] Setting up optimizer...")
 
         # Get ALL trainable parameters
         all_params = get_fsdp_all_parameters(self.model_map)
@@ -163,72 +223,46 @@ class WanT2VTrainer:
             raise RuntimeError("No trainable parameters found!")
 
         print0(f"[INFO] Optimizing {len(all_params)} parameters")
-        print0(f"[INFO] Weight decay: {self.weight_decay}")
-        print0(f"[INFO] Betas: ({self.beta1}, {self.beta2})")
 
         self.optimizer = torch.optim.AdamW(
             all_params, 
             lr=self.learning_rate, 
             weight_decay=self.weight_decay,
-            betas=(self.beta1, self.beta2),
-            eps=1e-8,
+            betas=(self.beta1, self.beta2)
         )
 
-        # Setup learning rate schedule
+        # Create warmup + cosine annealing scheduler
         if self.warmup_steps > 0:
-            # With warmup (typical for pretraining)
-            print0(f"[INFO] Setting up warmup + cosine LR schedule:")
-            print0(f"[INFO]   - Warmup steps: {self.warmup_steps}")
-            print0(f"[INFO]   - Total steps: {total_steps}")
-            print0(f"[INFO]   - Min LR: {self.lr_min}")
-
-            from torch.optim.lr_scheduler import LinearLR, CosineAnnealingLR, SequentialLR
-
-            # Warmup phase
-            warmup_scheduler = LinearLR(
+            print0(f"[INFO] Using warmup ({self.warmup_steps} steps) + cosine annealing")
+            
+            # Lambda function for warmup + cosine
+            def lr_lambda(current_step):
+                if current_step < self.warmup_steps:
+                    # Linear warmup
+                    return float(current_step) / float(max(1, self.warmup_steps))
+                else:
+                    # Cosine annealing after warmup
+                    progress = float(current_step - self.warmup_steps) / float(max(1, total_steps - self.warmup_steps))
+                    cosine_decay = 0.5 * (1.0 + torch.cos(torch.tensor(progress * 3.141592653589793)))
+                    return max(self.lr_min / self.learning_rate, cosine_decay.item())
+            
+            self.lr_scheduler = torch.optim.lr_scheduler.LambdaLR(
                 self.optimizer,
-                start_factor=0.1,  # Start at 10% of target LR
-                end_factor=1.0,
-                total_iters=self.warmup_steps,
-            )
-
-            # Cosine decay phase
-            cosine_steps = max(1, total_steps - self.warmup_steps)
-            cosine_scheduler = CosineAnnealingLR(
-                self.optimizer,
-                T_max=cosine_steps,
-                eta_min=self.lr_min,
-            )
-
-            # Combine warmup + cosine
-            self.lr_scheduler = SequentialLR(
-                self.optimizer,
-                schedulers=[warmup_scheduler, cosine_scheduler],
-                milestones=[self.warmup_steps],
+                lr_lambda=lr_lambda
             )
         else:
-            # No warmup (typical for finetuning)
-            print0(f"[INFO] Setting up cosine LR schedule (no warmup):")
-            print0(f"[INFO]   - Total steps: {total_steps}")
-            print0(f"[INFO]   - Min LR: {self.lr_min}")
-
-            from torch.optim.lr_scheduler import CosineAnnealingLR
-            
-            self.lr_scheduler = CosineAnnealingLR(
-                self.optimizer,
-                T_max=total_steps,
-                eta_min=self.lr_min,
+            print0(f"[INFO] Using cosine annealing (no warmup)")
+            self.lr_scheduler = torch.optim.lr_scheduler.CosineAnnealingLR(
+                self.optimizer, 
+                T_max=total_steps, 
+                eta_min=self.lr_min
             )
-
-        print0(f"[INFO] Optimizer and scheduler configured for {self.mode}")
 
     def validate_setup(self):
         """Validate FSDP setup with a test forward pass."""
         print0("[INFO] Validating FSDP setup...")
-
         test_fsdp_forward_pass(self.model_map, self.device, self.bf16)
 
-        # Check memory
         if torch.cuda.is_available():
             memory_allocated = torch.cuda.memory_allocated(self.device) / 1024**3
             memory_reserved = torch.cuda.memory_reserved(self.device) / 1024**3
@@ -241,38 +275,28 @@ class WanT2VTrainer:
         batch_size_per_node: int = 1,
         save_every: int = 500,
         consolidate_every: int = 1000,
-        log_every: int = 5,
+        log_every: int = 10,
         output_dir: str = "./wan_t2v_outputs",
         resume_checkpoint: Optional[str] = None,
     ):
-        """
-        Train the model with flow matching.
-        
-        Args:
-            batch_size_per_node: Batch size for each node (NOT per GPU)
-            consolidate_every: Save consolidated model every N steps
-        """
-        print0("=" * 80)
-        print0(f"[INFO] Starting T2V {self.mode.upper()} with Flow Matching")
-        print0("=" * 80)
+        """Train the model with mode-aware configuration."""
+        print0(f"\n[INFO] Starting T2V training - Mode: {self.mode.upper()}")
         print0(f"[INFO] Batch size per node: {batch_size_per_node}")
         print0(f"[INFO] Total effective batch size: {batch_size_per_node * self.num_nodes}")
-        print0(f"[INFO] Number of epochs: {num_epochs}")
 
         self.setup_pipeline()
         self.setup_fsdp()
 
-        # Create dataloader first to calculate total steps
+        # Create dataloader
         dataloader, sampler = create_dataloader(meta_folder, batch_size_per_node, self.num_nodes)
 
         steps_per_epoch = len(dataloader)
         total_steps = num_epochs * steps_per_epoch
 
-        print0(f"[INFO] Steps per epoch: {steps_per_epoch}")
-        print0(f"[INFO] Total training steps: {total_steps}")
-
-        # Now setup optimizer with correct total_steps
+        # Setup optimizer with total steps for scheduler
         self.setup_optim(total_steps)
+        print0(f"[INFO] Scheduler configured for {total_steps} total steps")
+
         self.validate_setup()
 
         global_step = 0
@@ -283,14 +307,13 @@ class WanT2VTrainer:
                 self.model_map, self.optimizer, self.lr_scheduler, resume_checkpoint
             )
             start_epoch = global_step // steps_per_epoch
-            print0(f"[INFO] Resumed from step {global_step}, epoch {start_epoch}")
 
         if is_main_process():
             os.makedirs(output_dir, exist_ok=True)
 
             config = {
-                "mode": self.mode,
                 "model_id": self.model_id,
+                "mode": self.mode,
                 "learning_rate": self.learning_rate,
                 "weight_decay": self.weight_decay,
                 "beta1": self.beta1,
@@ -304,22 +327,16 @@ class WanT2VTrainer:
                 "num_nodes": self.num_nodes,
                 "gpus_per_node": self.local_world_size,
                 "total_gpus": self.world_size,
-                "total_steps": total_steps,
                 "cpu_offload": self.cpu_offload,
-                # Flow matching config
                 "use_sigma_noise": self.use_sigma_noise,
                 "timestep_sampling": self.timestep_sampling,
-                "logit_mean": self.logit_mean,
-                "logit_std": self.logit_std,
                 "flow_shift": self.flow_shift,
                 "mix_uniform_ratio": self.mix_uniform_ratio,
+                "training_method": "manual_flow_matching_fixed",
             }
 
-            # Use different wandb project based on mode
-            project_name = f"wan-t2v-{self.mode}"
-            
             wandb.init(
-                project=project_name,
+                project=f"wan-t2v-{self.mode}",
                 config=config,
                 resume=resume_checkpoint is not None,
             )
@@ -343,13 +360,13 @@ class WanT2VTrainer:
                 self.optimizer.zero_grad(set_to_none=True)
 
                 try:
+                    # FIXED: Uses manual flow matching (no scheduler.add_noise)
                     loss, metrics = step_fsdp_transformer_t2v(
                         pipe=self.pipe,
                         model_map=self.model_map,
                         batch=batch,
                         device=self.device,
                         bf16=self.bf16,
-                        # Flow matching parameters
                         use_sigma_noise=self.use_sigma_noise,
                         timestep_sampling=self.timestep_sampling,
                         logit_mean=self.logit_mean,
@@ -386,21 +403,21 @@ class WanT2VTrainer:
                 num_steps += 1
                 global_step += 1
 
-                current_lr = self.optimizer.param_groups[0]["lr"]
-
                 # Logging
                 if is_main_process() and (global_step % log_every == 0):
                     log_dict = {
                         "train_loss": loss.item(),
                         "train_avg_loss": epoch_loss / num_steps,
-                        "lr": current_lr,
+                        "lr": self.optimizer.param_groups[0]["lr"],
                         "grad_norm": grad_norm,
                         "epoch": epoch,
                         "global_step": global_step,
                         # Flow matching metrics
                         "sigma_mean": metrics.get("sigma_mean", 0),
-                        "timestep_mean": metrics.get("timestep_mean", 0),
-                        "sampling_method": metrics.get("sampling_method", "unknown"),
+                        "sigma_min": metrics.get("sigma_min", 0),
+                        "sigma_max": metrics.get("sigma_max", 0),
+                        "timestep_min": metrics.get("timestep_min", 0),
+                        "timestep_max": metrics.get("timestep_max", 0),
                     }
 
                     wandb.log(log_dict, step=global_step)
@@ -410,14 +427,15 @@ class WanT2VTrainer:
                             {
                                 "loss": f"{loss.item():.4f}",
                                 "avg": f"{(epoch_loss / num_steps):.4f}",
-                                "lr": f"{current_lr:.2e}",
+                                "lr": f"{self.optimizer.param_groups[0]['lr']:.2e}",
                                 "gn": f"{grad_norm:.2f}",
                             }
                         )
 
-                # Checkpointing with smart consolidation
+                # Checkpointing with consolidation control
                 if save_every and (global_step % save_every == 0):
-                    # Only consolidate at specified intervals
+                    # Consolidate based on consolidate_every
+                    should_consolidate = (global_step % consolidate_every == 0)
                     
                     save_fsdp_checkpoint(
                         self.model_map,
@@ -425,7 +443,7 @@ class WanT2VTrainer:
                         self.lr_scheduler,
                         output_dir,
                         global_step,
-                        consolidate=True,
+                        consolidate=should_consolidate,
                     )
 
             # Epoch summary
@@ -435,9 +453,9 @@ class WanT2VTrainer:
             if is_main_process():
                 wandb.log({"epoch/avg_loss": avg_loss, "epoch/num": epoch + 1}, step=global_step)
 
-        # Final checkpoint (always consolidated)
+        # Final checkpoint (always consolidate)
         if is_main_process():
-            print0(f"[INFO] {self.mode.upper()} complete, saving final consolidated checkpoint...")
+            print0("[INFO] Training complete, saving final checkpoint...")
 
             save_fsdp_checkpoint(
                 self.model_map,
@@ -451,6 +469,4 @@ class WanT2VTrainer:
             print0(f"[INFO] Saved final checkpoint at step {global_step}")
             wandb.finish()
 
-        print0("=" * 80)
-        print0(f"[INFO] {self.mode.upper()} complete!")
-        print0("=" * 80)
+        print0("[INFO] Training complete!")

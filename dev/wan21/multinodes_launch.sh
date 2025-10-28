@@ -11,6 +11,7 @@ NNODES=${NNODES:-2}  # Default to 2 nodes if not set
 # You can also set this via environment variable:
 # export NNODES=3
 # ./wan21_launch.sh
+# NNODES=5 ./multinodes_launch.sh
 
 echo "=========================================="
 echo "Multi-Node Training Configuration"
@@ -27,12 +28,12 @@ echo ""
 for i in {1..1}; do
   echo "Iteration $i: Allocating resources..."
   
-  salloc -t 00:08:00 \
+  salloc -t 04:00:00 \
     -N $NNODES \
     --gres=gpu:8 \
     --job-name=wan21-t2v-${NNODES}n-pretrain \
     --account=coreai_dlalgo_llm \
-    --partition=interactive \
+    --partition=batch \
     bash -c "export NNODES=$NNODES; /lustre/fsw/portfolios/coreai/users/linnanw/wan2.1/mutinodes_pretrain.sh"
   
   EXIT_CODE=$?

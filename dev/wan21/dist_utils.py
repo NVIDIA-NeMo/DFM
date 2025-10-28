@@ -14,7 +14,7 @@ def init_dist():
     """Initialize distributed training - FIXED to use LOCAL_WORLD_SIZE."""
     if not dist.is_initialized():
         dist.init_process_group(backend="nccl", init_method="env://")
-    
+
     local_rank = int(os.environ.get("LOCAL_RANK", "0"))
     torch.cuda.set_device(local_rank)
 
@@ -24,16 +24,16 @@ def init_dist():
     # CRITICAL FIX: Use LOCAL_WORLD_SIZE (not FSDP_LOCAL_WORLD_SIZE!)
     # This must match what you export in your shell script
     local_world = int(os.environ.get("LOCAL_WORLD_SIZE", "8"))
-    
+
     node_id = rank // local_world
     node_base = node_id * local_world
     local_ranks = list(range(node_base, node_base + local_world))
     pg_local = dist.new_group(ranks=local_ranks)
-    
+
     if rank == 0:
         print(f"[DIST] Initialized: world_size={world_size}, local_world_size={local_world}")
-        print(f"[DIST] Node groups created successfully")
-    
+        print("[DIST] Node groups created successfully")
+
     return rank, world_size, local_rank, pg_local
 
 
@@ -56,8 +56,8 @@ def setup_distributed():
     # Initialize process group first
     if not dist.is_initialized():
         dist.init_process_group(backend="nccl")
-        print0(f"[DIST] Initialized process group")
-    
+        print0("[DIST] Initialized process group")
+
     # THEN set device
     torch.cuda.set_device(local_rank)
 

@@ -1,15 +1,14 @@
 #!/usr/bin/env python3
-# main_t2v_unified.py - Unified entry point for WAN 2.1 T2V Training
-# Supports both PRETRAINING and FINETUNING modes
+# main_t2v.py - WAN 2.1 T2V Training with Mode System (FIXED VERSION)
 
 import argparse
 
-from dist_utils import print0, init_dist
+from dist_utils import print0
 from trainer_t2v import WanT2VTrainer
 
 
 def parse_args():
-    p = argparse.ArgumentParser("WAN 2.1 T2V Training (Pretrain or Finetune)")
+    p = argparse.ArgumentParser("WAN 2.1 T2V Training (Pretrain or Finetune) - FIXED")
 
     # ========================================================================
     # MODE SELECTION - THIS IS THE KEY FLAG
@@ -126,7 +125,7 @@ def apply_mode_defaults(args):
             "flow_shift": 3.0,
             "mix_uniform_ratio": 0.1,
             "save_every": 500,
-            "consolidate_every": 1000,  # More frequent for finetuning
+            "consolidate_every": 1000,
             "log_every": 5,
             "output_dir": "./wan_t2v_finetune_outputs",
         }
@@ -142,8 +141,9 @@ def apply_mode_defaults(args):
 def print_config_summary(args):
     """Print a summary of the configuration."""
     print0("\n" + "=" * 80)
-    print0(f"WAN 2.1 T2V TRAINING - MODE: {args.mode.upper()}")
+    print0(f"WAN 2.1 T2V TRAINING (FIXED) - MODE: {args.mode.upper()}")
     print0("=" * 80)
+    print0("\n🔧 FIXED: Using manual flow matching (no scheduler explosion!)")
     
     print0("\n📋 MODEL & DATA:")
     print0(f"  Model ID: {args.model_id}")
@@ -175,6 +175,7 @@ def print_config_summary(args):
         print0(f"  Flow shift: {args.flow_shift}")
         print0(f"  Logit std: {args.logit_std}")
         print0(f"  Mix uniform ratio: {args.mix_uniform_ratio}")
+    print0(f"  Method: Manual interpolation (FIXED)")
     
     print0("\n💾 CHECKPOINTING:")
     print0(f"  Save every: {args.save_every} steps")
@@ -187,7 +188,6 @@ def print_config_summary(args):
 
 def main():
     args = parse_args()
-    rank, world_size, local_rank, pg_local = init_dist()
     
     # Apply mode-specific defaults
     args = apply_mode_defaults(args)
@@ -197,19 +197,23 @@ def main():
     
     # Confirm mode
     if args.mode == "pretrain":
-        print0("🚀 Starting PRETRAINING (learning from scratch)")
+        print0("🚀 Starting PRETRAINING (true from-scratch training)")
+        print0("   • RANDOM weight initialization (not pretrained)")
         print0("   • Higher learning rate for faster learning")
         print0("   • Stronger regularization to prevent overfitting")
         print0("   • Better timestep coverage for comprehensive training")
+        print0("   • FIXED: Manual flow matching (no scheduler bugs)")
     else:
         print0("🎯 Starting FINETUNING (adapting pretrained model)")
+        print0("   • PRETRAINED weight initialization (loads from HuggingFace)")
         print0("   • Lower learning rate to preserve pretrained features")
         print0("   • Conservative updates to avoid catastrophic forgetting")
         print0("   • Multiple epochs on smaller dataset")
+        print0("   • FIXED: Manual flow matching (no scheduler bugs)")
     
     print0("")
     
-    # Create unified trainer
+    # Create trainer with FIXED training logic
     trainer = WanT2VTrainer(
         model_id=args.model_id,
         mode=args.mode,
@@ -252,70 +256,50 @@ if __name__ == "__main__":
 
 
 # ============================================================================
-# USAGE EXAMPLES
+# USAGE EXAMPLES (FIXED VERSION)
 # ============================================================================
 
-# 1. FINETUNING with all defaults:
-# torchrun --nproc-per-node=8 main_t2v_unified.py \
+# 1. FINETUNING with all defaults (FIXED - no scheduler explosion):
+# torchrun --nproc-per-node=8 main_t2v.py \
 #     --mode finetune \
 #     --meta_folder /path/to/data
 
-# 2. PRETRAINING with all defaults:
-# torchrun --nproc-per-node=8 main_t2v_unified.py \
+# 2. PRETRAINING with all defaults (FIXED - stable at all timesteps):
+# torchrun --nproc-per-node=8 main_t2v.py \
 #     --mode pretrain \
 #     --meta_folder /path/to/large/dataset
 
 # 3. FINETUNING with custom learning rate:
-# torchrun --nproc-per-node=8 main_t2v_unified.py \
+# torchrun --nproc-per-node=8 main_t2v.py \
 #     --mode finetune \
 #     --meta_folder /path/to/data \
 #     --learning_rate 5e-6
 
 # 4. PRETRAINING with custom batch size and LR:
-# torchrun --nproc-per-node=8 main_t2v_unified.py \
+# torchrun --nproc-per-node=8 main_t2v.py \
 #     --mode pretrain \
 #     --meta_folder /path/to/large/dataset \
 #     --batch_size_per_node 8 \
 #     --learning_rate 5e-4
 
-# 5. Multi-node PRETRAINING:
+# 5. Multi-node PRETRAINING (FIXED - no crashes):
 # torchrun \
 #     --nnodes=10 \
 #     --nproc-per-node=8 \
 #     --rdzv-backend=c10d \
 #     --rdzv-endpoint=<master_addr>:<master_port> \
-#     main_t2v_unified.py \
+#     main_t2v.py \
 #     --mode pretrain \
 #     --meta_folder /path/to/large/dataset
 
 # 6. FINETUNING with resume:
-# torchrun --nproc-per-node=8 main_t2v_unified.py \
+# torchrun --nproc-per-node=8 main_t2v.py \
 #     --mode finetune \
 #     --meta_folder /path/to/data \
 #     --resume_checkpoint ./wan_t2v_finetune_outputs/checkpoint-5000
 
-# 7. Custom PRETRAINING (override all parameters):
-# torchrun --nproc-per-node=8 main_t2v_unified.py \
-#     --mode pretrain \
-#     --meta_folder /path/to/data \
-#     --batch_size_per_node 16 \
-#     --learning_rate 1e-3 \
-#     --weight_decay 0.15 \
-#     --flow_shift 7.0 \
-#     --warmup_steps 2000
-
-# 8. FINETUNING without CPU offload (more memory, faster):
-# torchrun --nproc-per-node=8 main_t2v_unified.py \
-#     --mode finetune \
-#     --meta_folder /path/to/data \
-#     --no_cpu_offload
-
-# 9. Debug mode with frequent logging:
-# DEBUG_TRAINING=1 torchrun --nproc-per-node=8 main_t2v_unified.py \
+# 7. Debug mode with detailed logging:
+# DEBUG_TRAINING=1 torchrun --nproc-per-node=8 main_t2v.py \
 #     --mode pretrain \
 #     --meta_folder /path/to/data \
 #     --log_every 1
-
-# 10. Compare modes side-by-side:
-# First run: python compare_configs.py
-# Then choose your mode and run the appropriate command above

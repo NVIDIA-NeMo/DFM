@@ -14,13 +14,14 @@ echo "$MASTER_ADDR, $MASTER_PORT"
 # TRAINING CONFIGURATION
 # ============================================================================
 MODE=pretrain
-META_FOLDER=/linnanw/hdvilla_sample/pika/wan21_codes/dmd_1.3B_meta
+META_FOLDER=/linnanw/hdvilla_sample/pika/wan21_codes/1.3B_meta
 BATCH_PER_NODE=1
 LR=1e-4
 EPOCHS=1000000
 SAVE_EVERY=50
 OUTDIR=./wan_pretrain_1.3B
 LOG_EVERY=1
+RESUME_CKPT=/linnanw/wan2.1/wan_pretrain_1.3B/checkpoint-2250
 
 TRAIN_CMD="main_t2v.py \
   --mode ${MODE} \
@@ -30,7 +31,8 @@ TRAIN_CMD="main_t2v.py \
   --num_epochs ${EPOCHS} \
   --save_every ${SAVE_EVERY} \
   --output_dir ${OUTDIR} \
-  --log_every ${LOG_EVERY}"
+  --log_every ${LOG_EVERY} \
+  --resume_checkpoint ${RESUME_CKPT}"
 
 # ============================================================================
 # CONTAINER CONFIGURATION
