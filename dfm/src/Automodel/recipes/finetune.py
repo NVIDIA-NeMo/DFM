@@ -29,7 +29,7 @@ from nemo_automodel._diffusers.auto_diffusion_pipeline import NeMoAutoDiffusionP
 from Automodel.flow_matching.training_step_t2v import (
     step_fsdp_transformer_t2v,
 )
-from nemo_automodel.components.checkpoint.checkpointing import CheckpointingConfig
+from nemo_automodel.components.checkpoint.checkpointing import CheckpointingConfig, Checkpointer
 from nemo_automodel.components.distributed.fsdp2 import FSDP2Manager
 from nemo_automodel.components.loggers.log_utils import setup_logging
 from nemo_automodel.components.loggers.wandb_utils import suppress_wandb_log_messages
@@ -261,6 +261,13 @@ class TrainWan21DiffusionRecipe(BaseRecipe):
             model_state_dict_keys=model_state_dict_keys,
         )
         self.restore_from = checkpoint_cfg.get("restore_from", None)
+        self.checkpointer = Checkpointer(
+            config=self.checkpoint_config,
+            dp_rank=self._get_dp_rank(include_cp=True),
+            tp_rank=self._get_tp_rank(),
+            pp_rank=self._get_pp_rank(),
+            moe_mesh=None,
+        )
 
         dataloader_cfg = self.cfg.get("data.dataloader")
         if not hasattr(dataloader_cfg, "instantiate"):
