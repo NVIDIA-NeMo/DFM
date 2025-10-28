@@ -19,7 +19,7 @@ from torch.distributed.tensor.parallel import (
     parallelize_module,
 )
 
-from nemo_automodel.components.distributed.parallelizer import ParallelizationStrategy, DefaultParallelizationStrategy, apply_fsdp2_sharding_recursively
+from nemo_automodel.components.distributed.parallelizer import ParallelizationStrategy, apply_fsdp2_sharding_recursively
 
 logger = logging.getLogger(__name__)
 

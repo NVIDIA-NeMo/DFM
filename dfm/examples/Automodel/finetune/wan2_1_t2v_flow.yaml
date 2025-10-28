@@ -46,6 +46,8 @@ fsdp:
   tp_size: 1
   cp_size: 1
   pp_size: 1
+  dp_replicate_size: 1
+  dp_size: 8
 
 logging:
   save_every: 50

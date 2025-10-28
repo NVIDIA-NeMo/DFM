@@ -25,7 +25,6 @@ import wandb
 from torch.distributed.fsdp import MixedPrecisionPolicy
 from transformers.utils.hub import TRANSFORMERS_CACHE
 
-# from nemo_automodel._diffusers.auto_diffusion_pipeline import NeMoAutoDiffusionPipeline
 from Automodel._diffusers.auto_diffusion_pipeline import NeMoAutoDiffusionPipeline
 from Automodel.flow_matching.training_step_t2v import (
     step_fsdp_transformer_t2v,
@@ -51,9 +50,10 @@ def build_model_and_optimizer(
     cp_size: int = 1,
     pp_size: int = 1,
     dp_size: Optional[int] = None,
+    dp_replicate_size: Optional[int] = None,
     use_hf_tp_plan: bool = False,
     optimizer_cfg: Optional[Dict[str, Any]] = None,
-) -> tuple[NeMoAutoDiffusionPipeline, dict[str, Dict[str, Any]], torch.optim.Optimizer]:
+) -> tuple[NeMoAutoDiffusionPipeline, dict[str, Dict[str, Any]], torch.optim.Optimizer, Any]:
     """Build the WAN 2.1 diffusion model, parallel scheme, and optimizer."""
 
     logging.info("[INFO] Building NeMoAutoDiffusionPipeline with transformer parallel scheme...")
@@ -67,25 +67,26 @@ def build_model_and_optimizer(
         denom = max(1, tp_size * cp_size * pp_size)
         dp_size = max(1, world_size // denom)
 
-    fsdp2_manager = FSDP2Manager(
-        dp_size=dp_size,
-        tp_size=tp_size,
-        cp_size=cp_size,
-        pp_size=pp_size,
-        backend="nccl",
-        world_size=world_size,
-        use_hf_tp_plan=use_hf_tp_plan,
-        activation_checkpointing=True,
-        mp_policy=MixedPrecisionPolicy(
+    manager_args: Dict[str, Any] = {
+        "dp_size": dp_size,
+        "dp_replicate_size": dp_replicate_size,
+        "tp_size": tp_size,
+        "cp_size": cp_size,
+        "pp_size": pp_size,
+        "backend": "nccl",
+        "world_size": world_size,
+        "use_hf_tp_plan": use_hf_tp_plan,
+        "activation_checkpointing": True,
+        "mp_policy": MixedPrecisionPolicy(
             param_dtype=bf16_dtype,
             reduce_dtype=bf16_dtype,
             output_dtype=bf16_dtype,
         ),
-    )
+    }
+    
+    parallel_scheme = {"transformer": manager_args}
 
-    parallel_scheme = {"transformer": fsdp2_manager}
-
-    pipe = NeMoAutoDiffusionPipeline.from_pretrained(
+    pipe, created_managers = NeMoAutoDiffusionPipeline.from_pretrained(
         model_id,
         torch_dtype=bf16_dtype,
         device=device,
@@ -93,7 +94,7 @@ def build_model_and_optimizer(
         load_for_training=True,
         components_to_load=["transformer"],
     )
-
+    fsdp2_manager = created_managers["transformer"]
     transformer_module = getattr(pipe, "transformer", None)
     if transformer_module is None:
         raise RuntimeError("transformer not found in pipeline after parallelization")
@@ -210,6 +211,7 @@ class TrainWan21DiffusionRecipe(BaseRecipe):
         cp_size = fsdp_cfg.get("cp_size", 1)
         pp_size = fsdp_cfg.get("pp_size", 1)
         dp_size = fsdp_cfg.get("dp_size", None)
+        dp_replicate_size = fsdp_cfg.get("dp_replicate_size", None)
         use_hf_tp_plan = fsdp_cfg.get("use_hf_tp_plan", False)
 
         (self.pipe, self.model_map, self.optimizer, self.device_mesh) = build_model_and_optimizer(
@@ -222,6 +224,7 @@ class TrainWan21DiffusionRecipe(BaseRecipe):
             cp_size=cp_size,
             pp_size=pp_size,
             dp_size=dp_size,
+            dp_replicate_size=dp_replicate_size,
             use_hf_tp_plan=use_hf_tp_plan,
             optimizer_cfg=self.cfg.get("optim.optimizer", {}),
         )
