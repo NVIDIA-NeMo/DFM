@@ -334,11 +334,11 @@ torchrun --nproc_per_node 8 cosmos1/models/diffusion/nemo/post_training/video2wo
 
 To review the complete set of parameters such as the learning rate, checkpointing strategy, model parameters, required video metadata and Tensor `dtype`, and more, the `cosmos_diffusion_{model_size}_video2world_action_ctrl_finetune` NeMo2 recipe and `DiTConfig` are located in these modules:
 
-- NeMo2 Recipe: `nemo-vfm/nemo/collections/diffusion/train.py::finetune_{7b,14b}_action_control`
+- NeMo2 Recipe: `nemo-dfm/nemo/collections/diffusion/train.py::finetune_{7b,14b}_action_control`
   - Training and checkpoint settings.
-- `DiTConfig`: `nemo-vfm/nemo/collections/diffusion/models/model.py::DiT{7B,14B}Video2WorldActionConfig`
+- `DiTConfig`: `nemo-dfm/nemo/collections/diffusion/models/model.py::DiT{7B,14B}Video2WorldActionConfig`
   - Model architecture configuration, including the action control vector dimension, e.g. `config.action_emb_dim=7` (i.e. of shape `(B, 7)`) for the Bridge dataset.
-- Data Module: `nemo-vfm/nemo/collections/diffusion/datamodule.py::ActionControlDiffusionDataset`
+- Data Module: `nemo-dfm/nemo/collections/diffusion/datamodule.py::ActionControlDiffusionDataset`
   - Action control dataset and data loading.
 
 For more information on NeMo2 recipes and NeMo Lightning settings, you can refer to: https://github.com/NVIDIA/NeMo.

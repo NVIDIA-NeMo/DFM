@@ -66,7 +66,7 @@ export NUM_DEVICES=1
 export CONDITIONED_IMAGE_OR_VIDEO="cosmos1/models/diffusion/assets/v1p0/video2world_input1.mp4"
 export PROMPT="The video showcases a vibrant green sports car with a sleek design, parked on a concrete surface. The car is oriented towards the right side of the frame, highlighting its rear and side profiles. The backdrop features a picturesque beach, with sandy dunes in the foreground and a serene sea in the background. The sky is clear, displaying a soft gradient of colors that hints at either sunrise or sunset. The scene is tranquil, with no people or other vehicles in sight, and the car remains stationary, inviting viewers to appreciate its beauty against the stunning natural landscape."
 export CTRL_MODEL_DIR=/lustre/fsw/portfolios/coreai/users/sgovande/models/mcore_blur2world_7B_converted/ctrl
-PYTHONPATH=$(pwd):~/lustre/nemo-vfm torchrun --nproc_per_node=$NUM_DEVICES cosmos1/models/diffusion/nemo/inference/control2world.py --cosmos_assets_dir ./checkpoints --conditioned_image_or_video_path $CONDITIONED_IMAGE_OR_VIDEO --num_devices $NUM_DEVICES --cp_size $NUM_DEVICES --prompt "$PROMPT" --control_weight 1 --ctrl_model_dir $CTRL_MODEL_DIR
+PYTHONPATH=$(pwd):~/lustre/nemo-dfm torchrun --nproc_per_node=$NUM_DEVICES cosmos1/models/diffusion/nemo/inference/control2world.py --cosmos_assets_dir ./checkpoints --conditioned_image_or_video_path $CONDITIONED_IMAGE_OR_VIDEO --num_devices $NUM_DEVICES --cp_size $NUM_DEVICES --prompt "$PROMPT" --control_weight 1 --ctrl_model_dir $CTRL_MODEL_DIR
 """
 
 

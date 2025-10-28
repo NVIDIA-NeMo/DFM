@@ -1,14 +1,14 @@
-# NeMo VFM: video foundation model collection
+# NeMo DFM: video foundation model collection
 
-NeMo VFM is a state-of-the-art framework for fast, large-scale training and inference of video world models. It unifies the latest diffusion-based and autoregressive techniques, prioritizing efficiency and performance from research prototyping to production deployment.
+NeMo DFM is a state-of-the-art framework for fast, large-scale training and inference of video world models. It unifies the latest diffusion-based and autoregressive techniques, prioritizing efficiency and performance from research prototyping to production deployment.
 
 ## Projects
 
 This collection consists of 4 projects:
-1. [Scalable diffusion training framework](nemo_vfm/diffusion/readme.rst)
-2. [Accelerated diffusion world models](nemo_vfm/physicalai/Cosmos/cosmos1/models/diffusion/README.md)
-3. [Accelerated autoregressive world models](nemo_vfm/physicalai/Cosmos/cosmos1/models/autoregressive/README.md)
-4. [Sparse attention for efficient diffusion inference](nemo_vfm/sparse_attention/README.md)
+1. [Scalable diffusion training framework](nemo_dfm/diffusion/readme.rst)
+2. [Accelerated diffusion world models](nemo_dfm/physicalai/Cosmos/cosmos1/models/diffusion/README.md)
+3. [Accelerated autoregressive world models](nemo_dfm/physicalai/Cosmos/cosmos1/models/autoregressive/README.md)
+4. [Sparse attention for efficient diffusion inference](nemo_dfm/sparse_attention/README.md)
 
 ## Citations
 
