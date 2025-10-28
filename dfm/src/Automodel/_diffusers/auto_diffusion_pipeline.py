@@ -95,12 +95,12 @@ class NeMoAutoDiffusionPipeline(DiffusionPipeline):
     Drop-in Diffusers pipeline that adds optional FSDP2/TP parallelization during from_pretrained.
 
     Features:
-    - Accepts a per-component mapping from component name to FSDP2Manager
+    - Accepts a per-component mapping from component name to FSDP2Manager init args
     - Moves all nn.Module components to the chosen device/dtype
-    - Parallelizes only components present in the mapping using their manager
+    - Parallelizes only components present in the mapping by constructing a manager per component
 
     parallel_scheme:
-    - Dict[str, FSDP2Manager]: component name -> manager used to parallelize that component
+    - Dict[str, Dict[str, Any]]: component name -> kwargs for FSDP2Manager(...)
     """
 
     @classmethod
@@ -108,7 +108,7 @@ class NeMoAutoDiffusionPipeline(DiffusionPipeline):
         cls,
         pretrained_model_name_or_path: str,
         *model_args,
-        parallel_scheme: Optional[Dict[str, FSDP2Manager]] = None,
+        parallel_scheme: Optional[Dict[str, Dict[str, Any]]] = None,
         device: Optional[torch.device] = None,
         torch_dtype: Any = "auto",
         move_to_device: bool = True,
@@ -139,18 +139,20 @@ class NeMoAutoDiffusionPipeline(DiffusionPipeline):
                     logger.info("[INFO] Ensuring params trainable: %s", name)
                     _ensure_params_trainable(module, module_name=name)
 
-        # Use per-component FSDP2Manager mappings to parallelize components
+        # Use per-component FSDP2Manager init-args to parallelize components
+        created_managers: Dict[str, FSDP2Manager] = {}
         if parallel_scheme is not None:
             assert torch.distributed.is_initialized(), "Expect distributed environment to be initialized"
             _init_parallelizer()
             for comp_name, comp_module in _iter_pipeline_modules(pipe):
-                manager = parallel_scheme.get(comp_name)
-                if manager is None:
+                manager_args = parallel_scheme.get(comp_name)
+                if manager_args is None:
                     continue
                 try:
-                    new_m = manager.parallelize(comp_module)
-                    if new_m is not comp_module:
-                        setattr(pipe, comp_name, new_m)
+                    manager = FSDP2Manager(**manager_args)
+                    created_managers[comp_name] = manager
+                    parallel_module = manager.parallelize(comp_module)
+                    setattr(pipe, comp_name, parallel_module)
                 except Exception as e:
                     logger.warning("FSDP2Manager.parallelize failed for %s: %s", comp_name, e)
-        return pipe
+        return pipe, created_managers
