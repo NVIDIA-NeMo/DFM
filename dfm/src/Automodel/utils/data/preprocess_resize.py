@@ -24,6 +24,7 @@ import torch
 from diffusers import AutoencoderKLWan
 from transformers import AutoTokenizer, UMT5EncoderModel
 
+
 # Set up logging
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)

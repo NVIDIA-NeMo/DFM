@@ -23,6 +23,7 @@ import numpy as np
 import torch
 from diffusers import AutoencoderKLWan
 
+
 # Set up logging
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)

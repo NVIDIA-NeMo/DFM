@@ -18,18 +18,19 @@ from typing import Any, Dict, Iterable, Optional, Tuple
 
 import torch
 import torch.nn as nn
+from Automodel.distributed.dfm_parallelizer import WanParallelizationStrategy
 from diffusers import DiffusionPipeline
-
+from nemo_automodel.components.distributed import parallelizer
 from nemo_automodel.components.distributed.fsdp2 import FSDP2Manager
 from nemo_automodel.shared.utils import dtype_from_str
-from nemo_automodel.components.distributed import parallelizer
-from Automodel.distributed.dfm_parallelizer import WanParallelizationStrategy
+
 
 logger = logging.getLogger(__name__)
 
 
 def _init_parallelizer():
     parallelizer.PARALLELIZATION_STRATEGIES["WanTransformer3DModel"] = WanParallelizationStrategy()
+
 
 def _choose_device(device: Optional[torch.device]) -> torch.device:
     if device is not None:

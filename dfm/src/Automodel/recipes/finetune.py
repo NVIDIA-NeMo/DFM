@@ -21,22 +21,21 @@ from typing import Any, Dict, Optional
 
 import torch
 import torch.distributed as dist
-import wandb
-from torch.distributed.fsdp import MixedPrecisionPolicy
-from transformers.utils.hub import TRANSFORMERS_CACHE
-
 from Automodel._diffusers.auto_diffusion_pipeline import NeMoAutoDiffusionPipeline
 from Automodel.flow_matching.training_step_t2v import (
     step_fsdp_transformer_t2v,
 )
-from nemo_automodel.components.checkpoint.checkpointing import CheckpointingConfig, Checkpointer
-from nemo_automodel.components.distributed.fsdp2 import FSDP2Manager
+from nemo_automodel.components.checkpoint.checkpointing import Checkpointer, CheckpointingConfig
 from nemo_automodel.components.loggers.log_utils import setup_logging
 from nemo_automodel.components.loggers.wandb_utils import suppress_wandb_log_messages
 from nemo_automodel.components.training.rng import StatefulRNG
 from nemo_automodel.components.training.step_scheduler import StepScheduler
 from nemo_automodel.recipes.base_recipe import BaseRecipe
 from nemo_automodel.recipes.llm.train_ft import build_distributed, build_wandb
+from torch.distributed.fsdp import MixedPrecisionPolicy
+from transformers.utils.hub import TRANSFORMERS_CACHE
+
+import wandb
 
 
 def build_model_and_optimizer(
@@ -83,7 +82,7 @@ def build_model_and_optimizer(
             output_dtype=bf16_dtype,
         ),
     }
-    
+
     parallel_scheme = {"transformer": manager_args}
 
     pipe, created_managers = NeMoAutoDiffusionPipeline.from_pretrained(
