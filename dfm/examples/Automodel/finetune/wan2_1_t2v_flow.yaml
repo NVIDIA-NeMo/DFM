@@ -53,7 +53,7 @@ logging:
 
 checkpoint:
   enabled: true
-  checkpoint_dir: /opt/Automodel/wan_t2v_flow_outputs_base_recipe_checkpoint_NEW_new/
+  checkpoint_dir: /opt/DFM/wan_t2v_flow_outputs_base_recipe_dfm/
   model_save_format: torch_save
   save_consolidated: false
   restore_from: null
