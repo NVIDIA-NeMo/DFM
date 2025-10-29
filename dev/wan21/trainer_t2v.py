@@ -7,7 +7,7 @@ import torch
 import torch.distributed as dist
 import wandb
 from data_utils import create_dataloader
-from diffusers import WanPipeline, WanTransformer3DModel
+from diffusers import WanPipeline
 from dist_utils import is_main_process, print0, setup_distributed
 from fsdp2_utils_t2v import (
     get_fsdp_all_parameters,
@@ -23,9 +23,9 @@ from training_step_t2v import step_fsdp_transformer_t2v
 class WanT2VTrainer:
     """
     WAN 2.1 T2V trainer with mode system (FIXED VERSION).
-    
+
     FIXED: Uses manual flow matching instead of scheduler.add_noise()
-    
+
     Features:
     - Mode-based configuration (pretrain/finetune)
     - FSDP for distributed training
@@ -82,28 +82,30 @@ class WanT2VTrainer:
         self.local_rank = setup_distributed()
         self.world_size = dist.get_world_size() if dist.is_initialized() else 1
         self.device = torch.device("cuda", self.local_rank)
-        
+
         # Calculate node information
         self.local_world_size = int(os.environ.get("LOCAL_WORLD_SIZE", self.world_size))
         self.num_nodes = self.world_size // self.local_world_size if self.local_world_size > 0 else 1
         self.node_rank = dist.get_rank() // self.local_world_size if dist.is_initialized() else 0
 
         print0(f"[INFO] WAN 2.1 T2V Trainer - Mode: {mode.upper()}")
-        print0(f"[INFO] Total GPUs: {self.world_size}, GPUs per node: {self.local_world_size}, Num nodes: {self.num_nodes}")
+        print0(
+            f"[INFO] Total GPUs: {self.world_size}, GPUs per node: {self.local_world_size}, Num nodes: {self.num_nodes}"
+        )
         print0(f"[INFO] Node rank: {self.node_rank}, Local rank: {self.local_rank}")
-        
+
         # Important note about weight initialization
         if mode == "finetune":
             print0(f"[INFO] Weight initialization: PRETRAINED (from {model_id})")
         else:
-            print0(f"[INFO] Weight initialization: RANDOM (true from-scratch training)")
-        
+            print0("[INFO] Weight initialization: RANDOM (true from-scratch training)")
+
         print0(f"[INFO] Learning rate: {learning_rate}")
         print0(f"[INFO] Weight decay: {weight_decay}, Beta2: {beta2}, Grad clip: {grad_clip}")
         print0(f"[INFO] Warmup steps: {warmup_steps}")
         print0(f"[INFO] CPU offload: {'ENABLED' if cpu_offload else 'DISABLED'}")
-        print0(f"[INFO] FIXED: Using manual flow matching (no scheduler explosion)")
-        print0(f"[INFO] Flow matching config:")
+        print0("[INFO] FIXED: Using manual flow matching (no scheduler explosion)")
+        print0("[INFO] Flow matching config:")
         print0(f"[INFO]   - Enabled: {use_sigma_noise}")
         print0(f"[INFO]   - Timestep sampling: {timestep_sampling}")
         print0(f"[INFO]   - Flow shift: {flow_shift}")
@@ -116,71 +118,72 @@ class WanT2VTrainer:
 
     def setup_pipeline(self):
         """Load pipeline with mode-aware weight initialization."""
-        
+
         if self.mode == "finetune":
             # FINETUNE: Always load pretrained weights
             print0("[INFO] FINETUNE MODE: Loading pretrained weights...")
-            
+
             self.pipe = WanPipeline.from_pretrained(
-                self.model_id, 
+                self.model_id,
                 torch_dtype=torch.bfloat16,
             )
-            
+
             print0(f"[INFO] ✓ Loaded pretrained transformer from {self.model_id}")
-            
+
             # Verify weights are actually loaded
-            if hasattr(self.pipe, 'transformer') and self.pipe.transformer is not None:
-                if hasattr(self.pipe.transformer, 'blocks') and len(self.pipe.transformer.blocks) > 0:
+            if hasattr(self.pipe, "transformer") and self.pipe.transformer is not None:
+                if hasattr(self.pipe.transformer, "blocks") and len(self.pipe.transformer.blocks) > 0:
                     first_param = next(self.pipe.transformer.blocks[0].parameters())
                     param_mean = first_param.abs().mean().item()
                     param_std = first_param.std().item()
-                    
+
                     if param_mean < 1e-6:
                         raise RuntimeError(f"[ERROR] Weights are RANDOM! Mean: {param_mean:.2e}")
                     else:
-                        print0(f"[INFO] ✓ Pretrained weights verified:")
+                        print0("[INFO] ✓ Pretrained weights verified:")
                         print0(f"[INFO]   - Mean: {param_mean:.4f}")
                         print0(f"[INFO]   - Std:  {param_std:.4f}")
-        
+
         else:  # pretrain mode
             # PRETRAIN: Random initialization (true from-scratch)
             print0("[INFO] PRETRAIN MODE: Random initialization (from scratch)...")
             print0(f"[INFO] Loading config from {self.model_id}...")
-            
+
             # Load just the config
             from diffusers import WanTransformer3DModel
+
             transformer = WanTransformer3DModel.from_pretrained(
                 self.model_id,
                 subfolder="transformer",
                 torch_dtype=torch.bfloat16,
             )
-            
+
             # Get config and reinitialize with random weights
             config = transformer.config
             print0("[INFO] Reinitializing transformer with RANDOM weights...")
-            transformer = WanTransformer3DModel(config)
-            
+            transformer = WanTransformer3DModel.from_config(config)
+
             # Load pipeline with random transformer
             self.pipe = WanPipeline.from_pretrained(
                 self.model_id,
                 transformer=transformer,
                 torch_dtype=torch.bfloat16,
             )
-            
+
             # Verify weights are random
-            if hasattr(self.pipe.transformer, 'blocks') and len(self.pipe.transformer.blocks) > 0:
+            if hasattr(self.pipe.transformer, "blocks") and len(self.pipe.transformer.blocks) > 0:
                 first_param = next(self.pipe.transformer.blocks[0].parameters())
                 param_mean = first_param.abs().mean().item()
                 param_std = first_param.std().item()
-                
-                print0(f"[INFO] ✓ Random initialization verified:")
+
+                print0("[INFO] ✓ Random initialization verified:")
                 print0(f"[INFO]   - Mean: {param_mean:.4f} (should be near 0)")
                 print0(f"[INFO]   - Std:  {param_std:.4f} (should be ~0.02)")
-                
+
                 # Random init should have very small mean
                 if param_mean > 0.01:
                     print0(f"[WARNING] Mean seems high for random init: {param_mean:.4f}")
-        
+
         # Remove VAE and text encoder (we only need transformer + scheduler)
         if hasattr(self.pipe, "vae") and self.pipe.vae is not None:
             print0("[INFO] Removing VAE from pipeline (not needed for training)...")
@@ -225,16 +228,13 @@ class WanT2VTrainer:
         print0(f"[INFO] Optimizing {len(all_params)} parameters")
 
         self.optimizer = torch.optim.AdamW(
-            all_params, 
-            lr=self.learning_rate, 
-            weight_decay=self.weight_decay,
-            betas=(self.beta1, self.beta2)
+            all_params, lr=self.learning_rate, weight_decay=self.weight_decay, betas=(self.beta1, self.beta2)
         )
 
         # Create warmup + cosine annealing scheduler
         if self.warmup_steps > 0:
             print0(f"[INFO] Using warmup ({self.warmup_steps} steps) + cosine annealing")
-            
+
             # Lambda function for warmup + cosine
             def lr_lambda(current_step):
                 if current_step < self.warmup_steps:
@@ -245,17 +245,12 @@ class WanT2VTrainer:
                     progress = float(current_step - self.warmup_steps) / float(max(1, total_steps - self.warmup_steps))
                     cosine_decay = 0.5 * (1.0 + torch.cos(torch.tensor(progress * 3.141592653589793)))
                     return max(self.lr_min / self.learning_rate, cosine_decay.item())
-            
-            self.lr_scheduler = torch.optim.lr_scheduler.LambdaLR(
-                self.optimizer,
-                lr_lambda=lr_lambda
-            )
+
+            self.lr_scheduler = torch.optim.lr_scheduler.LambdaLR(self.optimizer, lr_lambda=lr_lambda)
         else:
-            print0(f"[INFO] Using cosine annealing (no warmup)")
+            print0("[INFO] Using cosine annealing (no warmup)")
             self.lr_scheduler = torch.optim.lr_scheduler.CosineAnnealingLR(
-                self.optimizer, 
-                T_max=total_steps, 
-                eta_min=self.lr_min
+                self.optimizer, T_max=total_steps, eta_min=self.lr_min
             )
 
     def validate_setup(self):
@@ -303,9 +298,7 @@ class WanT2VTrainer:
         start_epoch = 0
 
         if resume_checkpoint:
-            global_step = load_fsdp_checkpoint(
-                self.model_map, self.optimizer, self.lr_scheduler, resume_checkpoint
-            )
+            global_step = load_fsdp_checkpoint(self.model_map, self.optimizer, self.lr_scheduler, resume_checkpoint)
             start_epoch = global_step // steps_per_epoch
 
         if is_main_process():
@@ -351,6 +344,7 @@ class WanT2VTrainer:
             iterable = dataloader
             if is_main_process():
                 from tqdm import tqdm
+
                 iterable = tqdm(dataloader, desc=f"Epoch {epoch + 1}/{num_epochs}")
 
             epoch_loss = 0.0
@@ -387,7 +381,8 @@ class WanT2VTrainer:
 
                 # Gradient clipping
                 trainable_params = [
-                    p for p in self.model_map["transformer"]["fsdp_transformer"].parameters() 
+                    p
+                    for p in self.model_map["transformer"]["fsdp_transformer"].parameters()
                     if p.requires_grad and p.grad is not None
                 ]
 
@@ -435,8 +430,8 @@ class WanT2VTrainer:
                 # Checkpointing with consolidation control
                 if save_every and (global_step % save_every == 0):
                     # Consolidate based on consolidate_every
-                    should_consolidate = (global_step % consolidate_every == 0)
-                    
+                    should_consolidate = global_step % consolidate_every == 0
+
                     save_fsdp_checkpoint(
                         self.model_map,
                         self.optimizer,

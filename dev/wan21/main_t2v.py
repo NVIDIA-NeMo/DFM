@@ -13,89 +13,81 @@ def parse_args():
     # ========================================================================
     # MODE SELECTION - THIS IS THE KEY FLAG
     # ========================================================================
-    p.add_argument("--mode", type=str, default="finetune", 
-                   choices=["pretrain", "finetune"],
-                   help="Training mode: 'pretrain' (from scratch) or 'finetune' (adapt pretrained)")
+    p.add_argument(
+        "--mode",
+        type=str,
+        default="finetune",
+        choices=["pretrain", "finetune"],
+        help="Training mode: 'pretrain' (from scratch) or 'finetune' (adapt pretrained)",
+    )
 
     # Model configuration
-    p.add_argument("--model_id", type=str, default="Wan-AI/Wan2.1-T2V-1.3B-Diffusers", 
-                   help="HuggingFace model ID")
+    p.add_argument("--model_id", type=str, default="Wan-AI/Wan2.1-T2V-1.3B-Diffusers", help="HuggingFace model ID")
 
     # Training configuration
-    p.add_argument("--meta_folder", type=str, required=True, 
-                   help="Path to folder containing .meta files")
-    p.add_argument("--num_epochs", type=int, default=None,
-                   help="Number of training epochs (default: mode-dependent)")
-    p.add_argument("--batch_size_per_node", type=int, default=None,
-                   help="Batch size per NODE (default: mode-dependent)")
-    p.add_argument("--learning_rate", type=float, default=None,
-                   help="Learning rate (default: mode-dependent)")
+    p.add_argument("--meta_folder", type=str, required=True, help="Path to folder containing .meta files")
+    p.add_argument("--num_epochs", type=int, default=None, help="Number of training epochs (default: mode-dependent)")
+    p.add_argument(
+        "--batch_size_per_node", type=int, default=None, help="Batch size per NODE (default: mode-dependent)"
+    )
+    p.add_argument("--learning_rate", type=float, default=None, help="Learning rate (default: mode-dependent)")
 
     # Optimizer settings
-    p.add_argument("--weight_decay", type=float, default=None,
-                   help="Weight decay (default: mode-dependent)")
-    p.add_argument("--beta1", type=float, default=0.9,
-                   help="Adam beta1")
-    p.add_argument("--beta2", type=float, default=None,
-                   help="Adam beta2 (default: mode-dependent)")
-    p.add_argument("--grad_clip", type=float, default=None,
-                   help="Gradient clipping (default: mode-dependent)")
+    p.add_argument("--weight_decay", type=float, default=None, help="Weight decay (default: mode-dependent)")
+    p.add_argument("--beta1", type=float, default=0.9, help="Adam beta1")
+    p.add_argument("--beta2", type=float, default=None, help="Adam beta2 (default: mode-dependent)")
+    p.add_argument("--grad_clip", type=float, default=None, help="Gradient clipping (default: mode-dependent)")
 
     # Learning rate schedule
-    p.add_argument("--warmup_steps", type=int, default=None,
-                   help="Warmup steps (default: mode-dependent)")
-    p.add_argument("--lr_min", type=float, default=None,
-                   help="Minimum LR (default: mode-dependent)")
+    p.add_argument("--warmup_steps", type=int, default=None, help="Warmup steps (default: mode-dependent)")
+    p.add_argument("--lr_min", type=float, default=None, help="Minimum LR (default: mode-dependent)")
 
     # Memory optimization
-    p.add_argument("--cpu_offload", action="store_true", default=True,
-                   help="Enable CPU offloading")
-    p.add_argument("--no_cpu_offload", action="store_false", dest="cpu_offload",
-                   help="Disable CPU offloading")
+    p.add_argument("--cpu_offload", action="store_true", default=True, help="Enable CPU offloading")
+    p.add_argument("--no_cpu_offload", action="store_false", dest="cpu_offload", help="Disable CPU offloading")
 
     # Flow matching arguments
-    p.add_argument("--use_sigma_noise", action="store_true", default=True,
-                   help="Use flow matching noise scheduling")
-    p.add_argument("--no_sigma_noise", action="store_false", dest="use_sigma_noise",
-                   help="Disable flow matching")
-    p.add_argument("--timestep_sampling", type=str, default=None,
-                   choices=["uniform", "logit_normal", "mode"],
-                   help="Timestep sampling strategy (default: mode-dependent)")
-    p.add_argument("--logit_mean", type=float, default=0.0,
-                   help="Mean for logit-normal distribution")
-    p.add_argument("--logit_std", type=float, default=None,
-                   help="Std for logit-normal (default: mode-dependent)")
-    p.add_argument("--flow_shift", type=float, default=None,
-                   help="Flow matching shift (default: mode-dependent)")
-    p.add_argument("--mix_uniform_ratio", type=float, default=None,
-                   help="Uniform sampling ratio (default: mode-dependent)")
+    p.add_argument("--use_sigma_noise", action="store_true", default=True, help="Use flow matching noise scheduling")
+    p.add_argument("--no_sigma_noise", action="store_false", dest="use_sigma_noise", help="Disable flow matching")
+    p.add_argument(
+        "--timestep_sampling",
+        type=str,
+        default=None,
+        choices=["uniform", "logit_normal", "mode"],
+        help="Timestep sampling strategy (default: mode-dependent)",
+    )
+    p.add_argument("--logit_mean", type=float, default=0.0, help="Mean for logit-normal distribution")
+    p.add_argument("--logit_std", type=float, default=None, help="Std for logit-normal (default: mode-dependent)")
+    p.add_argument("--flow_shift", type=float, default=None, help="Flow matching shift (default: mode-dependent)")
+    p.add_argument(
+        "--mix_uniform_ratio", type=float, default=None, help="Uniform sampling ratio (default: mode-dependent)"
+    )
 
     # Checkpointing
-    p.add_argument("--save_every", type=int, default=None,
-                   help="Save checkpoint every N steps (default: mode-dependent)")
-    p.add_argument("--consolidate_every", type=int, default=None,
-                   help="Consolidate every N steps (default: mode-dependent)")
-    p.add_argument("--log_every", type=int, default=None,
-                   help="Log every N steps (default: mode-dependent)")
-    p.add_argument("--output_dir", type=str, default=None,
-                   help="Output directory (default: mode-dependent)")
-    p.add_argument("--resume_checkpoint", type=str, default=None, 
-                   help="Path to checkpoint to resume from")
+    p.add_argument(
+        "--save_every", type=int, default=None, help="Save checkpoint every N steps (default: mode-dependent)"
+    )
+    p.add_argument(
+        "--consolidate_every", type=int, default=None, help="Consolidate every N steps (default: mode-dependent)"
+    )
+    p.add_argument("--log_every", type=int, default=None, help="Log every N steps (default: mode-dependent)")
+    p.add_argument("--output_dir", type=str, default=None, help="Output directory (default: mode-dependent)")
+    p.add_argument("--resume_checkpoint", type=str, default=None, help="Path to checkpoint to resume from")
 
     return p.parse_args()
 
 
 def apply_mode_defaults(args):
     """Apply mode-specific defaults for parameters not explicitly set."""
-    
+
     mode = args.mode
-    
+
     # Define defaults for each mode
     if mode == "pretrain":
         defaults = {
-            "num_epochs": 1,
-            "batch_size_per_node": 4,
-            "learning_rate": 1e-4,
+            "num_epochs": 10000000,
+            "batch_size_per_node": 1,
+            "learning_rate": 5e-5,
             "weight_decay": 0.1,
             "beta2": 0.95,
             "grad_clip": 2.0,
@@ -103,11 +95,11 @@ def apply_mode_defaults(args):
             "lr_min": 1e-5,
             "timestep_sampling": "logit_normal",
             "logit_std": 1.5,
-            "flow_shift": 5.0,
+            "flow_shift": 3.0,
             "mix_uniform_ratio": 0.2,
-            "save_every": 2000,
-            "consolidate_every": 10000,
-            "log_every": 10,
+            "save_every": 50,
+            "consolidate_every": 50,
+            "log_every": 1,
             "output_dir": "./wan_t2v_pretrain_outputs",
         }
     else:  # finetune
@@ -129,12 +121,12 @@ def apply_mode_defaults(args):
             "log_every": 5,
             "output_dir": "./wan_t2v_finetune_outputs",
         }
-    
+
     # Apply defaults for None values
     for key, default_value in defaults.items():
         if getattr(args, key) is None:
             setattr(args, key, default_value)
-    
+
     return args
 
 
@@ -144,14 +136,14 @@ def print_config_summary(args):
     print0(f"WAN 2.1 T2V TRAINING (FIXED) - MODE: {args.mode.upper()}")
     print0("=" * 80)
     print0("\n🔧 FIXED: Using manual flow matching (no scheduler explosion!)")
-    
+
     print0("\n📋 MODEL & DATA:")
     print0(f"  Model ID: {args.model_id}")
     print0(f"  Meta folder: {args.meta_folder}")
     print0(f"  Output dir: {args.output_dir}")
     if args.resume_checkpoint:
         print0(f"  Resume from: {args.resume_checkpoint}")
-    
+
     print0("\n⚙️  TRAINING PARAMETERS:")
     print0(f"  Epochs: {args.num_epochs}")
     print0(f"  Batch size per node: {args.batch_size_per_node}")
@@ -159,15 +151,15 @@ def print_config_summary(args):
     print0(f"  Weight decay: {args.weight_decay}")
     print0(f"  Gradient clip: {args.grad_clip}")
     print0(f"  Adam betas: ({args.beta1}, {args.beta2})")
-    
+
     print0("\n📈 LEARNING RATE SCHEDULE:")
     if args.warmup_steps > 0:
         print0(f"  Warmup steps: {args.warmup_steps}")
-        print0(f"  Schedule: Linear warmup → Cosine decay")
+        print0("  Schedule: Linear warmup → Cosine decay")
     else:
-        print0(f"  Schedule: Cosine decay (no warmup)")
+        print0("  Schedule: Cosine decay (no warmup)")
     print0(f"  Min LR: {args.lr_min:.2e}")
-    
+
     print0("\n🌊 FLOW MATCHING:")
     print0(f"  Enabled: {args.use_sigma_noise}")
     if args.use_sigma_noise:
@@ -175,26 +167,26 @@ def print_config_summary(args):
         print0(f"  Flow shift: {args.flow_shift}")
         print0(f"  Logit std: {args.logit_std}")
         print0(f"  Mix uniform ratio: {args.mix_uniform_ratio}")
-    print0(f"  Method: Manual interpolation (FIXED)")
-    
+    print0("  Method: Manual interpolation (FIXED)")
+
     print0("\n💾 CHECKPOINTING:")
     print0(f"  Save every: {args.save_every} steps")
     print0(f"  Consolidate every: {args.consolidate_every} steps")
     print0(f"  Log every: {args.log_every} steps")
     print0(f"  CPU offload: {args.cpu_offload}")
-    
+
     print0("\n" + "=" * 80 + "\n")
 
 
 def main():
     args = parse_args()
-    
+
     # Apply mode-specific defaults
     args = apply_mode_defaults(args)
-    
+
     # Print configuration summary
     print_config_summary(args)
-    
+
     # Confirm mode
     if args.mode == "pretrain":
         print0("🚀 Starting PRETRAINING (true from-scratch training)")
@@ -210,9 +202,9 @@ def main():
         print0("   • Conservative updates to avoid catastrophic forgetting")
         print0("   • Multiple epochs on smaller dataset")
         print0("   • FIXED: Manual flow matching (no scheduler bugs)")
-    
+
     print0("")
-    
+
     # Create trainer with FIXED training logic
     trainer = WanT2VTrainer(
         model_id=args.model_id,

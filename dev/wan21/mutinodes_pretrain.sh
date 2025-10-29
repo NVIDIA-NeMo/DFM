@@ -16,7 +16,7 @@ echo "$MASTER_ADDR, $MASTER_PORT"
 MODE=pretrain
 META_FOLDER=/linnanw/hdvilla_sample/pika/wan21_codes/1.3B_meta
 BATCH_PER_NODE=1
-LR=1e-4
+LR=5e-5
 EPOCHS=1000000
 SAVE_EVERY=50
 OUTDIR=./wan_pretrain_1.3B
@@ -32,6 +32,7 @@ TRAIN_CMD="main_t2v.py \
   --save_every ${SAVE_EVERY} \
   --output_dir ${OUTDIR} \
   --log_every ${LOG_EVERY} \
+  --consolidate_every 50 \
   --resume_checkpoint ${RESUME_CKPT}"
 
 # ============================================================================
@@ -112,6 +113,7 @@ for NODE_RANK in $(seq 0 $((NNODES - 1))); do
         echo \"[NODE $NODE_RANK] LOCAL_WORLD_SIZE=\$LOCAL_WORLD_SIZE\"
         
         export HF_HOME=/linnanw/hdvilla_sample/cache
+        wandb login de9a5254a21f53f6024f458252896f254653d9f4
         export LOCAL_WORLD_SIZE=8
         export MASTER_ADDR=$MASTER_ADDR
         export MASTER_PORT=$MASTER_PORT
