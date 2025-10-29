@@ -116,7 +116,7 @@ class NeMoAutoDiffusionPipeline(DiffusionPipeline):
         load_for_training: bool = False,
         components_to_load: Optional[Iterable[str]] = None,
         **kwargs,
-    ) -> DiffusionPipeline:
+    ) -> tuple[DiffusionPipeline, Dict[str, FSDP2Manager]]:
         pipe: DiffusionPipeline = DiffusionPipeline.from_pretrained(
             pretrained_model_name_or_path,
             *model_args,
