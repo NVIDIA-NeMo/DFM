@@ -21,6 +21,7 @@ from typing import Any, Dict, Optional
 
 import torch
 import torch.distributed as dist
+import wandb
 from Automodel._diffusers.auto_diffusion_pipeline import NeMoAutoDiffusionPipeline
 from Automodel.flow_matching.training_step_t2v import (
     step_fsdp_transformer_t2v,
@@ -34,8 +35,6 @@ from nemo_automodel.recipes.base_recipe import BaseRecipe
 from nemo_automodel.recipes.llm.train_ft import build_distributed, build_wandb
 from torch.distributed.fsdp import MixedPrecisionPolicy
 from transformers.utils.hub import TRANSFORMERS_CACHE
-
-import wandb
 
 
 def build_model_and_optimizer(
