@@ -107,20 +107,20 @@ def get_batch_on_this_cp_rank(data: Dict):
 @dataclass
 class DiTModelProvider(TransformerConfig, ModelProviderMixin[VisionModule]):
     """
-    Config for DiT-S model
+    Config for DiT-XL model
     """
 
     crossattn_emb_size: int = 1024
     add_bias_linear: bool = False
     gated_linear_unit: bool = False
 
-    num_layers: int = 12
-    hidden_size: int = 1024
+    num_layers: int = 28
+    hidden_size: int = 1152
     max_img_h: int = 80
     max_img_w: int = 80
     max_frames: int = 34
     patch_spatial: int = 2
-    num_attention_heads: int = 6
+    num_attention_heads: int = 16
     layernorm_epsilon = 1e-6
     normalization = "RMSNorm"
     add_bias_linear = False
@@ -144,12 +144,13 @@ class DiTModelProvider(TransformerConfig, ModelProviderMixin[VisionModule]):
     in_channels: int = 16
 
     # remove these 2 parameters
-    data_step_fn = dit_data_step
-    forward_step_fn = dit_forward_step
+    # data_step_fn = dit_data_step
+    # forward_step_fn = dit_forward_step
 
     replicated_t_embedder = True
     qkv_format: str = 'sbhd'
-    seq_length: int = 1024
+
+    seq_length: int = 2048
     vocab_size: int = None
     make_vocab_size_divisible_by: int = 128
 
