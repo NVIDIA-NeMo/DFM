@@ -146,26 +146,19 @@ def collate_fn(batch: List[Dict[str, torch.Tensor]]) -> Dict[str, torch.Tensor]:
 
 
 def build_node_parallel_sampler(
-    dataset: Dataset,
-    num_nodes: Optional[int] = None,
+    dataset: "Dataset",
+    dp_rank: int,
+    dp_world_size: int,
+    _num_nodes: Optional[int] = None,
     shuffle: bool = True,
-) -> Optional[DistributedSampler]:
+) -> Optional["DistributedSampler"]:
     if not dist.is_initialized():
         return None
 
-    world_size = dist.get_world_size()
-    local_world_size = int(os.environ.get("LOCAL_WORLD_SIZE", world_size))
-    local_world_size = max(local_world_size, 1)
-    if num_nodes is None:
-        num_nodes = max(1, world_size // local_world_size)
-
-    node_rank = dist.get_rank() // local_world_size
-    replicas = num_nodes
-
     return DistributedSampler(
         dataset,
-        num_replicas=replicas,
-        rank=node_rank,
+        num_replicas=dp_world_size,
+        rank=dp_rank,
         shuffle=shuffle,
         drop_last=False,
     )
@@ -175,6 +168,8 @@ def build_wan21_dataloader(
     *,
     meta_folder: str,
     batch_size: int,
+    dp_rank: int,
+    dp_world_size: int,
     shuffle: bool = True,
     num_workers: int = 2,
     device: str = "cpu",
@@ -193,7 +188,7 @@ def build_wan21_dataloader(
         max_files=max_files,
     )
 
-    sampler = build_node_parallel_sampler(dataset, num_nodes, shuffle=shuffle)
+    sampler = build_node_parallel_sampler(dataset, dp_rank, dp_world_size, shuffle=shuffle)
 
     use_pin_memory = device == "cpu"
     dataloader = DataLoader(
