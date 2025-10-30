@@ -20,8 +20,8 @@ from typing import Any, Dict, Literal
 
 from torch import int_repr
 
-from megatron.bridge.data.Dit.data.diffusion_energon_datamodule import DiffusionDataModule
-from megatron.bridge.data.wan.wan_taskencoder import WanTaskEncoder
+from dfm.src.megatron.data.Dit.data.diffusion_energon_datamodule import DiffusionDataModule
+from dfm.src.megatron.data.wan.wan_taskencoder import WanTaskEncoder
 from megatron.bridge.data.utils import DatasetBuildContext, DatasetProvider
 
 @dataclass(kw_only=True)

@@ -28,10 +28,10 @@ from megatron.core.transformer.enums import ModelType
 from megatron.core.transformer.transformer_block import TransformerBlock
 from megatron.core.transformer.transformer_config import TransformerConfig
 from megatron.core.utils import make_sharded_tensor_for_checkpoint
-from megatron.bridge.models.wan.wan_layer_spec import (
+from dfm.src.megatron.model.wan.wan_layer_spec import (
     get_wan_block_with_transformer_engine_spec as WanLayerWithAdaLNspec,
 )
-from megatron.bridge.models.wan.wan_layer_spec import WanLayerNorm
+from dfm.src.megatron.model.wan.wan_layer_spec import WanLayerNorm
 from torch import Tensor
 from .rope_utils import Wan3DRopeEmbeddings
 

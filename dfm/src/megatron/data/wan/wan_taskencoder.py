@@ -18,7 +18,7 @@ import torch
 import torch.nn.functional as F
 from megatron.energon import DefaultTaskEncoder, SkipSample
 from megatron.energon.task_encoder.cooking import Cooker, basic_sample_keys
-from megatron.bridge.models.wan.utils.utils import grid_sizes_calculation, patchify
+from dfm.src.megatron.model.wan.utils.utils import grid_sizes_calculation, patchify
 from megatron.core import parallel_state
 
 
@@ -73,45 +73,28 @@ class WanTaskEncoder(DefaultTaskEncoder):
         self.seq_length = seq_length
 
 
-    # def actual_encode_sample(self, sample: dict) -> dict:
-
-    #     video_latent = sample["pth"]
-    #     context_embeddings = sample["pickle"]
-    #     video_metadata = sample["json"]
-
-    #     # sanity quality check
-    #     if torch.isnan(video_latent).any() or torch.isinf(video_latent).any():
-    #         raise SkipSample()
-    #     if torch.max(torch.abs(video_latent)) > 1e3:
-    #         raise SkipSample()
-
-    #     # calculate grid size
-    #     grid_size = grid_sizes_calculation(
-    #         input_shape = video_latent.shape[1:], 
-    #         patch_size = (self.patch_temporal, self.patch_spatial, self.patch_spatial),
-    #     )
-
-    #     ### Note: shape of sample's values
-    #     # video_latent: [latents_channels, F_latents, W_latents, H_latents]
-    #     # grid_size: [F_patches, W_patches, H_patches]
-    #     # context_embeddings: [context_seq_len, text_embedding_dim]
-
-    #     return dict(
-    #         video_latent=video_latent,
-    #         grid_size=grid_size,
-    #         context_embeddings=context_embeddings,
-    #         video_metadata=video_metadata,
-    #     )
-
-
     def encode_sample(self, sample: dict) -> dict:
 
-        # mock encode sample
-        video_latent = torch.tensor(torch.randn(16, 3, 104, 60), dtype=torch.float32)
-        # video_latent = torch.tensor(torch.randn(16, 24, 104, 60), dtype=torch.float32)
-        grid_size = torch.tensor([video_latent.shape[1] // self.patch_temporal, video_latent.shape[2] // self.patch_spatial, video_latent.shape[3] // self.patch_spatial], dtype=torch.int32)
-        context_embeddings = torch.tensor(torch.randn(512, 4096), dtype=torch.float32)
-        video_metadata = {}
+        video_latent = sample["pth"]
+        context_embeddings = sample["pickle"]
+        video_metadata = sample["json"]
+
+        # sanity quality check
+        if torch.isnan(video_latent).any() or torch.isinf(video_latent).any():
+            raise SkipSample()
+        if torch.max(torch.abs(video_latent)) > 1e3:
+            raise SkipSample()
+
+        # calculate grid size
+        grid_size = grid_sizes_calculation(
+            input_shape = video_latent.shape[1:], 
+            patch_size = (self.patch_temporal, self.patch_spatial, self.patch_spatial),
+        )
+
+        ### Note: shape of sample's values
+        # video_latent: [latents_channels, F_latents, W_latents, H_latents]
+        # grid_size: [F_patches, W_patches, H_patches]
+        # context_embeddings: [context_seq_len, text_embedding_dim]
 
         return dict(
             video_latent=video_latent,
@@ -119,6 +102,23 @@ class WanTaskEncoder(DefaultTaskEncoder):
             context_embeddings=context_embeddings,
             video_metadata=video_metadata,
         )
+
+
+    # def encode_sample(self, sample: dict) -> dict:
+
+    #     # mock encode sample
+    #     video_latent = torch.tensor(torch.randn(16, 3, 104, 60), dtype=torch.float32)
+    #     # video_latent = torch.tensor(torch.randn(16, 24, 104, 60), dtype=torch.float32)
+    #     grid_size = torch.tensor([video_latent.shape[1] // self.patch_temporal, video_latent.shape[2] // self.patch_spatial, video_latent.shape[3] // self.patch_spatial], dtype=torch.int32)
+    #     context_embeddings = torch.tensor(torch.randn(512, 4096), dtype=torch.float32)
+    #     video_metadata = {}
+
+    #     return dict(
+    #         video_latent=video_latent,
+    #         grid_size=grid_size,
+    #         context_embeddings=context_embeddings,
+    #         video_metadata=video_metadata,
+    #     )
 
 
     def batch(self, samples: list[dict]) -> dict:

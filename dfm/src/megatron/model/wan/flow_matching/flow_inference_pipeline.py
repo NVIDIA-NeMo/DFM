@@ -14,20 +14,20 @@ import torch.cuda.amp as amp
 import torch.distributed as dist
 from tqdm import tqdm
 
-from megatron.bridge.models.wan.wan_model import WanModel
+from dfm.src.megatron.model.wan.wan_model import WanModel
 from megatron.bridge.models.wan.wan_provider import WanModelProvider
-from megatron.bridge.models.wan.modules.t5 import T5EncoderModel
-from megatron.bridge.models.wan.modules import WanVAE
-from megatron.bridge.models.wan.inference.utils.fm_solvers import (
+from dfm.src.megatron.model.wan.modules.t5 import T5EncoderModel
+from dfm.src.megatron.model.wan.modules import WanVAE
+from dfm.src.megatron.model.wan.inference.utils.fm_solvers import (
     FlowDPMSolverMultistepScheduler,
     get_sampling_sigmas,
     retrieve_timesteps,
 )
-from megatron.bridge.models.wan.inference.utils.fm_solvers_unipc import FlowUniPCMultistepScheduler
-from megatron.bridge.models.wan.utils.utils import grid_sizes_calculation, patchify
+from dfm.src.megatron.model.wan.inference.utils.fm_solvers_unipc import FlowUniPCMultistepScheduler
+from dfm.src.megatron.model.wan.utils.utils import grid_sizes_calculation, patchify
 from megatron.core import parallel_state
 from torch.nn import functional as F
-from megatron.bridge.models.wan.utils.utils import split_inputs_cp, cat_outputs_cp
+from dfm.src.megatron.model.wan.utils.utils import split_inputs_cp, cat_outputs_cp
 
 import math
 from typing import Tuple, Union

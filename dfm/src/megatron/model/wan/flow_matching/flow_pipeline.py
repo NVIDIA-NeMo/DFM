@@ -19,8 +19,8 @@ import torch
 from megatron.core import parallel_state
 from torch import Tensor
 from diffusers import WanPipeline
-from megatron.bridge.models.wan.flow_matching.time_shift_utils import compute_density_for_timestep_sampling
-from megatron.bridge.models.wan.utils.utils import patchify, split_inputs_cp
+from dfm.src.megatron.model.wan.flow_matching.time_shift_utils import compute_density_for_timestep_sampling
+from dfm.src.megatron.model.wan.utils.utils import patchify, split_inputs_cp
 
 class FlowPipeline:
 
