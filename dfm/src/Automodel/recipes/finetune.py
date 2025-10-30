@@ -43,7 +43,7 @@ def build_model_and_optimizer(
     learning_rate: float,
     device: torch.device,
     bf16_dtype: torch.dtype,
-    cpu_offload: bool = True,
+    cpu_offload: bool = False,
     tp_size: int = 1,
     cp_size: int = 1,
     pp_size: int = 1,
@@ -191,7 +191,7 @@ class TrainWan21DiffusionRecipe(BaseRecipe):
         fsdp_cfg = self.cfg.get("fsdp", {})
         fm_cfg = self.cfg.get("flow_matching", {})
 
-        self.cpu_offload = fsdp_cfg.get("cpu_offload", True)
+        self.cpu_offload = fsdp_cfg.get("cpu_offload", False)
         self.use_sigma_noise = fm_cfg.get("use_sigma_noise", True)
         self.timestep_sampling = fm_cfg.get("timestep_sampling", "uniform")
         self.logit_mean = fm_cfg.get("logit_mean", 0.0)
@@ -227,7 +227,6 @@ class TrainWan21DiffusionRecipe(BaseRecipe):
             optimizer_cfg=self.cfg.get("optim.optimizer", {}),
         )
 
-        # Expose the trainable module as a single model for BaseRecipe tracking
         self.model = self.model_map["transformer"]["fsdp_transformer"]
         self.peft_config = None
 
@@ -275,12 +274,9 @@ class TrainWan21DiffusionRecipe(BaseRecipe):
         if not hasattr(dataloader_cfg, "instantiate"):
             raise RuntimeError("data.dataloader must be a config node with instantiate()")
 
-        dataloader_obj = dataloader_cfg.instantiate()
-        if isinstance(dataloader_obj, tuple):
-            self.dataloader, self.sampler = dataloader_obj
-        else:
-            self.dataloader = dataloader_obj
-            self.sampler = getattr(dataloader_obj, "sampler", None)
+        self.dataloader, self.sampler = dataloader_cfg.instantiate(
+            dp_rank=self._get_dp_rank(), dp_world_size=self._get_dp_group_size()
+        )
 
         self.raw_steps_per_epoch = len(self.dataloader)
         if self.raw_steps_per_epoch == 0:
@@ -296,9 +292,7 @@ class TrainWan21DiffusionRecipe(BaseRecipe):
         self.local_batch_size = getattr(self.dataloader, "batch_size", 1)
         # Desired global effective batch size across all DP ranks and nodes
         self.global_batch_size = max(1, int(self.batch_size_per_node) * int(self.num_nodes))
-
         # Steps per epoch after gradient accumulation
-        # grad_acc_steps must be an integer; StepScheduler will assert divisibility
         grad_acc_steps = max(1, self.global_batch_size // max(1, self.local_batch_size * self.dp_size))
         self.steps_per_epoch = ceil(self.raw_steps_per_epoch / grad_acc_steps)
 
@@ -328,31 +322,6 @@ class TrainWan21DiffusionRecipe(BaseRecipe):
 
         if is_main_process():
             os.makedirs(self.checkpoint_config.checkpoint_dir, exist_ok=True)
-
-            if wandb.run is None:
-                config = {
-                    "model_id": self.model_id,
-                    "learning_rate": self.learning_rate,
-                    "num_epochs": self.num_epochs,
-                    "batch_size_per_node": self.batch_size_per_node,
-                    "total_batch_size": self.batch_size_per_node * self.num_nodes,
-                    "num_nodes": self.num_nodes,
-                    "gpus_per_node": self.local_world_size,
-                    "total_gpus": self.world_size,
-                    "approach": "wan_t2v_flow_matching",
-                    "cpu_offload": self.cpu_offload,
-                    "use_sigma_noise": self.use_sigma_noise,
-                    "timestep_sampling": self.timestep_sampling,
-                    "logit_mean": self.logit_mean,
-                    "logit_std": self.logit_std,
-                    "flow_shift": self.flow_shift,
-                    "mix_uniform_ratio": self.mix_uniform_ratio,
-                }
-                wandb.init(
-                    project="wan-t2v-flow-matching",
-                    config=config,
-                    resume=self.restore_from is not None,
-                )
 
         if dist.is_initialized():
             dist.barrier()
@@ -407,24 +376,16 @@ class TrainWan21DiffusionRecipe(BaseRecipe):
                         logging.info(f"[DEBUG] Batch shapes - video: {video_shape}, text: {text_shape}")
                         raise
 
-                    (loss / max(1, len(batch_group))).backward()
+                    (loss / len(batch_group)).backward()
                     micro_losses.append(float(loss.item()))
 
-                trainable_params = [
-                    p
-                    for p in self.model_map["transformer"]["fsdp_transformer"].parameters()
-                    if p.requires_grad and p.grad is not None
-                ]
-
-                grad_norm = 0.0
-                if trainable_params:
-                    grad_norm = torch.nn.utils.clip_grad_norm_(trainable_params, max_norm=1.0)
-                    grad_norm = float(grad_norm) if torch.is_tensor(grad_norm) else grad_norm
+                grad_norm = torch.nn.utils.clip_grad_norm_(self.model.parameters(), max_norm=1.0)
+                grad_norm = float(grad_norm) if torch.is_tensor(grad_norm) else grad_norm
 
                 self.optimizer.step()
                 self.lr_scheduler.step()
 
-                group_loss_mean = float(sum(micro_losses) / max(1, len(micro_losses)))
+                group_loss_mean = float(sum(micro_losses) / len(micro_losses))
                 epoch_loss += group_loss_mean
                 num_steps += 1
                 global_step = int(self.step_scheduler.step)
@@ -456,7 +417,7 @@ class TrainWan21DiffusionRecipe(BaseRecipe):
                 if self.step_scheduler.is_ckpt_step:
                     self.save_checkpoint(epoch, global_step)
 
-            avg_loss = epoch_loss / max(num_steps, 1)
+            avg_loss = epoch_loss / num_steps
             logging.info(f"[INFO] Epoch {epoch + 1} complete. avg_loss={avg_loss:.6f}")
 
             if is_main_process() and wandb.run is not None:
