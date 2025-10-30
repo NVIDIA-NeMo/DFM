@@ -62,21 +62,11 @@ build-backend = "setuptools.build_meta"
 
 [dependency-groups]
 automodel = [
-    "bitsandbytes==0.45.5; (platform_machine == 'x86_64' and platform_system != 'Darwin')",
-    "datasets>=4.0.0",
+    "nemo-automodel @ git+https://github.com/NVIDIA-NeMo/Automodel@main",
     "diffusers",
     "ftfy",
     "imageio-ffmpeg",
-    "liger-kernel>=0.5.9; (platform_machine == 'x86_64' and platform_system != 'Darwin')",
-    "megatron-fsdp",
-    "opencv-python-headless==4.10.0.84",
-    "pybind11",
-    "pyyaml",
-    "torch<=2.8.0",
-    "torchdata",
-    "transformers<=4.57.1",
-    "wandb",
-    "torchao",
+    "opencv-python-headless==4.10.0.84"
 ]
 docs = [
     "myst-parser>=4.0.1",

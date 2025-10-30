@@ -20,8 +20,7 @@ import torch
 import torch.distributed as dist
 from diffusers import AutoencoderKLWan
 from diffusers.utils import export_to_video
-from nemo_automodel._diffusers import NeMoAutoDiffusionPipeline
-from nemo_automodel.components.distributed.fsdp2 import FSDP2Manager
+from Automodel._diffusers.auto_diffusion_pipeline import NeMoAutoDiffusionPipeline
 from nemo_automodel.components.distributed.init_utils import initialize_distributed
 from nemo_automodel.components.loggers.log_utils import setup_logging
 
@@ -97,29 +96,26 @@ def main():
         "Wan-AI/Wan2.2-T2V-A14B-Diffusers", subfolder="vae", torch_dtype=torch.bfloat16
     )
     # Build per-component managers mapping
-    fsdp2_manager = FSDP2Manager(
-        dp_size=dp_size,
-        tp_size=tp_size,
-        cp_size=cp_size,
-        pp_size=pp_size,
-        backend="nccl",
-        world_size=world_size,
-        use_hf_tp_plan=False,
-    )
-
+    manager_args = {
+        "dp_size": dp_size,
+        "tp_size": tp_size,
+        "cp_size": cp_size,
+        "pp_size": pp_size,
+        "backend": "nccl",
+        "world_size": world_size,
+        "use_hf_tp_plan": False,
+    }
     # Wan pipelines typically have components like: 'vae', 'text_encoder', 'image_encoder', 'transformer', 'transformer_2'
     # Parallelize only the heavy transformer components
     parallel_scheme = {}
     for name in ("transformer", "transformer_2"):
-        parallel_scheme[name] = fsdp2_manager
+        parallel_scheme[name] = manager_args
 
-    # Build pipeline with Automodel's parallelizing pipeline
-    pipe = NeMoAutoDiffusionPipeline.from_pretrained(
-        "Wan-AI/Wan2.2-T2V-A14B-Diffusers",
-        vae=vae,
-        torch_dtype=bf16,
-        device=device,
-        parallel_scheme=parallel_scheme,
+    pipe, _ = NeMoAutoDiffusionPipeline.from_pretrained(
+        "Wan-AI/Wan2.2-T2V-A14B-Diffusers", 
+        vae=vae, 
+        torch_dtype=torch.bfloat16, 
+        parallel_scheme=parallel_scheme
     )
     logging.info("[Setup] Pipeline loaded and parallelized via NeMoAutoDiffusionPipeline")
     dist.barrier()

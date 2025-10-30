@@ -19,7 +19,6 @@ data:
     batch_size: 1
     num_workers: 2
     device: cpu
-    num_nodes: 2
 
 batch:
   batch_size_per_node: 8
@@ -54,7 +53,7 @@ logging:
 
 checkpoint:
   enabled: true
-  checkpoint_dir: /opt/DFM/wan_t2v_flow_outputs_base_recipe_multi_node_fsdp_run_1/
+  checkpoint_dir: /opt/DFM/wan_t2v_flow_outputs_base_recipe_multi_node_fsdp_run_3/
   model_save_format: torch_save
   save_consolidated: false
   restore_from: null
