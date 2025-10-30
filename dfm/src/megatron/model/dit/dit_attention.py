@@ -170,7 +170,7 @@ class JointSelfAttention(Attention):
         query = query.reshape(query.size(0), query.size(1), -1, self.hidden_size_per_attention_head)
         return query, key, value
 
-    def get_query_key_value_tensors(self, hidden_states, key_value_states=None):
+    def get_query_key_value_tensors(self, hidden_states, key_value_states=None, split_qkv=False):
         """
         Derives `query`, `key` and `value` tensors from `hidden_states`.
         """
