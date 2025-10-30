@@ -391,7 +391,7 @@ class TrainWan21DiffusionRecipe(BaseRecipe):
                 global_step = int(self.step_scheduler.step)
 
                 if self.log_every and self.log_every > 0 and is_main_process() and (global_step % self.log_every == 0):
-                    avg_loss = epoch_loss / max(num_steps, 1)
+                    avg_loss = epoch_loss / num_steps
                     log_dict = {
                         "train_loss": group_loss_mean,
                         "train_avg_loss": avg_loss,
