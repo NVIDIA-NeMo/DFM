@@ -149,11 +149,8 @@ class NeMoAutoDiffusionPipeline(DiffusionPipeline):
                 manager_args = parallel_scheme.get(comp_name)
                 if manager_args is None:
                     continue
-                try:
-                    manager = FSDP2Manager(**manager_args)
-                    created_managers[comp_name] = manager
-                    parallel_module = manager.parallelize(comp_module)
-                    setattr(pipe, comp_name, parallel_module)
-                except Exception as e:
-                    logger.warning("FSDP2Manager.parallelize failed for %s: %s", comp_name, e)
+                manager = FSDP2Manager(**manager_args)
+                created_managers[comp_name] = manager
+                parallel_module = manager.parallelize(comp_module)
+                setattr(pipe, comp_name, parallel_module)
         return pipe, created_managers
