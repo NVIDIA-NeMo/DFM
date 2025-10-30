@@ -19,7 +19,6 @@ data:
     batch_size: 1
     num_workers: 2
     device: cpu
-    num_nodes: 1
 
 batch:
   batch_size_per_node: 8
