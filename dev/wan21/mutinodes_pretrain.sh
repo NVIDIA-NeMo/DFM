@@ -26,7 +26,7 @@ RESUME_CKPT=/linnanw/wan2.1/wan_pretrain_1.3B/checkpoint-2250
 TRAIN_CMD="main_t2v.py \
   --mode ${MODE} \
   --meta_folder ${META_FOLDER} \
-  --batch_size_per_node ${BATCH_PER_NODE} \
+  --batch_size_per_gpu ${BATCH_PER_NODE} \
   --learning_rate ${LR} \
   --num_epochs ${EPOCHS} \
   --save_every ${SAVE_EVERY} \

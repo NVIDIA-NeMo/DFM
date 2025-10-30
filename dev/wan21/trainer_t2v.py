@@ -1,4 +1,4 @@
-# trainer_t2v.py - WAN 2.1 T2V Trainer with Mode System (FIXED VERSION)
+# trainer_t2v.py - WAN 2.1 T2V Trainer with Gradient Accumulation (REVISED)
 
 import os
 from typing import Optional
@@ -22,13 +22,14 @@ from training_step_t2v import step_fsdp_transformer_t2v
 
 class WanT2VTrainer:
     """
-    WAN 2.1 T2V trainer with mode system (FIXED VERSION).
+    WAN 2.1 T2V trainer with gradient accumulation.
 
-    FIXED: Uses manual flow matching instead of scheduler.add_noise()
+    FSDP = Data-parallel training with sharded parameters/gradients/optimizer state.
 
     Features:
     - Mode-based configuration (pretrain/finetune)
     - FSDP for distributed training
+    - Gradient accumulation support
     - Manual flow matching (no scheduler explosion)
     - Warmup + Cosine annealing LR schedule
     """
@@ -98,55 +99,24 @@ class WanT2VTrainer:
         if mode == "finetune":
             print0(f"[INFO] Weight initialization: PRETRAINED (from {model_id})")
         else:
-            print0("[INFO] Weight initialization: RANDOM (true from-scratch training)")
-
-        print0(f"[INFO] Learning rate: {learning_rate}")
-        print0(f"[INFO] Weight decay: {weight_decay}, Beta2: {beta2}, Grad clip: {grad_clip}")
-        print0(f"[INFO] Warmup steps: {warmup_steps}")
-        print0(f"[INFO] CPU offload: {'ENABLED' if cpu_offload else 'DISABLED'}")
-        print0("[INFO] FIXED: Using manual flow matching (no scheduler explosion)")
-        print0("[INFO] Flow matching config:")
-        print0(f"[INFO]   - Enabled: {use_sigma_noise}")
-        print0(f"[INFO]   - Timestep sampling: {timestep_sampling}")
-        print0(f"[INFO]   - Flow shift: {flow_shift}")
-        print0(f"[INFO]   - Mix uniform ratio: {mix_uniform_ratio}")
-
-        self.pipe = None
-        self.model_map = {}
-        self.optimizer = None
-        self.lr_scheduler = None
+            print0("[INFO] Weight initialization: RANDOM (training from scratch)")
 
     def setup_pipeline(self):
-        """Load pipeline with mode-aware weight initialization."""
+        """Load pipeline with appropriate initialization based on mode."""
+        print0(f"[INFO] Loading pipeline: {self.model_id}")
 
         if self.mode == "finetune":
-            # FINETUNE: Always load pretrained weights
-            print0("[INFO] FINETUNE MODE: Loading pretrained weights...")
-
+            # Load pretrained model
+            print0("[INFO] Loading PRETRAINED model from HuggingFace...")
             self.pipe = WanPipeline.from_pretrained(
                 self.model_id,
                 torch_dtype=torch.bfloat16,
             )
-
-            print0(f"[INFO] ✓ Loaded pretrained transformer from {self.model_id}")
-
-            # Verify weights are actually loaded
-            if hasattr(self.pipe, "transformer") and self.pipe.transformer is not None:
-                if hasattr(self.pipe.transformer, "blocks") and len(self.pipe.transformer.blocks) > 0:
-                    first_param = next(self.pipe.transformer.blocks[0].parameters())
-                    param_mean = first_param.abs().mean().item()
-                    param_std = first_param.std().item()
-
-                    if param_mean < 1e-6:
-                        raise RuntimeError(f"[ERROR] Weights are RANDOM! Mean: {param_mean:.2e}")
-                    else:
-                        print0("[INFO] ✓ Pretrained weights verified:")
-                        print0(f"[INFO]   - Mean: {param_mean:.4f}")
-                        print0(f"[INFO]   - Std:  {param_std:.4f}")
+            print0("[INFO] ✓ Pretrained model loaded")
 
         else:  # pretrain mode
-            # PRETRAIN: Random initialization (true from-scratch)
-            print0("[INFO] PRETRAIN MODE: Random initialization (from scratch)...")
+            # Load config and reinitialize with random weights
+            print0("[INFO] PRETRAIN mode: Initializing with RANDOM weights...")
             print0(f"[INFO] Loading config from {self.model_id}...")
 
             # Load just the config
@@ -216,7 +186,14 @@ class WanT2VTrainer:
         verify_fsdp_setup(self.model_map)
         print0("[INFO] FSDP setup complete")
 
-    def setup_optim(self, total_steps: int):
+    def setup_optim(self, total_optimizer_steps: int):
+        """
+        Setup optimizer and scheduler.
+
+        Args:
+            total_optimizer_steps: Total number of optimizer steps (not micro-batch steps)
+                                   = num_epochs × steps_per_epoch / grad_accum_steps
+        """
         print0("[INFO] Setting up optimizer...")
 
         # Get ALL trainable parameters
@@ -232,6 +209,7 @@ class WanT2VTrainer:
         )
 
         # Create warmup + cosine annealing scheduler
+        # Scheduler steps once per optimizer step (after gradient accumulation)
         if self.warmup_steps > 0:
             print0(f"[INFO] Using warmup ({self.warmup_steps} steps) + cosine annealing")
 
@@ -242,21 +220,29 @@ class WanT2VTrainer:
                     return float(current_step) / float(max(1, self.warmup_steps))
                 else:
                     # Cosine annealing after warmup
-                    progress = float(current_step - self.warmup_steps) / float(max(1, total_steps - self.warmup_steps))
+                    progress = float(current_step - self.warmup_steps) / float(
+                        max(1, total_optimizer_steps - self.warmup_steps)
+                    )
                     cosine_decay = 0.5 * (1.0 + torch.cos(torch.tensor(progress * 3.141592653589793)))
                     return max(self.lr_min / self.learning_rate, cosine_decay.item())
 
             self.lr_scheduler = torch.optim.lr_scheduler.LambdaLR(self.optimizer, lr_lambda=lr_lambda)
         else:
             print0("[INFO] Using cosine annealing (no warmup)")
-            self.lr_scheduler = torch.optim.lr_scheduler.CosineAnnealingLR(
-                self.optimizer, T_max=total_steps, eta_min=self.lr_min
-            )
+
+            def lr_lambda(current_step):
+                progress = float(current_step) / float(max(1, total_optimizer_steps))
+                cosine_decay = 0.5 * (1.0 + torch.cos(torch.tensor(progress * 3.141592653589793)))
+                return max(self.lr_min / self.learning_rate, cosine_decay.item())
+
+            self.lr_scheduler = torch.optim.lr_scheduler.LambdaLR(self.optimizer, lr_lambda=lr_lambda)
+
+        print0(f"[INFO] Scheduler configured for {total_optimizer_steps} optimizer steps")
 
     def validate_setup(self):
-        """Validate FSDP setup with a test forward pass."""
         print0("[INFO] Validating FSDP setup...")
-        test_fsdp_forward_pass(self.model_map, self.device, self.bf16)
+        test_fsdp_forward_pass(self.model_map, device=self.device, bf16=self.bf16)
+        print0("[INFO] ✓ Validation complete")
 
         if torch.cuda.is_available():
             memory_allocated = torch.cuda.memory_allocated(self.device) / 1024**3
@@ -267,39 +253,71 @@ class WanT2VTrainer:
         self,
         meta_folder: str,
         num_epochs: int = 10,
-        batch_size_per_node: int = 1,
+        batch_size_per_gpu: int = 1,  # RENAMED: per GPU, not per node
+        grad_accum_steps: int = 1,  # NEW: gradient accumulation
         save_every: int = 500,
         consolidate_every: int = 1000,
         log_every: int = 10,
         output_dir: str = "./wan_t2v_outputs",
         resume_checkpoint: Optional[str] = None,
     ):
-        """Train the model with mode-aware configuration."""
+        """
+        Train the model with FSDP and gradient accumulation.
+
+        Global batch size = batch_size_per_gpu × grad_accum_steps × world_size
+
+        Args:
+            meta_folder: Path to folder with .meta files
+            num_epochs: Number of training epochs
+            batch_size_per_gpu: Micro-batch size per GPU (per rank)
+            grad_accum_steps: Number of gradient accumulation steps
+            save_every: Save checkpoint every N optimizer steps
+            consolidate_every: Consolidate checkpoint every N optimizer steps
+            log_every: Log every N optimizer steps
+            output_dir: Output directory for checkpoints
+            resume_checkpoint: Path to checkpoint to resume from
+        """
+        # Calculate global batch size
+        global_batch_size = batch_size_per_gpu * grad_accum_steps * self.world_size
+
         print0(f"\n[INFO] Starting T2V training - Mode: {self.mode.upper()}")
-        print0(f"[INFO] Batch size per node: {batch_size_per_node}")
-        print0(f"[INFO] Total effective batch size: {batch_size_per_node * self.num_nodes}")
+        print0("[INFO] Batch configuration:")
+        print0(f"  - Micro-batch per GPU: {batch_size_per_gpu}")
+        print0(f"  - Gradient accumulation steps: {grad_accum_steps}")
+        print0(f"  - World size (total GPUs): {self.world_size}")
+        print0(f"  - Global batch size: {global_batch_size}")
+        print0(f"      = {batch_size_per_gpu} × {grad_accum_steps} × {self.world_size}")
 
         self.setup_pipeline()
         self.setup_fsdp()
 
         # Create dataloader
-        dataloader, sampler = create_dataloader(meta_folder, batch_size_per_node, self.num_nodes)
+        dataloader, sampler = create_dataloader(
+            meta_folder, batch_size_per_gpu=batch_size_per_gpu, num_nodes=self.num_nodes
+        )
 
-        steps_per_epoch = len(dataloader)
-        total_steps = num_epochs * steps_per_epoch
+        # Calculate steps
+        microbatch_steps_per_epoch = len(dataloader)
+        optimizer_steps_per_epoch = microbatch_steps_per_epoch // grad_accum_steps
+        total_optimizer_steps = num_epochs * optimizer_steps_per_epoch
 
-        # Setup optimizer with total steps for scheduler
-        self.setup_optim(total_steps)
-        print0(f"[INFO] Scheduler configured for {total_steps} total steps")
+        print0("[INFO] Training steps:")
+        print0(f"  - Micro-batch steps per epoch: {microbatch_steps_per_epoch}")
+        print0(f"  - Optimizer steps per epoch: {optimizer_steps_per_epoch}")
+        print0(f"  - Total optimizer steps: {total_optimizer_steps}")
+
+        # Setup optimizer with total OPTIMIZER steps for scheduler
+        self.setup_optim(total_optimizer_steps)
 
         self.validate_setup()
 
-        global_step = 0
+        optimizer_step = 0
         start_epoch = 0
 
         if resume_checkpoint:
-            global_step = load_fsdp_checkpoint(self.model_map, self.optimizer, self.lr_scheduler, resume_checkpoint)
-            start_epoch = global_step // steps_per_epoch
+            loaded_step = load_fsdp_checkpoint(self.model_map, self.optimizer, self.lr_scheduler, resume_checkpoint)
+            optimizer_step = loaded_step
+            start_epoch = (loaded_step * grad_accum_steps) // microbatch_steps_per_epoch
 
         if is_main_process():
             os.makedirs(output_dir, exist_ok=True)
@@ -315,17 +333,21 @@ class WanT2VTrainer:
                 "warmup_steps": self.warmup_steps,
                 "lr_min": self.lr_min,
                 "num_epochs": num_epochs,
-                "batch_size_per_node": batch_size_per_node,
-                "total_batch_size": batch_size_per_node * self.num_nodes,
+                "batch_size_per_gpu": batch_size_per_gpu,
+                "grad_accum_steps": grad_accum_steps,
+                "global_batch_size": global_batch_size,
                 "num_nodes": self.num_nodes,
                 "gpus_per_node": self.local_world_size,
                 "total_gpus": self.world_size,
+                "microbatch_steps_per_epoch": microbatch_steps_per_epoch,
+                "optimizer_steps_per_epoch": optimizer_steps_per_epoch,
+                "total_optimizer_steps": total_optimizer_steps,
                 "cpu_offload": self.cpu_offload,
                 "use_sigma_noise": self.use_sigma_noise,
                 "timestep_sampling": self.timestep_sampling,
                 "flow_shift": self.flow_shift,
                 "mix_uniform_ratio": self.mix_uniform_ratio,
-                "training_method": "manual_flow_matching_fixed",
+                "training_method": "manual_flow_matching_fsdp_grad_accum",
             }
 
             wandb.init(
@@ -339,7 +361,8 @@ class WanT2VTrainer:
 
         # Training loop
         for epoch in range(start_epoch, num_epochs):
-            sampler.set_epoch(epoch)
+            if sampler is not None:
+                sampler.set_epoch(epoch)
 
             iterable = dataloader
             if is_main_process():
@@ -348,13 +371,19 @@ class WanT2VTrainer:
                 iterable = tqdm(dataloader, desc=f"Epoch {epoch + 1}/{num_epochs}")
 
             epoch_loss = 0.0
-            num_steps = 0
+            accum_loss = 0.0
+            microbatch_count = 0
 
-            for step, batch in enumerate(iterable):
-                self.optimizer.zero_grad(set_to_none=True)
+            for microbatch_idx, batch in enumerate(iterable):
+                # Determine if this is an accumulation step or optimizer step
+                is_accumulating = (microbatch_idx + 1) % grad_accum_steps != 0
+
+                # Zero gradients at start of accumulation cycle
+                if microbatch_idx % grad_accum_steps == 0:
+                    self.optimizer.zero_grad(set_to_none=True)
 
                 try:
-                    # FIXED: Uses manual flow matching (no scheduler.add_noise)
+                    # Forward pass with manual flow matching
                     loss, metrics = step_fsdp_transformer_t2v(
                         pipe=self.pipe,
                         model_map=self.model_map,
@@ -367,101 +396,105 @@ class WanT2VTrainer:
                         logit_std=self.logit_std,
                         flow_shift=self.flow_shift,
                         mix_uniform_ratio=self.mix_uniform_ratio,
-                        global_step=global_step,
+                        global_step=optimizer_step,
                     )
 
                 except Exception as e:
-                    print0(f"[ERROR] Training step failed at epoch {epoch}, step {step}: {e}")
+                    print0(f"[ERROR] Training step failed at epoch {epoch}, microbatch {microbatch_idx}: {e}")
                     video_shape = batch.get("video_latents", torch.tensor([])).shape
                     text_shape = batch.get("text_embeddings", torch.tensor([])).shape
                     print0(f"[DEBUG] Batch shapes - video: {video_shape}, text: {text_shape}")
                     raise
 
-                loss.backward()
+                # Scale loss by accumulation steps (average over accumulated gradients)
+                scaled_loss = loss / grad_accum_steps
+                scaled_loss.backward()
 
-                # Gradient clipping
-                trainable_params = [
-                    p
-                    for p in self.model_map["transformer"]["fsdp_transformer"].parameters()
-                    if p.requires_grad and p.grad is not None
-                ]
-
-                grad_norm = 0.0
-                if trainable_params:
-                    grad_norm = torch.nn.utils.clip_grad_norm_(trainable_params, max_norm=self.grad_clip)
-                    grad_norm = float(grad_norm) if torch.is_tensor(grad_norm) else grad_norm
-
-                self.optimizer.step()
-                self.lr_scheduler.step()
-
+                accum_loss += loss.item()
                 epoch_loss += loss.item()
-                num_steps += 1
-                global_step += 1
+                microbatch_count += 1
 
-                # Logging
-                if is_main_process() and (global_step % log_every == 0):
-                    log_dict = {
-                        "train_loss": loss.item(),
-                        "train_avg_loss": epoch_loss / num_steps,
-                        "lr": self.optimizer.param_groups[0]["lr"],
-                        "grad_norm": grad_norm,
-                        "epoch": epoch,
-                        "global_step": global_step,
-                        # Flow matching metrics
-                        "sigma_mean": metrics.get("sigma_mean", 0),
-                        "sigma_min": metrics.get("sigma_min", 0),
-                        "sigma_max": metrics.get("sigma_max", 0),
-                        "timestep_min": metrics.get("timestep_min", 0),
-                        "timestep_max": metrics.get("timestep_max", 0),
-                    }
+                # Optimizer step after accumulation
+                if not is_accumulating:
+                    # Gradient clipping
+                    trainable_params = [
+                        p
+                        for p in self.model_map["transformer"]["fsdp_transformer"].parameters()
+                        if p.requires_grad and p.grad is not None
+                    ]
 
-                    wandb.log(log_dict, step=global_step)
+                    grad_norm = 0.0
+                    if trainable_params:
+                        grad_norm = torch.nn.utils.clip_grad_norm_(trainable_params, max_norm=self.grad_clip)
+                        grad_norm = float(grad_norm) if torch.is_tensor(grad_norm) else grad_norm
 
-                    if hasattr(iterable, "set_postfix"):
-                        iterable.set_postfix(
-                            {
-                                "loss": f"{loss.item():.4f}",
-                                "avg": f"{(epoch_loss / num_steps):.4f}",
-                                "lr": f"{self.optimizer.param_groups[0]['lr']:.2e}",
-                                "gn": f"{grad_norm:.2f}",
-                            }
+                    # Take optimizer step
+                    self.optimizer.step()
+                    self.lr_scheduler.step()
+
+                    optimizer_step += 1
+
+                    # Logging (per optimizer step)
+                    if is_main_process() and (optimizer_step % log_every == 0):
+                        avg_accum_loss = accum_loss / grad_accum_steps
+
+                        log_dict = {
+                            "train_loss": avg_accum_loss,  # Average loss over accumulated steps
+                            "train_avg_loss": epoch_loss / microbatch_count,
+                            "lr": self.optimizer.param_groups[0]["lr"],
+                            "grad_norm": grad_norm,
+                            "epoch": epoch,
+                            "optimizer_step": optimizer_step,
+                            "microbatch_step": microbatch_idx + 1,
+                            # Flow matching metrics (from last microbatch in accumulation)
+                            "sigma_mean": metrics.get("sigma_mean", 0),
+                            "sigma_min": metrics.get("sigma_min", 0),
+                            "sigma_max": metrics.get("sigma_max", 0),
+                            "timestep_min": metrics.get("timestep_min", 0),
+                            "timestep_max": metrics.get("timestep_max", 0),
+                        }
+
+                        wandb.log(log_dict, step=optimizer_step)
+
+                    # Reset accumulation loss
+                    accum_loss = 0.0
+
+                    # Save checkpoint (per optimizer step)
+                    if optimizer_step % save_every == 0:
+                        # Determine if we should consolidate
+                        should_consolidate = optimizer_step % consolidate_every == 0
+
+                        save_fsdp_checkpoint(
+                            self.model_map,
+                            self.optimizer,
+                            self.lr_scheduler,
+                            output_dir=output_dir,
+                            step=optimizer_step,
+                            consolidate=should_consolidate,
                         )
 
-                # Checkpointing with consolidation control
-                if save_every and (global_step % save_every == 0):
-                    # Consolidate based on consolidate_every
-                    should_consolidate = global_step % consolidate_every == 0
-
-                    save_fsdp_checkpoint(
-                        self.model_map,
-                        self.optimizer,
-                        self.lr_scheduler,
-                        output_dir,
-                        global_step,
-                        consolidate=should_consolidate,
-                    )
-
-            # Epoch summary
-            avg_loss = epoch_loss / max(num_steps, 1)
-            print0(f"[INFO] Epoch {epoch + 1} complete. avg_loss={avg_loss:.6f}")
-
+            # End of epoch logging
             if is_main_process():
-                wandb.log({"epoch/avg_loss": avg_loss, "epoch/num": epoch + 1}, step=global_step)
+                avg_epoch_loss = epoch_loss / microbatch_count
+                print0(f"[INFO] Epoch {epoch + 1}/{num_epochs} complete - Avg loss: {avg_epoch_loss:.6f}")
 
-        # Final checkpoint (always consolidate)
+            if dist.is_initialized():
+                dist.barrier()
+
+        # Save final checkpoint
         if is_main_process():
-            print0("[INFO] Training complete, saving final checkpoint...")
-
             save_fsdp_checkpoint(
                 self.model_map,
                 self.optimizer,
                 self.lr_scheduler,
-                output_dir,
-                global_step,
+                output_dir=output_dir,
+                step=optimizer_step,
                 consolidate=True,  # Always consolidate final checkpoint
             )
 
-            print0(f"[INFO] Saved final checkpoint at step {global_step}")
-            wandb.finish()
+        if dist.is_initialized():
+            dist.barrier()
 
-        print0("[INFO] Training complete!")
+        print0(f"\n✅ {self.mode.upper()} complete!")
+        print0(f"Total optimizer steps: {optimizer_step}")
+        print0(f"Global batch size: {global_batch_size}")

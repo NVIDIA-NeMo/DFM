@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-# main_t2v.py - WAN 2.1 T2V Training with Mode System (FIXED VERSION)
+# main_t2v.py - WAN 2.1 T2V Training with Gradient Accumulation (REVISED)
 
 import argparse
 
@@ -8,7 +8,7 @@ from trainer_t2v import WanT2VTrainer
 
 
 def parse_args():
-    p = argparse.ArgumentParser("WAN 2.1 T2V Training (Pretrain or Finetune) - FIXED")
+    p = argparse.ArgumentParser("WAN 2.1 T2V Training (Pretrain or Finetune) - REVISED")
 
     # ========================================================================
     # MODE SELECTION - THIS IS THE KEY FLAG
@@ -28,7 +28,13 @@ def parse_args():
     p.add_argument("--meta_folder", type=str, required=True, help="Path to folder containing .meta files")
     p.add_argument("--num_epochs", type=int, default=None, help="Number of training epochs (default: mode-dependent)")
     p.add_argument(
-        "--batch_size_per_node", type=int, default=None, help="Batch size per NODE (default: mode-dependent)"
+        "--batch_size_per_gpu",
+        type=int,
+        default=None,
+        help="Micro-batch size per GPU (per rank) (default: mode-dependent)",
+    )
+    p.add_argument(
+        "--grad_accum_steps", type=int, default=None, help="Gradient accumulation steps (default: mode-dependent)"
     )
     p.add_argument("--learning_rate", type=float, default=None, help="Learning rate (default: mode-dependent)")
 
@@ -65,12 +71,18 @@ def parse_args():
 
     # Checkpointing
     p.add_argument(
-        "--save_every", type=int, default=None, help="Save checkpoint every N steps (default: mode-dependent)"
+        "--save_every",
+        type=int,
+        default=None,
+        help="Save checkpoint every N optimizer steps (default: mode-dependent)",
     )
     p.add_argument(
-        "--consolidate_every", type=int, default=None, help="Consolidate every N steps (default: mode-dependent)"
+        "--consolidate_every",
+        type=int,
+        default=None,
+        help="Consolidate every N optimizer steps (default: mode-dependent)",
     )
-    p.add_argument("--log_every", type=int, default=None, help="Log every N steps (default: mode-dependent)")
+    p.add_argument("--log_every", type=int, default=None, help="Log every N optimizer steps (default: mode-dependent)")
     p.add_argument("--output_dir", type=str, default=None, help="Output directory (default: mode-dependent)")
     p.add_argument("--resume_checkpoint", type=str, default=None, help="Path to checkpoint to resume from")
 
@@ -86,7 +98,8 @@ def apply_mode_defaults(args):
     if mode == "pretrain":
         defaults = {
             "num_epochs": 10000000,
-            "batch_size_per_node": 1,
+            "batch_size_per_gpu": 1,
+            "grad_accum_steps": 1,
             "learning_rate": 5e-5,
             "weight_decay": 0.1,
             "beta2": 0.95,
@@ -105,7 +118,8 @@ def apply_mode_defaults(args):
     else:  # finetune
         defaults = {
             "num_epochs": 10,
-            "batch_size_per_node": 1,
+            "batch_size_per_gpu": 1,
+            "grad_accum_steps": 1,
             "learning_rate": 1e-5,
             "weight_decay": 0.01,
             "beta2": 0.999,
@@ -132,10 +146,13 @@ def apply_mode_defaults(args):
 
 def print_config_summary(args):
     """Print a summary of the configuration."""
+    # Calculate global batch size for display (world_size will be determined at runtime)
     print0("\n" + "=" * 80)
-    print0(f"WAN 2.1 T2V TRAINING (FIXED) - MODE: {args.mode.upper()}")
+    print0(f"WAN 2.1 T2V TRAINING (REVISED) - MODE: {args.mode.upper()}")
     print0("=" * 80)
-    print0("\n🔧 FIXED: Using manual flow matching (no scheduler explosion!)")
+    print0("\n🔧 REVISED: FSDP with gradient accumulation")
+    print0("   • Data-parallel training with sharded states")
+    print0("   • Global batch = batch_size_per_gpu × grad_accum_steps × world_size")
 
     print0("\n📋 MODEL & DATA:")
     print0(f"  Model ID: {args.model_id}")
@@ -144,9 +161,11 @@ def print_config_summary(args):
     if args.resume_checkpoint:
         print0(f"  Resume from: {args.resume_checkpoint}")
 
-    print0("\n⚙️  TRAINING PARAMETERS:")
+    print0("\n⚙️ TRAINING PARAMETERS:")
     print0(f"  Epochs: {args.num_epochs}")
-    print0(f"  Batch size per node: {args.batch_size_per_node}")
+    print0(f"  Micro-batch per GPU: {args.batch_size_per_gpu}")
+    print0(f"  Gradient accumulation: {args.grad_accum_steps}")
+    print0(f"  Global batch: {args.batch_size_per_gpu} × {args.grad_accum_steps} × world_size")
     print0(f"  Learning rate: {args.learning_rate:.2e}")
     print0(f"  Weight decay: {args.weight_decay}")
     print0(f"  Gradient clip: {args.grad_clip}")
@@ -167,12 +186,12 @@ def print_config_summary(args):
         print0(f"  Flow shift: {args.flow_shift}")
         print0(f"  Logit std: {args.logit_std}")
         print0(f"  Mix uniform ratio: {args.mix_uniform_ratio}")
-    print0("  Method: Manual interpolation (FIXED)")
+    print0("  Method: Manual interpolation")
 
     print0("\n💾 CHECKPOINTING:")
-    print0(f"  Save every: {args.save_every} steps")
-    print0(f"  Consolidate every: {args.consolidate_every} steps")
-    print0(f"  Log every: {args.log_every} steps")
+    print0(f"  Save every: {args.save_every} optimizer steps")
+    print0(f"  Consolidate every: {args.consolidate_every} optimizer steps")
+    print0(f"  Log every: {args.log_every} optimizer steps")
     print0(f"  CPU offload: {args.cpu_offload}")
 
     print0("\n" + "=" * 80 + "\n")
@@ -194,18 +213,18 @@ def main():
         print0("   • Higher learning rate for faster learning")
         print0("   • Stronger regularization to prevent overfitting")
         print0("   • Better timestep coverage for comprehensive training")
-        print0("   • FIXED: Manual flow matching (no scheduler bugs)")
+        print0("   • FSDP: Data-parallel with sharded parameters/gradients")
     else:
         print0("🎯 Starting FINETUNING (adapting pretrained model)")
         print0("   • PRETRAINED weight initialization (loads from HuggingFace)")
         print0("   • Lower learning rate to preserve pretrained features")
         print0("   • Conservative updates to avoid catastrophic forgetting")
         print0("   • Multiple epochs on smaller dataset")
-        print0("   • FIXED: Manual flow matching (no scheduler bugs)")
+        print0("   • FSDP: Data-parallel with sharded parameters/gradients")
 
     print0("")
 
-    # Create trainer with FIXED training logic
+    # Create trainer
     trainer = WanT2VTrainer(
         model_id=args.model_id,
         mode=args.mode,
@@ -232,7 +251,8 @@ def main():
     trainer.train(
         meta_folder=args.meta_folder,
         num_epochs=args.num_epochs,
-        batch_size_per_node=args.batch_size_per_node,
+        batch_size_per_gpu=args.batch_size_per_gpu,
+        grad_accum_steps=args.grad_accum_steps,
         save_every=args.save_every,
         consolidate_every=args.consolidate_every,
         log_every=args.log_every,
@@ -248,33 +268,42 @@ if __name__ == "__main__":
 
 
 # ============================================================================
-# USAGE EXAMPLES (FIXED VERSION)
+# USAGE EXAMPLES (REVISED VERSION)
 # ============================================================================
 
-# 1. FINETUNING with all defaults (FIXED - no scheduler explosion):
+# 1. FINETUNING with all defaults:
 # torchrun --nproc-per-node=8 main_t2v.py \
 #     --mode finetune \
 #     --meta_folder /path/to/data
+# Global batch = 1 × 1 × 8 = 8
 
-# 2. PRETRAINING with all defaults (FIXED - stable at all timesteps):
+# 2. FINETUNING with gradient accumulation (effective batch = 32):
+# torchrun --nproc-per-node=8 main_t2v.py \
+#     --mode finetune \
+#     --meta_folder /path/to/data \
+#     --batch_size_per_gpu 1 \
+#     --grad_accum_steps 4
+# Global batch = 1 × 4 × 8 = 32
+
+# 3. PRETRAINING with all defaults:
 # torchrun --nproc-per-node=8 main_t2v.py \
 #     --mode pretrain \
 #     --meta_folder /path/to/large/dataset
 
-# 3. FINETUNING with custom learning rate:
-# torchrun --nproc-per-node=8 main_t2v.py \
+# 4. Multi-node FINETUNING (10 nodes, 8 GPUs each, global batch = 160):
+# torchrun \
+#     --nnodes=10 \
+#     --nproc-per-node=8 \
+#     --rdzv-backend=c10d \
+#     --rdzv-endpoint=<master_addr>:<master_port> \
+#     main_t2v.py \
 #     --mode finetune \
 #     --meta_folder /path/to/data \
-#     --learning_rate 5e-6
+#     --batch_size_per_gpu 2 \
+#     --grad_accum_steps 1
+# Global batch = 2 × 1 × 80 = 160
 
-# 4. PRETRAINING with custom batch size and LR:
-# torchrun --nproc-per-node=8 main_t2v.py \
-#     --mode pretrain \
-#     --meta_folder /path/to/large/dataset \
-#     --batch_size_per_node 8 \
-#     --learning_rate 5e-4
-
-# 5. Multi-node PRETRAINING (FIXED - no crashes):
+# 5. Multi-node with gradient accumulation (global batch = 320):
 # torchrun \
 #     --nnodes=10 \
 #     --nproc-per-node=8 \
@@ -282,16 +311,22 @@ if __name__ == "__main__":
 #     --rdzv-endpoint=<master_addr>:<master_port> \
 #     main_t2v.py \
 #     --mode pretrain \
-#     --meta_folder /path/to/large/dataset
+#     --meta_folder /path/to/large/dataset \
+#     --batch_size_per_gpu 1 \
+#     --grad_accum_steps 4
+# Global batch = 1 × 4 × 80 = 320
 
-# 6. FINETUNING with resume:
+# 6. Resume from checkpoint:
 # torchrun --nproc-per-node=8 main_t2v.py \
 #     --mode finetune \
 #     --meta_folder /path/to/data \
 #     --resume_checkpoint ./wan_t2v_finetune_outputs/checkpoint-5000
 
-# 7. Debug mode with detailed logging:
-# DEBUG_TRAINING=1 torchrun --nproc-per-node=8 main_t2v.py \
-#     --mode pretrain \
+# 7. Custom learning rate with large batch:
+# torchrun --nproc-per-node=8 main_t2v.py \
+#     --mode finetune \
 #     --meta_folder /path/to/data \
-#     --log_every 1
+#     --batch_size_per_gpu 4 \
+#     --grad_accum_steps 2 \
+#     --learning_rate 5e-5
+# Global batch = 4 × 2 × 8 = 64
