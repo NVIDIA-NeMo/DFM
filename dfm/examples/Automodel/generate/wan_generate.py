@@ -18,9 +18,9 @@ import os
 
 import torch
 import torch.distributed as dist
+from Automodel._diffusers.auto_diffusion_pipeline import NeMoAutoDiffusionPipeline
 from diffusers import AutoencoderKLWan
 from diffusers.utils import export_to_video
-from Automodel._diffusers.auto_diffusion_pipeline import NeMoAutoDiffusionPipeline
 from nemo_automodel.components.distributed.init_utils import initialize_distributed
 from nemo_automodel.components.loggers.log_utils import setup_logging
 
@@ -112,10 +112,7 @@ def main():
         parallel_scheme[name] = manager_args
 
     pipe, _ = NeMoAutoDiffusionPipeline.from_pretrained(
-        "Wan-AI/Wan2.2-T2V-A14B-Diffusers", 
-        vae=vae, 
-        torch_dtype=torch.bfloat16, 
-        parallel_scheme=parallel_scheme
+        "Wan-AI/Wan2.2-T2V-A14B-Diffusers", vae=vae, torch_dtype=torch.bfloat16, parallel_scheme=parallel_scheme
     )
     logging.info("[Setup] Pipeline loaded and parallelized via NeMoAutoDiffusionPipeline")
     dist.barrier()

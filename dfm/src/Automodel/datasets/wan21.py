@@ -175,7 +175,7 @@ def build_wan21_dataloader(
     transform_text: Optional[Callable[[torch.Tensor], torch.Tensor]] = None,
     transform_video: Optional[Callable[[torch.Tensor], torch.Tensor]] = None,
     filter_fn: Optional[Callable[[Dict], bool]] = None,
-    max_files: Optional[int] = None
+    max_files: Optional[int] = None,
 ) -> Tuple[DataLoader, Optional[DistributedSampler]]:
     dataset = MetaFilesDataset(
         meta_folder=meta_folder,
