@@ -175,13 +175,13 @@ To launch training on one node
 
 .. code-block:: bash
 
-   torchrun --nproc-per-node 8 nemo/collections/diffusion/train.py --yes --factory pretrain_xl
+   torchrun --nproc-per-node 2 nemo_vfm/diffusion/train.py --yes --factory pretrain_xl
 
 To launch training on multiple nodes using Slurm
 
 .. code-block:: bash
 
-   sbatch nemo/collections/diffusion/scripts/train.sh --factory pretrain_xl
+   sbatch nemo_vfm/diffusion/train.py --factory pretrain_xl
 
 
 Citations
