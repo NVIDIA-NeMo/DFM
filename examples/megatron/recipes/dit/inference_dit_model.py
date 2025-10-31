@@ -36,28 +36,10 @@ from einops import rearrange
 from dfm.src.megatron.model.dit.dit_provider import DiTModelProvider
 
 from nemo_vfm.diffusion.utils.mcore_parallel_utils import Utils
+from dfm.src.megatron.model.dit.dit_inference import run_diffusion_inference
+
 
 MegatronParallel.init_ddp = lambda self: None
-
-def save_video(
-    grid: np.ndarray,
-    fps: int,
-    H: int,
-    W: int,
-    video_save_quality: int,
-    video_save_path: str,
-):
-
-    kwargs = {
-        "fps": fps,
-        "quality": video_save_quality,
-        "macro_block_size": 1,
-        "ffmpeg_params": ["-s", f"{W}x{H}"],
-        "output_params": ["-f", "mp4"],
-    }
-
-    print('video_save_path', video_save_path)
-    imageio.mimsave(video_save_path, grid, "mp4", **kwargs)
 
 EXAMPLE_PROMPT = (
     "The teal robot is cooking food in a kitchen. Steam rises from a simmering pot "
@@ -238,52 +220,7 @@ def data_preprocess(data_batch, state_shape):
     data_batch = encode_seq_length(data_batch, format="sbhd")
     return data_batch
 
-def run_diffusion_inference(args, data_batch, state_shape, vae, diffusion_pipeline):
-    data_batch = data_preprocess(data_batch, state_shape)
-    latent = diffusion_pipeline.generate_samples_from_batch(
-        data_batch,
-        guidance=args.guidance,
-        state_shape=state_shape,
-        num_steps=args.num_steps,
-        is_negative_prompt=True if "neg_t5_text_embeddings" in data_batch else False,
-    )
-    print("[nemo_vfm/diffusion/inference.py] sample.shape before rearrange: ", latent.shape)
-    ph, pw, pt, C = 2, 2, 1, 16  # D must be ph*pw*pt*C == 64
-    # Target latent grid from your desired output video spec
-    H_img, W_img, F = args.height, args.width, args.num_video_frames
-    H = (H_img // 8) // ph
-    W = (W_img // 8) // pw
-    T = 1
 
-    print('latent shape: ', latent.shape)
-    from einops import rearrange
-    latent = rearrange(
-        latent,
-        'b (T H W) (ph pw pt c) -> b c (T pt) (H ph) (W pw)',
-        ph=ph, pw=pw, pt=pt, c=C,
-        T=T, H=H, W=W,
-    )
-    print("[nemo_vfm/diffusion/inference.py] sample.shape after rearrange: ", latent.shape)
-
-
-    rank = torch.distributed.get_rank()
-    if rank == 0:
-        # Post-processing and save video
-        sigma_data = 0.5
-        decoded_video = (1.0 + vae.decode(latent / sigma_data)).clamp(0, 2) / 2
-        decoded_video = (decoded_video * 255).to(torch.uint8).permute(0, 2, 3, 4, 1).cpu().numpy()
-
-        print('decoded_video: ', decoded_video.shape)
-        for i in range(len(decoded_video)):
-            save_video(
-                grid=decoded_video[i],
-                fps=args.fps,
-                H=args.height,
-                W=args.width,
-                video_save_quality=5,
-                video_save_path=args.video_save_path + f'_{i}.mp4',
-            )
-            print_rank_0(f"saved video to {args.video_save_path}!")
 
 
 def main(args):
@@ -311,6 +248,7 @@ def main(args):
 
     # load old cehckpoint
     new_state = {}
+    print("loading model....")
     state = torch.load('model.pth')
     for key, value in state.items():
         if 'extra_state' in key:
@@ -323,7 +261,8 @@ def main(args):
     vae = CausalVideoTokenizer.from_pretrained("Cosmos-0.1-Tokenizer-CV4x8x8")
     vae.to("cuda")
     print_rank_0("generating video...")
-    run_diffusion_inference(args, data_batch, state_shape, vae, diffusion_pipeline)
+    data_batch = data_preprocess(data_batch, state_shape)
+    run_diffusion_inference(diffusion_pipeline, args, data_batch, state_shape, vae)
 
 
 if __name__ == "__main__":
