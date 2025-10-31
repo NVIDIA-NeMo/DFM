@@ -129,7 +129,7 @@ def cat_outputs_cp(x: torch.Tensor, seq_dim: int) -> torch.Tensor:
     else:
         return x
 
-# DEBUGGING thd
+
 def thd_split_inputs_cp(x: torch.Tensor,
                            cu_seqlens_q_padded: torch.Tensor,
                            cp_group: dist.ProcessGroup) -> torch.Tensor:

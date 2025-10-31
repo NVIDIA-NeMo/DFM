@@ -1,6 +1,5 @@
 import torch
 from torch.cuda import amp
-from dfm.src.megatron.model.wan.utils.utils import split_inputs_cp
 from megatron.core import parallel_state
 
 class Wan3DRopeEmbeddings(torch.nn.Module):
@@ -57,10 +56,9 @@ class Wan3DRopeEmbeddings(torch.nn.Module):
         # We concatenate them along dim=1 to get (max_seq_len, batch_size, 1, dim_head)
         freqs_real = torch.cat(freqs_real, dim=1)
 
-        # DEBUGGING thd
-        # # TODO: if run context/sequence related parallel, then we need to scatter 
-        # # the freqs_real to the context parallel region, using specific cp_rank split method
-        # if parallel_state.get_context_parallel_world_size() > 1:
-        #     freqs_real = split_inputs_cp(freqs_real, 0)
+        # Note:
+        # when running context_parallel, which must use "thd" for qkv_format,
+        # we don't need to scatter the freqs to the context parallel region,
+        # because mcore rope_utils will automatically retrieve the correct freqs for each context parallel region
 
         return freqs_real
