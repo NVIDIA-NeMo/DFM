@@ -25,7 +25,9 @@ from megatron.bridge.training.losses import masked_next_token_loss
 from megatron.bridge.training.state import GlobalState
 
 from dfm.src.megatron.model.dit.edm.edm_pipeline import EDMPipeline
-
+from nemo.collections.common.video_tokenizers.cosmos_tokenizer import CausalVideoTokenizer
+from dfm.src.megatron.model.dit.dit_inference import run_diffusion_inference
+import os
 
 
 logger = logging.getLogger(__name__)
@@ -100,6 +102,27 @@ def get_batch_on_this_cp_rank(data):
 class DITForwardStep:
     def __init__(self):
         self.diffusion_pipeline = EDMPipeline(sigma_data=0.5)
+        self.valid = False
+        self.train = True
+        self.step = 0
+
+    def on_validation_start(self, batch, step):
+        vae = CausalVideoTokenizer.from_pretrained("Cosmos-0.1-Tokenizer-CV4x8x8")
+        vae.to("cuda")
+
+        class Config:
+            height = 512
+            width = 768
+            num_video_frames = 1
+            fps = 1
+            video_save_path = 'new_video'
+            guidance = 7
+            num_steps = 35
+
+        os.makedirs('output_folder', exist_ok=True)
+        Config.video_save_path = 'output_folder/' + Config.video_save_path + f'_{step}'
+        state_shape = [len(batch['video']), 2048, 64]
+        run_diffusion_inference(self.diffusion_pipeline, Config, batch, state_shape, vae)
 
 
     def __call__(
@@ -116,6 +139,19 @@ class DITForwardStep:
         Returns:
             tuple containing the output tensor and the loss function
         """
+        batch = self.__data_process__(state, data_iterator, model, return_schedule_plan)
+        if model.training and self.valid:
+            self.train = True
+            self.valid = False
+        elif (not model.training) and self.train:
+            self.train = False
+            self.valid = True
+            self.step += 1
+            self.on_validation_start(batch, step=self.step)
+        return self.forward_step(state, batch, model, return_schedule_plan)
+
+    def __data_process__(self, state: GlobalState, data_iterator: Iterable, model: GPTModel, return_schedule_plan: bool = False
+    ) -> tuple[torch.Tensor, partial]:
         timers = state.timers
         straggler_timer = state.straggler_timer
 
@@ -128,11 +164,16 @@ class DITForwardStep:
             batch = dit_data_step(
                 qkv_format, data_iterator
             )
+        return batch
+
+    def forward_step(self, state, batch, model, return_schedule_plan: bool = False):
+        timers = state.timers
         timers("batch-generator").stop()
-        
+
         check_for_nan_in_loss = state.cfg.rerun_state_machine.check_for_nan_in_loss
         check_for_spiky_loss = state.cfg.rerun_state_machine.check_for_spiky_loss
         # import pdb;pdb.set_trace()
+        straggler_timer = state.straggler_timer
         with straggler_timer:
             if parallel_state.is_pipeline_last_stage():
                 output_batch, loss = self.diffusion_pipeline.training_step(model, batch, 0)
