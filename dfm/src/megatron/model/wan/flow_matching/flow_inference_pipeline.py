@@ -99,9 +99,10 @@ class FlowInferencePipeline:
         wan_checkpoint_dir = self._select_checkpoint_dir(checkpoint_dir, checkpoint_step)
         self.model = self.setup_model_from_checkpoint(wan_checkpoint_dir)
         
-        # DEBUGGING
+        # DEBUGGING thd
         # set qkv_format to to "thd" for context parallelism
-        self.model.config.qkv_format = "sbhd"
+        # self.model.config.qkv_format = "sbhd"
+        self.model.config.qkv_format = "thd"
 
         # set self.sp_size=1 for later use, just to respect the original Wan inference code
         self.sp_size = 1
@@ -486,11 +487,12 @@ class FlowInferencePipeline:
                 timestep = [t] * batch_size
                 timestep = torch.stack(timestep)
 
-                # run context parallelism slitting
-                if parallel_state.get_context_parallel_world_size() > 1:
-                    latent_model_input = split_inputs_cp(latent_model_input, 0)
-                    arg_c['context'] = split_inputs_cp(arg_c['context'], 0)
-                    arg_null['context'] = split_inputs_cp(arg_null['context'], 0)
+                # DEBUGGING thd
+                # # run context parallelism slitting
+                # if parallel_state.get_context_parallel_world_size() > 1:
+                #     latent_model_input = split_inputs_cp(latent_model_input, 0)
+                #     arg_c['context'] = split_inputs_cp(arg_c['context'], 0)
+                #     arg_null['context'] = split_inputs_cp(arg_null['context'], 0)
 
                 self.model.to(self.device)
                 noise_pred_cond = self.forward_pp_step(
@@ -499,15 +501,16 @@ class FlowInferencePipeline:
                 noise_pred_uncond = self.forward_pp_step(
                     latent_model_input, grid_sizes=grid_sizes, max_video_seq_len=max_video_seq_len, timestep=timestep, arg_c=arg_null)
 
-                # run context parallelism gathering
-                if parallel_state.get_context_parallel_world_size() > 1:
-                    arg_c['context'] = cat_outputs_cp(arg_c['context'], 0) # we need to cat the context back together for the next timestep
-                    arg_null['context'] = cat_outputs_cp(arg_null['context'], 0) # we need to cat the context back together for the next timestep
-                    # TODO: does this step slow down speed???
-                    noise_pred_cond = noise_pred_cond.contiguous()
-                    noise_pred_uncond = noise_pred_uncond.contiguous()
-                    noise_pred_cond = cat_outputs_cp(noise_pred_cond, 0)
-                    noise_pred_uncond = cat_outputs_cp(noise_pred_uncond, 0)
+                # DEBUGGING thd
+                # # run context parallelism gathering
+                # if parallel_state.get_context_parallel_world_size() > 1:
+                #     arg_c['context'] = cat_outputs_cp(arg_c['context'], 0) # we need to cat the context back together for the next timestep
+                #     arg_null['context'] = cat_outputs_cp(arg_null['context'], 0) # we need to cat the context back together for the next timestep
+                #     # TODO: does this step slow down speed???
+                #     noise_pred_cond = noise_pred_cond.contiguous()
+                #     noise_pred_uncond = noise_pred_uncond.contiguous()
+                #     noise_pred_cond = cat_outputs_cp(noise_pred_cond, 0)
+                #     noise_pred_uncond = cat_outputs_cp(noise_pred_uncond, 0)
 
                 # run unpatchify
                 unpatchified_noise_pred_cond = noise_pred_cond

@@ -57,9 +57,10 @@ class Wan3DRopeEmbeddings(torch.nn.Module):
         # We concatenate them along dim=1 to get (max_seq_len, batch_size, 1, dim_head)
         freqs_real = torch.cat(freqs_real, dim=1)
 
-        # TODO: if run context/sequence related parallel, then we need to scatter 
-        # the freqs_real to the context parallel region, using specific cp_rank split method
-        if parallel_state.get_context_parallel_world_size() > 1:
-            freqs_real = split_inputs_cp(freqs_real, 0)
+        # DEBUGGING thd
+        # # TODO: if run context/sequence related parallel, then we need to scatter 
+        # # the freqs_real to the context parallel region, using specific cp_rank split method
+        # if parallel_state.get_context_parallel_world_size() > 1:
+        #     freqs_real = split_inputs_cp(freqs_real, 0)
 
         return freqs_real

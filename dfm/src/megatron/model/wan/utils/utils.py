@@ -3,6 +3,8 @@ from typing import Tuple
 from torch.distributed import all_gather
 import megatron.core.parallel_state as parallel_state
 import math
+import torch.distributed as dist
+import transformer_engine_torch as tex
 
 def grid_sizes_calculation(
     input_shape: Tuple[int, int, int],  # (F_latents, H_latents, W_latents)
@@ -126,3 +128,40 @@ def cat_outputs_cp(x: torch.Tensor, seq_dim: int) -> torch.Tensor:
         return gathered_tensors
     else:
         return x
+
+# DEBUGGING thd
+def thd_split_inputs_cp(x: torch.Tensor,
+                           cu_seqlens_q_padded: torch.Tensor,
+                           cp_group: dist.ProcessGroup) -> torch.Tensor:
+    """
+    Split a THD-packed tensor across CP ranks for inputs shaped [S, B, ...].
+
+    Args:
+        x: [S, B, ...] tensor (sequence first).
+        cu_seqlens_q_padded: 1D int32 THD cu_seqlens (padded) used for packing.
+        cp_group: context-parallel process group.
+
+    Returns:
+        x_local: [S_local, B, ...] shard for this CP rank.
+    """
+    # Move to [B, S, ...] to use THD partitioning along S
+    x_bs = x.transpose(0, 1).contiguous()  # [B, S, ...]
+
+    total_S = x_bs.size(1)
+    cp_size = dist.get_world_size(cp_group)
+    cp_rank = dist.get_rank(cp_group)
+
+    # Compute this rank's THD partition indices (same API as during gather)
+    idx = tex.thd_get_partitioned_indices(
+        cu_seqlens_q_padded,  # int32 offsets
+        total_S,
+        cp_size,
+        cp_rank,
+    ).to(device=x_bs.device, dtype=torch.long)  # [S_local]
+
+    # Take the shard along sequence dim
+    x_local_bs = x_bs.index_select(dim=1, index=idx).contiguous()  # [B, S_local, ...]
+
+    # Return to [S, B, ...]
+    x_local = x_local_bs.transpose(0, 1).contiguous()  # [S_local, B, ...]
+    return x_local

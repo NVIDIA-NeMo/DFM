@@ -20,7 +20,7 @@ from megatron.core import parallel_state
 from torch import Tensor
 from diffusers import WanPipeline
 from dfm.src.megatron.model.wan.flow_matching.time_shift_utils import compute_density_for_timestep_sampling
-from dfm.src.megatron.model.wan.utils.utils import patchify, split_inputs_cp
+from dfm.src.megatron.model.wan.utils.utils import patchify, split_inputs_cp, thd_split_inputs_cp
 
 class FlowPipeline:
 
@@ -150,11 +150,17 @@ class FlowPipeline:
         # ========================================================================
         
         if parallel_state.get_context_parallel_world_size() > 1:
-            video_latents = split_inputs_cp(video_latents, 0)
-            noisy_latents = split_inputs_cp(noisy_latents, 0)
-            noise = split_inputs_cp(noise, 0)
-            context_embeddings = split_inputs_cp(context_embeddings, 0)
-            split_loss_mask = split_inputs_cp(loss_mask, 0)
+            # DEBUGGING thd
+            # video_latents = split_inputs_cp(video_latents, 0)
+            # noisy_latents = split_inputs_cp(noisy_latents, 0)
+            # noise = split_inputs_cp(noise, 0)
+            # context_embeddings = split_inputs_cp(context_embeddings, 0)
+            # split_loss_mask = split_inputs_cp(loss_mask, 0)
+            video_latents = thd_split_inputs_cp(video_latents, packed_seq_params['self_attention'].cu_seqlens_q, parallel_state.get_context_parallel_group())
+            noisy_latents = thd_split_inputs_cp(noisy_latents, packed_seq_params['self_attention'].cu_seqlens_q, parallel_state.get_context_parallel_group())
+            noise = thd_split_inputs_cp(noise, packed_seq_params['self_attention'].cu_seqlens_q, parallel_state.get_context_parallel_group())
+            context_embeddings = thd_split_inputs_cp(context_embeddings, packed_seq_params['cross_attention'].cu_seqlens_kv, parallel_state.get_context_parallel_group())
+            split_loss_mask = thd_split_inputs_cp(loss_mask, packed_seq_params['self_attention'].cu_seqlens_q, parallel_state.get_context_parallel_group())
         else:
             video_latents = video_latents
             noisy_latents = noisy_latents
