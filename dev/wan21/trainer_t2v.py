@@ -351,7 +351,7 @@ class WanT2VTrainer:
             }
 
             wandb.init(
-                project=f"wan-t2v-{self.mode}",
+                project=f"wan-t2v-overfit-{self.mode}",
                 config=config,
                 resume=resume_checkpoint is not None,
             )

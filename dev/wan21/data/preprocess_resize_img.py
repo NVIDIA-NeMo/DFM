@@ -1,6 +1,7 @@
 import json
 import logging
 import pickle
+import sys
 from pathlib import Path
 from typing import Dict, List, Optional, Tuple
 
@@ -12,7 +13,14 @@ from transformers import AutoTokenizer, UMT5EncoderModel
 
 
 # Set up logging
-logging.basicConfig(level=logging.INFO)
+
+logging.basicConfig(
+    level=logging.INFO,
+    format="%(asctime)s - %(name)s - %(levelname)s - %(message)s",
+    handlers=[
+        logging.StreamHandler(sys.stdout)  # Explicitly output to stdout
+    ],
+)
 logger = logging.getLogger(__name__)
 
 
@@ -409,14 +417,13 @@ class VideoPreprocessor:
 
     def encode_video(self, video_tensor: torch.Tensor) -> torch.Tensor:
         """
-        CRITICAL FIX: Encode video using Wan2.1 VAE without manual normalization.
-        The VAE encode() already returns normalized latents!
+        Encode video using Wan2.1 VAE with per-channel normalization.
 
         Args:
             video_tensor: Video tensor of shape (batch, channels, num_frames, height, width)
 
         Returns:
-            Video latent tensor (already normalized by VAE)
+            Normalized video latent tensor
         """
         logger.info(f"Input video tensor shape: {video_tensor.shape}, dtype: {video_tensor.dtype}")
 
@@ -427,10 +434,6 @@ class VideoPreprocessor:
 
         # Convert to [-1, 1] range for VAE
         video_tensor = video_tensor * 2.0 - 1.0
-
-        # CRITICAL FIX: Check if VAE encode() returns normalized latents
-        # According to Wan2.1 code, the VAE.encode() should handle normalization internally
-        # We should NOT manually normalize again!
 
         logger.info("Encoding with Wan2.1 VAE...")
 
@@ -446,49 +449,56 @@ class VideoPreprocessor:
                 video_latents = latent_dist.latent_dist.sample()
                 logger.info("Using stochastic sampling (may cause flares)")
 
-        # CRITICAL: Check if we need to normalize
-        # If VAE already normalizes, we should NOT normalize again
-        # Let's check the latent statistics
-        latent_mean = video_latents.mean().item()
-        latent_std = video_latents.std().item()
+        # Log raw latent statistics before normalization
+        raw_mean = video_latents.mean().item()
+        raw_std = video_latents.std().item()
+        logger.info(f"Raw latent statistics (before normalization) - mean: {raw_mean:.4f}, std: {raw_std:.4f}")
 
-        logger.info(f"Raw latent statistics - mean: {latent_mean:.4f}, std: {latent_std:.4f}")
+        # ALWAYS apply Wan2.1 VAE per-channel normalization
+        # The VAE config provides latents_mean and latents_std for this purpose
+        if not hasattr(self.vae.config, "latents_mean") or not hasattr(self.vae.config, "latents_std"):
+            raise ValueError("Wan2.1 VAE requires latents_mean and latents_std in config for proper normalization")
 
-        # Check if latents are already normalized (mean~0, std~1)
-        if abs(latent_mean) < 0.5 and 0.5 < latent_std < 2.0:
-            logger.warning("⚠️  Latents appear already normalized! Skipping manual normalization.")
-            logger.warning("⚠️  If you see training issues, the VAE might already normalize internally.")
-            # Don't normalize again - use raw latents
-            final_latents = video_latents
-        else:
-            # Latents need normalization - apply Wan2.1 per-channel normalization
-            if not hasattr(self.vae.config, "latents_mean") or not hasattr(self.vae.config, "latents_std"):
-                raise ValueError("Wan2.1 VAE requires latents_mean and latents_std in config")
+        # Get per-channel normalization parameters
+        latents_mean = torch.tensor(self.vae.config.latents_mean, device=self.device, dtype=self.vae.dtype)
+        latents_std = torch.tensor(self.vae.config.latents_std, device=self.device, dtype=self.vae.dtype)
 
-            latents_mean = torch.tensor(self.vae.config.latents_mean, device=self.device, dtype=self.vae.dtype)
-            latents_std = torch.tensor(self.vae.config.latents_std, device=self.device, dtype=self.vae.dtype)
+        # Verify correct number of channels
+        expected_channels = self.vae.config.z_dim  # Should be 16 for Wan2.1
+        if len(latents_mean) != expected_channels or len(latents_std) != expected_channels:
+            raise ValueError(
+                f"Normalization parameters mismatch: expected {expected_channels} channels, "
+                f"got {len(latents_mean)} means and {len(latents_std)} stds"
+            )
 
-            # Reshape for broadcasting: (1, C, 1, 1, 1) for 5D tensors
-            latents_mean = latents_mean.view(1, -1, 1, 1, 1)
-            latents_std = latents_std.view(1, -1, 1, 1, 1)
+        # Reshape for broadcasting: (1, C, 1, 1, 1) for 5D tensors
+        latents_mean = latents_mean.view(1, -1, 1, 1, 1)
+        latents_std = latents_std.view(1, -1, 1, 1, 1)
 
-            logger.info("Applying Wan2.1 VAE per-channel normalization")
-            logger.info(f"latents_mean shape: {latents_mean.shape}, latents_std shape: {latents_std.shape}")
+        logger.info(f"Applying Wan2.1 VAE per-channel normalization ({expected_channels} channels)")
+        logger.info(f"Mean range: [{latents_mean.min().item():.4f}, {latents_mean.max().item():.4f}]")
+        logger.info(f"Std range: [{latents_std.min().item():.4f}, {latents_std.max().item():.4f}]")
 
-            # Apply Wan2.1 per-channel normalization: (z - mean) / std
-            final_latents = (video_latents - latents_mean) / latents_std
-            logger.info("Applied Wan2.1 VAE per-channel normalization")
+        # Apply Wan2.1 per-channel normalization: (z - mean) / std
+        normalized_latents = (video_latents - latents_mean) / latents_std
 
-        logger.info(f"Output video latents shape: {final_latents.shape}, dtype: {final_latents.dtype}")
+        # Log normalized statistics
+        final_mean = normalized_latents.mean().item()
+        final_std = normalized_latents.std().item()
+        logger.info(f"Normalized latent statistics - mean: {final_mean:.4f}, std: {final_std:.4f}")
+
+        # Sanity check: normalized latents should have mean ≈ 0 and std ≈ 1
+        if abs(final_mean) > 1.0 or final_std < 0.5 or final_std > 2.0:
+            logger.warning(
+                f"⚠️  Normalized latents have unusual statistics (mean: {final_mean:.4f}, std: {final_std:.4f}). "
+                f"Expected mean≈0, std≈1"
+            )
+
+        logger.info(f"Output video latents shape: {normalized_latents.shape}, dtype: {normalized_latents.dtype}")
         logger.info(f"Encoding mode: {'deterministic' if self.deterministic_latents else 'stochastic'}")
         logger.info(f"Memory optimization: {'enabled' if self.enable_memory_optimization else 'disabled'}")
 
-        # Final statistics
-        final_mean = final_latents.mean().item()
-        final_std = final_latents.std().item()
-        logger.info(f"Final latent statistics - mean: {final_mean:.4f}, std: {final_std:.4f}")
-
-        return final_latents
+        return normalized_latents
 
     def save_processed_data(
         self,

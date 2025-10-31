@@ -2,6 +2,7 @@
 # main_t2v.py - WAN 2.1 T2V Training with Gradient Accumulation (REVISED)
 
 import argparse
+import os
 
 from dist_utils import print0
 from trainer_t2v import WanT2VTrainer
@@ -197,8 +198,36 @@ def print_config_summary(args):
     print0("\n" + "=" * 80 + "\n")
 
 
+def find_latest_checkpoint(output_dir: str) -> str:
+    """Find the latest checkpoint in output directory."""
+    import glob
+    import re
+
+    if not os.path.exists(output_dir):
+        return None
+
+    checkpoints = glob.glob(os.path.join(output_dir, "checkpoint-*"))
+    if not checkpoints:
+        return None
+
+    # Extract step numbers and sort
+    def get_step(path):
+        match = re.search(r"checkpoint-(\d+)", path)
+        return int(match.group(1)) if match else 0
+
+    latest = max(checkpoints, key=get_step)
+    return latest
+
+
 def main():
     args = parse_args()
+
+    # Auto-resume if no checkpoint specified
+    if args.resume_checkpoint is None and args.output_dir:
+        latest = find_latest_checkpoint(args.output_dir)
+        if latest:
+            print0(f"\n🔄 Auto-detected latest checkpoint: {latest}")
+            args.resume_checkpoint = latest
 
     # Apply mode-specific defaults
     args = apply_mode_defaults(args)
