@@ -273,7 +273,7 @@ class EDMPipeline:
             x0_pred, eps_pred = self.denoise(xt, sigma, condition)
             # loss weights for different noise levels
             weights_per_sigma = self.get_per_sigma_loss_weights(sigma=sigma)
-            pred_mse = (xt - x0_pred) ** 2
+            pred_mse = (x0 - x0_pred) ** 2
             edm_loss = batch_mul(pred_mse, weights_per_sigma)
 
             output_batch = {
