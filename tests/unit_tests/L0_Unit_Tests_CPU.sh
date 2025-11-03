@@ -11,4 +11,7 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
-CUDA_VISIBLE_DEVICES="" coverage run -a --data-file=/workspace/.coverage --source=/workspace/ -m pytest tests/unit_tests -m "not pleasefixme" --cpu --with_downloads
+
+# Hide GPU from PyTorch by setting CUDA_VISIBLE_DEVICES to empty
+# This makes torch.cuda.is_available() return False
+CUDA_VISIBLE_DEVICES="" coverage run -a --data-file=/workspace/.coverage --source=/workspace/ -m pytest tests/unit_tests -m "not pleasefixme" --with_downloads
