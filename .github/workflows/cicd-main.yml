@@ -15,10 +15,6 @@ name: CICD NeMo
 on:
   schedule:
     - cron: 0 0 * * *
-  push:
-    branches:
-      - main
-      - "pull-request/[0-9]+"
   pull_request:
     branches:
       - main
