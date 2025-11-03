@@ -55,7 +55,7 @@ def pytest_configure(config):
     """
     Initial configuration of conftest.
     
-    Note: DFM uses the Automodel/RL pattern for CPU/GPU test separation.
+    Note: DFM uses the following pattern for CPU/GPU test separation:
     Tests don't use markers - GPU visibility is controlled by CUDA_VISIBLE_DEVICES
     in the shell scripts (L0_Unit_Tests_CPU.sh and L0_Unit_Tests_GPU.sh).
     """
