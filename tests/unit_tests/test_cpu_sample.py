@@ -18,19 +18,19 @@ import torch
 def test_cpu_tensor_operations():
     """Test basic CPU tensor operations"""
     # Create tensors on CPU
-    a = torch.tensor([1.0, 2.0, 3.0], device='cpu')
-    b = torch.tensor([4.0, 5.0, 6.0], device='cpu')
-    
+    a = torch.tensor([1.0, 2.0, 3.0], device="cpu")
+    b = torch.tensor([4.0, 5.0, 6.0], device="cpu")
+
     # Test addition
     c = a + b
     expected = torch.tensor([5.0, 7.0, 9.0])
     assert torch.allclose(c, expected), f"Expected {expected}, got {c}"
-    
+
     # Test multiplication
     d = a * b
     expected = torch.tensor([4.0, 10.0, 18.0])
     assert torch.allclose(d, expected), f"Expected {expected}, got {d}"
-    
+
     print("✓ CPU tensor operations test passed")
 
 
@@ -46,18 +46,18 @@ def test_cpu_only_environment():
 def test_cpu_matrix_multiplication():
     """Test matrix multiplication on CPU"""
     # Create random matrices
-    matrix_a = torch.randn(10, 20, device='cpu')
-    matrix_b = torch.randn(20, 30, device='cpu')
-    
+    matrix_a = torch.randn(10, 20, device="cpu")
+    matrix_b = torch.randn(20, 30, device="cpu")
+
     # Perform matrix multiplication
     result = torch.matmul(matrix_a, matrix_b)
-    
+
     # Verify shape
     assert result.shape == (10, 30), f"Expected shape (10, 30), got {result.shape}"
-    
+
     # Verify result is finite
     assert torch.isfinite(result).all(), "Result contains non-finite values"
-    
+
     print("✓ CPU matrix multiplication test passed")
 
 
