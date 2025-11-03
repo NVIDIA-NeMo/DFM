@@ -12,15 +12,13 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-from typing import Any, Callable, Dict, Optional, Tuple, List
 
-import numpy as np
 import torch
-from megatron.core import parallel_state
-from torch import Tensor
 from diffusers import WanPipeline
+from megatron.core import parallel_state
 from dfm.src.megatron.model.wan.flow_matching.time_shift_utils import compute_density_for_timestep_sampling
 from dfm.src.megatron.model.wan.utils.utils import patchify, thd_split_inputs_cp
+
 
 class FlowPipeline:
 
@@ -227,7 +225,7 @@ class FlowPipeline:
             mean_weighted_loss = weighted_loss.mean()
             if torch.isnan(mean_weighted_loss) or mean_weighted_loss > 100:
                 print(f"[ERROR] Loss explosion! Loss={mean_weighted_loss.item():.3f}")
-                print(f"[DEBUG] Stopping training - check hyperparameters")
+                print("[DEBUG] Stopping training - check hyperparameters")
                 raise ValueError(f"Loss exploded: {mean_weighted_loss.item()}")
 
             return model_pred, weighted_loss, split_loss_mask

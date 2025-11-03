@@ -14,6 +14,9 @@
 #     --base_seed 42 \
 #     --sample_steps 50
 
+
+# Goes to examples/megatron/recipe/wan
+
 import argparse
 import logging
 import os
