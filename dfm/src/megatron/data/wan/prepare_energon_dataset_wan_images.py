@@ -1,16 +1,21 @@
 import os
 import io
 import json
+import pickle
 import tarfile
 from pathlib import Path
-from typing import Dict, List, Optional, Tuple, Iterable
+from typing import Dict, List, Optional, Tuple, Iterable, Any
+import multiprocessing as mp
+import math
 
 import cv2
 import numpy as np
 import torch
+import webdataset as wds
 
 from diffusers import AutoencoderKLWan
 from transformers import AutoTokenizer, UMT5EncoderModel
+from tqdm import tqdm
 
 
 def _map_interpolation(resize_mode: str) -> int:
@@ -65,29 +70,53 @@ def _resize_frame(
         return frame
 
     original_height, original_width = frame.shape[:2]
+    target_height, target_width = target_size
+
+    interpolation = _map_interpolation(resize_mode)
+
+    if not maintain_aspect_ratio:
+        resized_frame = cv2.resize(frame, (target_width, target_height), interpolation=interpolation)
+        return resized_frame
+
+    if center_crop:
+        # Resize-to-cover: scale so both dims >= target, then center-crop to exact target
+        scale = max(target_height / max(1, original_height), target_width / max(1, original_width))
+        resize_height = int(math.ceil(original_height * scale))
+        resize_width = int(math.ceil(original_width * scale))
+
+        resized_frame = cv2.resize(frame, (resize_width, resize_height), interpolation=interpolation)
+
+        y_start = max(0, (resize_height - target_height) // 2)
+        x_start = max(0, (resize_width - target_width) // 2)
+        y_end = y_start + target_height
+        x_end = x_start + target_width
+
+        # Bound checks (should be safe due to ceil, but guard anyway)
+        y_start = min(y_start, max(0, resize_height - target_height))
+        x_start = min(x_start, max(0, resize_width - target_width))
+        y_end = min(y_end, resize_height)
+        x_end = min(x_end, resize_width)
+
+        cropped = resized_frame[y_start:y_end, x_start:x_end]
+
+        # If due to rounding one dim is still short, pad minimally (rare)
+        pad_h = max(0, target_height - cropped.shape[0])
+        pad_w = max(0, target_width - cropped.shape[1])
+        if pad_h > 0 or pad_w > 0:
+            cropped = np.pad(
+                cropped,
+                ((pad_h // 2, pad_h - pad_h // 2), (pad_w // 2, pad_w - pad_w // 2), (0, 0)),
+                mode="edge",
+            )
+            cropped = cropped[:target_height, :target_width]
+
+        return cropped
+
+    # Aspect-preserving resize-to-fit (no crop): may be smaller than target in one dim
     resize_height, resize_width = _calculate_resize_dimensions(
         original_height, original_width, target_size, maintain_aspect_ratio
     )
-
-    interpolation = _map_interpolation(resize_mode)
     resized_frame = cv2.resize(frame, (resize_width, resize_height), interpolation=interpolation)
-
-    if maintain_aspect_ratio and center_crop:
-        target_height, target_width = target_size
-        if resize_height != target_height or resize_width != target_width:
-            y_start = max(0, (resize_height - target_height) // 2)
-            x_start = max(0, (resize_width - target_width) // 2)
-            y_end = min(resize_height, y_start + target_height)
-            x_end = min(resize_width, x_start + target_width)
-            resized_frame = resized_frame[y_start:y_end, x_start:x_end]
-
-            if resized_frame.shape[0] < target_height or resized_frame.shape[1] < target_width:
-                pad_height = max(0, target_height - resized_frame.shape[0])
-                pad_width = max(0, target_width - resized_frame.shape[1])
-                resized_frame = np.pad(
-                    resized_frame, ((0, pad_height), (0, pad_width), (0, 0)), mode="constant", constant_values=0
-                )
-
     return resized_frame
 
 
@@ -98,6 +127,14 @@ def _decode_image_bytes_to_rgb(image_bytes: bytes) -> Optional[np.ndarray]:
         return None
     img_rgb = cv2.cvtColor(img_bgr, cv2.COLOR_BGR2RGB)
     return img_rgb
+
+
+def _select_target_size_for_image(image_rgb: np.ndarray) -> Tuple[int, int]:
+    h, w = image_rgb.shape[:2]
+    if h <= w:
+        return (480, 832)
+    else:
+        return (832, 480)
 
 
 def _image_to_video_tensor(
@@ -158,17 +195,22 @@ def _encode_text(
     caption: str,
 ) -> torch.Tensor:
     caption = (caption or "").strip()
+    # Pad to 512, then slice back to the non-padded length
     inputs = tokenizer(
-        caption,
-        max_length=512,
+        [caption],
         padding="max_length",
         truncation=True,
+        max_length=512,
         return_tensors="pt",
         return_attention_mask=True,
+        add_special_tokens=True,
     )
     inputs = {k: v.to(device) for k, v in inputs.items()}
-    outputs = text_encoder(input_ids=inputs["input_ids"], attention_mask=inputs["attention_mask"]).last_hidden_state
-    return outputs
+    outputs = text_encoder(
+        input_ids=inputs["input_ids"], attention_mask=inputs["attention_mask"]
+    ).last_hidden_state  # [1, L, C]
+    seq_len = int(inputs["attention_mask"][0].sum().item())
+    return outputs[0, :seq_len, :]
 
 
 @torch.no_grad()
@@ -229,17 +271,179 @@ def _read_tar_member_bytes(tf: tarfile.TarFile, member: tarfile.TarInfo) -> byte
         return f.read()
 
 
+def _process_tar_with_models(
+    tar_path: Path,
+    image_exts: Tuple[str, ...],
+    opts: Dict[str, Any],
+    device: str,
+    vae: AutoencoderKLWan,
+    text_encoder: UMT5EncoderModel,
+    tokenizer: AutoTokenizer,
+    model_dtype: torch.dtype,
+    sink: Any,
+    index: int,
+    tqdm_position: int = 0,
+) -> int:
+    processed = 0
+    failed = 0
+
+    try:
+        with tarfile.open(tar_path, mode="r:*") as tf:
+            pairs = list(_iter_tar_images_and_captions(tf, image_exts))
+            for img_member, cap_member in tqdm(
+                pairs, total=len(pairs), desc=f"{tar_path.name}", unit="img", position=tqdm_position, leave=False
+            ):
+                img_name = os.path.basename(img_member.name)
+
+                try:
+                    img_bytes = _read_tar_member_bytes(tf, img_member)
+                    if not img_bytes:
+                        failed += 1
+                        continue
+                    rgb = _decode_image_bytes_to_rgb(img_bytes)
+                    if rgb is None:
+                        failed += 1
+                        continue
+
+                    caption_text = ""
+                    if cap_member is not None:
+                        try:
+                            caption_bytes = _read_tar_member_bytes(tf, cap_member)
+                            caption_text = caption_bytes.decode("utf-8", errors="ignore")
+                        except Exception:
+                            caption_text = ""
+
+                    target_size = _select_target_size_for_image(rgb)
+                    video_tensor = _image_to_video_tensor(
+                        image_rgb=rgb,
+                        target_size=target_size,
+                        resize_mode=opts["resize_mode"],
+                        maintain_aspect_ratio=not opts.get("no_aspect_ratio", False),
+                        center_crop=opts.get("center_crop", False),
+                        target_dtype=model_dtype,
+                    )
+
+                    text_embed = _encode_text(tokenizer, text_encoder, device, caption_text)
+                    latents = _encode_video_latents(
+                        vae, device, video_tensor, deterministic_latents=not opts.get("stochastic", False)
+                    )
+
+                    # text_embed is already sliced to non-padded tokens: [L_actual, C]
+                    text_embed_cpu = text_embed.detach().to(device="cpu")
+                    latents_cpu = latents.detach().to(device="cpu")[0]
+
+                    C, T, H, W = video_tensor.shape[1:]
+                    json_data = {
+                        "source_tar": str(tar_path),
+                        "tar_member": img_member.name,
+                        "image_name": img_name,
+                        "processed_frames": int(T),
+                        "processed_height": int(H),
+                        "processed_width": int(W),
+                        "caption": caption_text,
+                        "deterministic_latents": bool(not opts.get("stochastic", False)),
+                        "memory_optimization": bool(not opts.get("no_memory_optimization", False)),
+                        "model_version": "wan2.1",
+                        "resize_settings": {
+                            "target_size": target_size,
+                            "resize_mode": opts["resize_mode"],
+                            "maintain_aspect_ratio": bool(not opts.get("no_aspect_ratio", False)),
+                            "center_crop": bool(opts.get("center_crop", False)),
+                        },
+                    }
+
+                    sample = {
+                        "__key__": f"{index:09}",
+                        "pth": latents_cpu,
+                        "pickle": pickle.dumps(text_embed_cpu, protocol=pickle.HIGHEST_PROTOCOL),
+                        "json": json_data,
+                    }
+                    sink.write(sample)
+
+                    index += 1
+                    processed += 1
+                except Exception:
+                    failed += 1
+                    continue
+    except Exception as e:
+        print(f"Failed to process tar {tar_path}: {e}")
+        return index
+
+    print(f"Processed tar {tar_path.name}: {processed} ok, {failed} failed. WDS written")
+    return index
+
+
+def _worker_run(
+    rank: int,
+    device: str,
+    tar_paths: List[str],
+    in_root: str,
+    out_root: str,
+    image_exts: Tuple[str, ...],
+    opts: Dict[str, Any],
+):
+    try:
+        torch.cuda.set_device(int(device.split(":")[-1]))
+    except Exception:
+        pass
+
+    vae, text_encoder, tokenizer, model_dtype = _init_hf_models(
+        model_id=opts["model"],
+        device=device,
+        enable_memory_optimization=not opts.get("no_memory_optimization", False),
+    )
+
+    out_root_path = Path(out_root)
+    in_root_path = Path(in_root)
+
+    # DEBUGGING
+    for tar_str in tar_paths:
+    # for tar_str in tar_paths[:1]:
+        tar_path = Path(tar_str)
+        # Mirror the original directory structure from input_dir under output_root
+        try:
+            rel_parent = tar_path.parent.relative_to(in_root_path)
+        except Exception:
+            rel_parent = Path("")
+        out_dir = out_root_path / rel_parent
+        out_dir.mkdir(parents=True, exist_ok=True)
+
+        out_tar = out_dir / f"{tar_path.stem}.tar"
+        if opts.get("skip_existing") and out_tar.exists():
+            continue
+
+        index = 0
+        with wds.TarWriter(str(out_tar)) as sink:
+            index = _process_tar_with_models(
+                tar_path=tar_path,
+                image_exts=image_exts,
+                opts=opts,
+                device=device,
+                vae=vae,
+                text_encoder=text_encoder,
+                tokenizer=tokenizer,
+                model_dtype=model_dtype,
+                sink=sink,
+                index=index,
+                tqdm_position=rank,
+            )
+
 def main():
     import argparse
 
     parser = argparse.ArgumentParser(
         description=(
-            "Prepare WAN encodings for image tar shards. Each .tar is written to a same-named directory "
-            "containing per-image VAE latents (.pth), T5 embeddings (.pkl), and metadata (.json)."
+            "Prepare WAN encodings for image tar shards and write WebDataset shards (pth, pickle, json)."
         )
     )
     parser.add_argument("--input_dir", type=str, required=True, help="Directory containing .tar shards of images")
-    parser.add_argument("--output_root", type=str, required=True, help="Root directory to write per-tar output dirs")
+    parser.add_argument("--output_dir", type=str, required=False, help="Directory to write webdataset shards")
+    parser.add_argument(
+        "--output_root",
+        type=str,
+        required=False,
+        help="Deprecated alias for --output_dir; if provided, will be used as output_dir",
+    )
     parser.add_argument(
         "--model",
         default="Wan-AI/Wan2.1-T2V-14B-Diffusers",
@@ -259,8 +463,6 @@ def main():
         default=".jpg,.jpeg,.png,.webp",
         help="Comma-separated list of image extensions to include",
     )
-    parser.add_argument("--height", type=int, default=None, help="Target height for image frames")
-    parser.add_argument("--width", type=int, default=None, help="Target width for image frames")
     parser.add_argument(
         "--resize_mode",
         default="bilinear",
@@ -272,29 +474,25 @@ def main():
     parser.add_argument(
         "--skip-existing",
         action="store_true",
-        help="Skip images whose output files already exist (all three: .pth, .pkl, .json)",
+        help="No-op in WDS mode; retained for CLI compatibility",
+    )
+    parser.add_argument("--shard_maxcount", type=int, default=10000, help="Max samples per WDS shard")
+    parser.add_argument(
+        "--gpus",
+        type=str,
+        default="0",
+        help="Comma-separated GPU indices to use (e.g., '0,1,2,3')",
     )
 
     args = parser.parse_args()
 
     input_dir = Path(args.input_dir)
-    output_root = Path(args.output_root)
+    # Resolve output directory (support legacy --output_root)
+    resolved_output_dir = args.output_dir or args.output_root
+    if resolved_output_dir is None:
+        parser.error("--output_dir must be specified (or legacy --output_root)")
+    output_root = Path(resolved_output_dir)
     output_root.mkdir(parents=True, exist_ok=True)
-
-    # Target size
-    target_size = None
-    if args.height is not None and args.width is not None:
-        target_size = (args.height, args.width)
-    elif (args.height is None) ^ (args.width is None):
-        parser.error("Both --height and --width must be specified together")
-
-    # Init HF models
-    device = "cuda"
-    vae, text_encoder, tokenizer, model_dtype = _init_hf_models(
-        model_id=args.model,
-        device=device,
-        enable_memory_optimization=not args.no_memory_optimization,
-    )
 
     image_exts = tuple(ext.strip().lower() for ext in args.image_exts.split(",") if ext.strip())
 
@@ -303,107 +501,48 @@ def main():
     if not tar_files:
         raise FileNotFoundError(f"No .tar files found in {input_dir}")
 
-    # DEBUGGING
-    # for tar_path in tar_files:
-    for tar_path in tar_files[:1]:
-        tar_stem = tar_path.name[:-4]  # drop .tar
-        out_dir = output_root / tar_stem
-        out_dir.mkdir(parents=True, exist_ok=True)
+    # Parse GPU list and shard tars
+    gpu_ids = [s.strip() for s in args.gpus.split(",") if s.strip()]
+    devices = [f"cuda:{gid}" for gid in gpu_ids]
+    num_workers = len(devices) if devices else 1
 
-        processed = 0
-        failed = 0
+    shards: List[List[str]] = [[] for _ in range(num_workers)]
+    for idx, tar_path in enumerate(tar_files):
+        shards[idx % num_workers].append(str(tar_path))
 
-        # Open tar for streaming read
-        try:
-            with tarfile.open(tar_path, mode="r:*") as tf:
-                for img_member, cap_member in _iter_tar_images_and_captions(tf, image_exts):
-                    img_name = os.path.basename(img_member.name)
-                    stem = os.path.splitext(img_name)[0]
+    opts = {
+        "model": args.model,
+        "stochastic": bool(args.stochastic),
+        "no_memory_optimization": bool(args.no_memory_optimization),
+        "resize_mode": args.resize_mode,
+        "no_aspect_ratio": bool(args.no_aspect_ratio),
+        "center_crop": bool(args.center_crop),
+        "skip_existing": bool(args.skip_existing),
+        "shard_maxcount": int(args.shard_maxcount),
+    }
 
-                    latents_path = out_dir / f"{stem}.pth"
-                    text_path = out_dir / f"{stem}.pkl"
-                    meta_path = out_dir / f"{stem}.json"
+    # Ensure CUDA-safe multiprocessing
+    try:
+        mp.set_start_method("spawn", force=True)
+    except RuntimeError:
+        pass
 
-                    if args.skip_existing and latents_path.exists() and text_path.exists() and meta_path.exists():
-                        continue
-
-                    try:
-                        img_bytes = _read_tar_member_bytes(tf, img_member)
-                        if not img_bytes:
-                            failed += 1
-                            continue
-                        rgb = _decode_image_bytes_to_rgb(img_bytes)
-                        if rgb is None:
-                            failed += 1
-                            continue
-
-                        caption_text = ""
-                        if cap_member is not None:
-                            try:
-                                caption_bytes = _read_tar_member_bytes(tf, cap_member)
-                                caption_text = caption_bytes.decode("utf-8", errors="ignore")
-                            except Exception:
-                                caption_text = ""
-
-                        video_tensor = _image_to_video_tensor(
-                            image_rgb=rgb,
-                            target_size=target_size,
-                            resize_mode=args.resize_mode,
-                            maintain_aspect_ratio=not args.no_aspect_ratio,
-                            center_crop=args.center_crop,
-                            target_dtype=model_dtype,
-                        )
-
-                        # Encode
-                        text_embed = _encode_text(tokenizer, text_encoder, device, caption_text)
-                        latents = _encode_video_latents(
-                            vae, device, video_tensor, deterministic_latents=not args.stochastic
-                        )
-
-                        # Move to CPU and drop batch dim
-                        text_embed_cpu = text_embed.detach().to(device="cpu")[0]
-                        latents_cpu = latents.detach().to(device="cpu")[0]
-
-                        # Save outputs
-                        torch.save(latents_cpu, latents_path)
-                        # Use pickle for text embeddings to keep exact dtype/shape
-                        with open(text_path, "wb") as f:
-                            import pickle
-
-                            pickle.dump(text_embed_cpu, f, protocol=pickle.HIGHEST_PROTOCOL)
-
-                        # Metadata
-                        C, T, H, W = video_tensor.shape[1:]
-                        json_data = {
-                            "source_tar": str(tar_path),
-                            "tar_member": img_member.name,
-                            "image_name": img_name,
-                            "processed_frames": int(T),  # always 1
-                            "processed_height": int(H),
-                            "processed_width": int(W),
-                            "caption": caption_text,
-                            "deterministic_latents": bool(not args.stochastic),
-                            "memory_optimization": bool(not args.no_memory_optimization),
-                            "model_version": "wan2.1",
-                            "resize_settings": {
-                                "target_size": target_size,
-                                "resize_mode": args.resize_mode,
-                                "maintain_aspect_ratio": bool(not args.no_aspect_ratio),
-                                "center_crop": bool(args.center_crop),
-                            },
-                        }
-                        with open(meta_path, "w", encoding="utf-8") as f:
-                            json.dump(json_data, f, ensure_ascii=False)
-
-                        processed += 1
-                    except Exception:
-                        failed += 1
-                        continue
-        except Exception as e:
-            print(f"Failed to process tar {tar_path}: {e}")
-            continue
-
-        print(f"Processed tar {tar_path.name}: {processed} ok, {failed} failed. Output -> {out_dir}")
+    if num_workers == 1:
+        _worker_run(0, devices[0] if devices else "cuda:0", shards[0], str(input_dir), str(output_root), image_exts, opts)
+    else:
+        procs: List[mp.Process] = []
+        for rank, device in enumerate(devices):
+            if not shards[rank]:
+                continue
+            p = mp.Process(
+                target=_worker_run,
+                args=(rank, device, shards[rank], str(input_dir), str(output_root), image_exts, opts),
+                daemon=False,
+            )
+            p.start()
+            procs.append(p)
+        for p in procs:
+            p.join()
 
 
 if __name__ == "__main__":

@@ -112,18 +112,34 @@ class FlowPipeline:
         # ========================================================================
         # Manual Flow Matching Noise Addition
         # ========================================================================
-        
-        # Generate noise
-        noise = torch.randn_like(torch.ones([1, 16, grid_sizes[0][0], grid_sizes[0][1]*2, grid_sizes[0][2]*2], device=video_latents.device), dtype=torch.float32)
-        noise = patchify(noise, (1, 2, 2))[0].unsqueeze(1)
-        # DEBUGGING
-        # because video_latents might be padded, we need to make sure noise also be padded to have the same shape
-        seq_noise = noise.shape[0]
-        seq_video = video_latents.shape[0]
-        if seq_noise < seq_video:
-            pad_len = seq_video - seq_noise
-            pad = torch.zeros((pad_len, noise.shape[1], noise.shape[2]), device=noise.device, dtype=noise.dtype)
-            noise = torch.cat([noise, pad], dim=0)
+
+        # Generate noise for batch
+        noise = []
+        in_channels = model.config.in_channels
+        patch_spatial = model.config.patch_spatial
+        patch_temporal = model.config.patch_temporal
+        for grid_size in grid_sizes:
+            sample_noise = torch.randn(
+                1,
+                in_channels,
+                grid_size[0]*patch_temporal,
+                grid_size[1]*patch_spatial,
+                grid_size[2]*patch_spatial,
+                dtype=torch.float32,
+                device=video_latents.device,
+            )
+            sample_noise = patchify(sample_noise, (patch_temporal, patch_spatial, patch_spatial))[0] # shape [noise_seq, c * ( pF * pH * pW)]
+
+            # because video_latents might be padded, we need to make sure noise also be padded to have the same shape
+            noise_seq = sample_noise.shape[0]
+            video_seq = video_latents.shape[0]
+            if noise_seq < video_seq:
+                pad_len = video_seq - noise_seq
+                pad = torch.zeros((pad_len, sample_noise.shape[1]), device=sample_noise.device, dtype=sample_noise.dtype)
+                sample_noise = torch.cat([sample_noise, pad], dim=0)
+            noise.append(sample_noise)
+        noise = torch.stack(noise, dim=1) # shape [noise_seq, batch_size, c * ( pF * pH * pW)]
+
 
         # CRITICAL: Manual flow matching (NOT scheduler.add_noise!)
         # x_t = (1 - σ) * x_0 + σ * ε
@@ -162,6 +178,12 @@ class FlowPipeline:
             context_embeddings = context_embeddings
             split_loss_mask = loss_mask
 
+        # # DEBUGGING
+        # print(f"[DEBUG] [flow_pipeline] video_latents shape: {video_latents.shape}")
+        # print(f"[DEBUG] [flow_pipeline] noisy_latents shape: {noisy_latents.shape}")
+        # print(f"[DEBUG] [flow_pipeline] noise shape: {noise.shape}")
+        # print(f"[DEBUG] [flow_pipeline] context_embeddings shape: {context_embeddings.shape}")
+        # print(f"[DEBUG] [flow_pipeline] split_loss_mask shape: {split_loss_mask.shape}")
 
         # ========================================================================
         # Forward Pass
