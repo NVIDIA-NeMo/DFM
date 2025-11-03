@@ -12,6 +12,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+# Goes to src/megatron/reicepe/wan
 import os
 from typing import List, Optional, Union
 

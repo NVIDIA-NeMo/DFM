@@ -1,3 +1,5 @@
+#Let's make a md file instead
+
 ### set path to Megatron-Bridge
 DFM_PATH=/path/to/dfm
 MBRIDGE_PATH=/path/to/megatron-bridge
@@ -13,7 +15,7 @@ pip install imageio-ffmpeg
 
 
 ### Convert checkpoint
-See ${MBRIDGE_PATH}/examples/conversion/convert_wan_checkpoints.py for details.
+# See ${MBRIDGE_PATH}/examples/conversion/convert_wan_checkpoints.py for details.
 
 
 ### Finetuning

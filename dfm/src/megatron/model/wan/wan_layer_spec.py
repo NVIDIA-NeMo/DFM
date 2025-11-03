@@ -17,17 +17,16 @@
 
 import copy
 from dataclasses import dataclass
-from typing import Union, Optional
+from typing import Optional, Union
 
 import torch
-import torch.cuda.amp as amp
 import torch.nn as nn
 from megatron.core import parallel_state, tensor_parallel
+from megatron.core.extensions.transformer_engine import TENorm
+from megatron.core.process_groups_config import ProcessGroupCollection
 from megatron.core.transformer.attention import (
     CrossAttention,
-    CrossAttentionSubmodules,
     SelfAttention,
-    SelfAttentionSubmodules,
 )
 from megatron.core.transformer.custom_layers.transformer_engine import (
     TEColumnParallelLinear,
@@ -42,8 +41,7 @@ from megatron.core.transformer.spec_utils import ModuleSpec, build_module
 from megatron.core.transformer.transformer_config import TransformerConfig
 from megatron.core.transformer.transformer_layer import TransformerLayer, TransformerLayerSubmodules
 from megatron.core.utils import make_viewless_tensor
-from megatron.core.process_groups_config import ProcessGroupCollection
-from megatron.core.extensions.transformer_engine import TENorm
+
 
 try:
     import transformer_engine  # pylint: disable=unused-import
@@ -57,6 +55,8 @@ except ImportError:
 
 
 class WanLayerNorm(nn.LayerNorm):
+    # Note to parth: Can we replace this with te layer norm or fuse with linear layer?
+    # (@huy) Remove this comment after you have answered the question.
 
     def __init__(self, dim, eps=1e-6, elementwise_affine=False):
         super().__init__(dim, elementwise_affine=elementwise_affine, eps=eps)
@@ -70,7 +70,7 @@ class WanLayerNorm(nn.LayerNorm):
 
 
 @dataclass
-class WanSelfAttentionSubmodules:
+class WanSelfAttentionSubmodules: # Call this DiTSelfAttentionSubmodules or DiTSelfAttentionConfig?
     """
     Configuration class for specifying the submodules of a self-attention.
     """
@@ -78,13 +78,13 @@ class WanSelfAttentionSubmodules:
     linear_qkv: Union[ModuleSpec, type] = None
     core_attention: Union[ModuleSpec, type] = None
     linear_proj: Union[ModuleSpec, type] = None
-    layernorm_across_head: bool = False
+    layernorm_across_head: bool = False # Should be moved to Trasnformer config and not layerspec. (@huy to remove this)
     q_layernorm: Union[ModuleSpec, type] = None
     k_layernorm: Union[ModuleSpec, type] = None
 
 
 @dataclass
-class WanCrossAttentionSubmodules:
+class WanCrossAttentionSubmodules: # Call this DiTCrossAttentionSubmodules or DiTCrossAttentionConfig?
     """
     Configuration class for specifying the submodules of a cross-attention.
     """
@@ -92,12 +92,12 @@ class WanCrossAttentionSubmodules:
     linear_kv: Union[ModuleSpec, type] = None
     core_attention: Union[ModuleSpec, type] = None
     linear_proj: Union[ModuleSpec, type] = None
-    layernorm_across_head: bool = False
+    layernorm_across_head: bool = False # Should be moved to Trasnformer config and not layerspec. (@huy to remove this)
     q_layernorm: Union[ModuleSpec, type] = None
     k_layernorm: Union[ModuleSpec, type] = None
 
 
-class WanSelfAttention(SelfAttention):
+class WanSelfAttention(SelfAttention): # Call this DitSelfAttention or DiTSelfAttentionConfig?
     def __init__(
         self,
         config: TransformerConfig,
@@ -116,7 +116,7 @@ class WanSelfAttention(SelfAttention):
             pg_collection,
         )
 
-        self.layernorm_across_head = submodules.layernorm_across_head
+        self.layernorm_across_head = getattr(self.config, "False", submodules.layernorm_across_head)
 
         # override q_layernorm
         if submodules.q_layernorm is not None:
@@ -124,7 +124,6 @@ class WanSelfAttention(SelfAttention):
                 q_layernorm_size = self.query_projection_size
             else:
                 q_layernorm_size = self.hidden_size_per_attention_head
-            import transformer_engine as te
             norm_config = copy.deepcopy(self.config)
             norm_config.normalization = "RMSNorm"
             self.q_layernorm = build_module(
@@ -142,7 +141,6 @@ class WanSelfAttention(SelfAttention):
                 k_layernorm_size = self.kv_projection_size
             else:
                 k_layernorm_size = self.hidden_size_per_attention_head
-            import transformer_engine as te
             norm_config = copy.deepcopy(self.config)
             norm_config.normalization = "RMSNorm"
             self.k_layernorm = build_module(
@@ -237,7 +235,7 @@ class WanSelfAttention(SelfAttention):
         return query, key, value
 
 
-class WanCrossAttention(CrossAttention):
+class WanCrossAttention(CrossAttention): # DiTCrossAttention or DiTCrossAttentionConfig?
     def __init__(
         self,
         config: TransformerConfig,
@@ -264,7 +262,6 @@ class WanCrossAttention(CrossAttention):
                 q_layernorm_size = self.query_projection_size
             else:
                 q_layernorm_size = self.hidden_size_per_attention_head
-            import transformer_engine as te
             norm_config = copy.deepcopy(self.config)
             norm_config.normalization = "RMSNorm"
             self.q_layernorm = build_module(
@@ -282,7 +279,6 @@ class WanCrossAttention(CrossAttention):
                 k_layernorm_size = self.kv_projection_size
             else:
                 k_layernorm_size = self.hidden_size_per_attention_head
-            import transformer_engine as te
             norm_config = copy.deepcopy(self.config)
             norm_config.normalization = "RMSNorm"
             self.k_layernorm = build_module(
@@ -321,6 +317,9 @@ class WanCrossAttention(CrossAttention):
             self.hidden_size_per_attention_head,
         )
         query = query.view(*new_tensor_shape)
+
+        # replace with our own implementation (Todo: @huy )
+        query, key, value = super().get_query_key_value_tensors(hidden_states, key_value_states)
 
         # gather query and key heads across TP ranks if self.layernorm_across_head is True
         if self.layernorm_across_head and parallel_state.get_tensor_model_parallel_world_size() > 1:
@@ -545,7 +544,8 @@ class WanLayerWithAdaLN(TransformerLayer):
         return output, context
 
 
-import transformer_engine as te
+
+
 def get_wan_block_with_transformer_engine_spec() -> ModuleSpec:
     params = {"attn_mask_type": AttnMaskType.padding}
     return ModuleSpec(
