@@ -17,6 +17,7 @@ from torch import Tensor
 from torch.distributed import ProcessGroup, all_gather, get_process_group_ranks, get_world_size
 
 
+# P2: Look into get_batch_on_this_cp_rank
 def split_inputs_cp(x: Tensor, seq_dim: int, cp_group: ProcessGroup) -> Tensor:
     """
     Split input tensor along the sequence dimension for checkpoint parallelism.

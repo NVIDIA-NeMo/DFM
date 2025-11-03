@@ -181,7 +181,7 @@ class DiTModelProvider(TransformerConfig, ModelProviderMixin[VisionModule]):
         return dynamic_import(self.vae_module)(self.vae_path)
 
 
-# Add all the DIT configs here like DIT7B, 14B, cosmos, etc, etc,
+# TODO: Add all the DIT configs here like DIT7B, 14B, cosmos, etc, etc,
 # @dataclass
 # class GPTProvider126M(GPTModelProvider):
 #     """Configuration for a 126M parameter GPT model.

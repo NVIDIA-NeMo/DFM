@@ -18,6 +18,7 @@ import torch
 from diffusers import AutoencoderKL
 from einops import rearrange
 
+# Get rid of it (Sajad to check) ---> Rename and move it to common
 
 class AutoencoderKLVAE(torch.nn.Module):
     def __init__(self, path):

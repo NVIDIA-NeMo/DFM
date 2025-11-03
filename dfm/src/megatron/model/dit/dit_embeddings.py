@@ -91,6 +91,7 @@ class ParallelSDXLTimestepEmbedding(SDXLTimestepEmbedding):
         return super().forward(sample)
 
 
+# To be used from Common
 class ParallelTimestepEmbedding(TimestepEmbedding):
     """
     ParallelTimestepEmbedding is a subclass of TimestepEmbedding that initializes
