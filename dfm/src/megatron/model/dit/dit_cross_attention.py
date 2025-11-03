@@ -32,6 +32,7 @@ from megatron.core.packed_seq_params import PackedSeqParams
 from megatron.core.transformer.transformer_block import TransformerBlock
 
 
+# Can be removed
 class CosmosTransformerBlock(TransformerBlock):
     def forward(
         self,
@@ -48,12 +49,14 @@ class CosmosTransformerBlock(TransformerBlock):
         )
 
 
+# Can be removed
 @dataclass
 class DiTCrossAttentionSubmodules(CrossAttentionSubmodules):
     q_layernorm: Union[ModuleSpec, type] = None
     k_layernorm: Union[ModuleSpec, type] = None
 
 
+# Can be removed
 class DiTCrossAttention(Attention):
     """Cross-attention layer class
 

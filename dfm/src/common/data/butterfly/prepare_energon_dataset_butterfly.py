@@ -28,6 +28,7 @@ from transformers import T5EncoderModel, T5TokenizerFast
 from nemo.collections.common.video_tokenizers.cosmos_tokenizer import CausalVideoTokenizer
 from nemo.collections.common.video_tokenizers.utils import read_image, resize_video
 
+# examples/megatron/receipes/dit
 def initialize_text_encoder(t5_cache_dir):
     """
     Initializes the T5 tokenizer and encoder model, loading them from a specified cache directory.

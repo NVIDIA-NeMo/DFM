@@ -14,6 +14,7 @@ from megatron.core.transformer.spec_utils import ModuleSpec, build_module
 from megatron.core.transformer.transformer_config import TransformerConfig
 
 
+# Can be removed
 @dataclass
 class JointSelfAttentionSubmodules:
     linear_qkv: Union[ModuleSpec, type] = None
@@ -26,6 +27,7 @@ class JointSelfAttentionSubmodules:
     added_k_layernorm: Union[ModuleSpec, type] = None
 
 
+# Can be removed
 # pylint: disable=C0116
 class JointSelfAttention(Attention):
     """Joint Self-attention layer class
@@ -322,6 +324,7 @@ class JointSelfAttention(Attention):
         return output, encoder_output
 
 
+# # Can be removed
 class FluxSingleAttention(SelfAttention):
     """Self-attention layer class
 

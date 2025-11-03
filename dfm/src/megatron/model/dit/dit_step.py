@@ -176,6 +176,9 @@ class DITForwardStep:
         straggler_timer = state.straggler_timer
         with straggler_timer:
             if parallel_state.is_pipeline_last_stage():
+                x = self.diffusion_pipeline.noise(x)
+                model(x)
+                # Self.diffusion_pipeline should not know anything about the model
                 output_batch, loss = self.diffusion_pipeline.training_step(model, batch, 0)
                 output_tensor = torch.mean(loss, dim=-1)
             else:
