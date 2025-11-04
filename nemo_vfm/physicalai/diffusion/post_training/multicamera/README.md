@@ -90,4 +90,3 @@ export XDG_CACHE_HOME=/path/to/.cache
 ```bash
 torchrun --nproc_per_node=8 nemo/collections/physicalai/diffusion/post_training/multicamera/multicamera.py
 ```
-
