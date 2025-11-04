@@ -124,8 +124,3 @@ We provide a sample training script for launching multi-node training. Simply co
 
    bash nemo/collections/diffusion/vae/train_vae.sh \
    data.path=xxx
-
-
-
-
-
