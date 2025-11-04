@@ -19,13 +19,7 @@ import pytest
 def pytest_addoption(parser):
     """
     Additional command-line arguments passed to pytest.
-    For now:
-        --cpu: use CPU during testing (DEFAULT: GPU)
-        --use_local_test_data: use local test data/skip downloading from URL/GitHub (DEFAULT: False)
     """
-    parser.addoption(
-        "--cpu", action="store_true", help="pass that argument to use CPU during testing (DEFAULT: False = GPU)"
-    )
     parser.addoption(
         "--with_downloads",
         action="store_true",
@@ -33,25 +27,8 @@ def pytest_addoption(parser):
     )
 
 
-@pytest.fixture
-def device(request):
-    """Simple fixture returning string denoting the device [CPU | GPU]"""
-    if request.config.getoption("--cpu"):
-        return "CPU"
-    else:
-        return "GPU"
-
-
 @pytest.fixture(autouse=True)
-def run_only_on_device_fixture(request, device):
-    """Fixture to skip tests based on the device"""
-    if request.node.get_closest_marker("run_only_on"):
-        if request.node.get_closest_marker("run_only_on").args[0] != device:
-            pytest.skip("skipped on this device: {}".format(device))
-
-
-@pytest.fixture(autouse=True)
-def downloads_weights(request, device):
+def downloads_weights(request):
     """Fixture to validate if the with_downloads flag is passed if necessary"""
     if request.node.get_closest_marker("with_downloads"):
         if not request.config.getoption("--with_downloads"):
@@ -77,15 +54,16 @@ def reset_env_vars():
 def pytest_configure(config):
     """
     Initial configuration of conftest.
-    The function checks if test_data.tar.gz is present in tests/.data.
-    If so, compares its size with github's test_data.tar.gz.
-    If file absent or sizes not equal, function downloads the archive from github and unpacks it.
+
+    Note: DFM uses the following pattern for CPU/GPU test separation:
+    Tests don't use markers - GPU visibility is controlled by CUDA_VISIBLE_DEVICES
+    in the shell scripts (L0_Unit_Tests_CPU.sh and L0_Unit_Tests_GPU.sh).
     """
     config.addinivalue_line(
         "markers",
-        "run_only_on(device): runs the test only on a given device [CPU | GPU]",
+        "with_downloads: runs the test using data present in tests/.data",
     )
     config.addinivalue_line(
         "markers",
-        "with_downloads: runs the test using data present in tests/.data",
+        "pleasefixme: marks test as needing fixes (will be skipped in CI)",
     )
