@@ -12,40 +12,53 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+default_language_version:
+  python: python3
+
+ci:
+  autofix_prs: false
+  autoupdate_commit_msg: '[pre-commit.ci] pre-commit suggestions'
+  autoupdate_schedule: quarterly
+
+default_install_hook_types: [pre-commit, commit-msg]
+
 repos:
   - repo: https://github.com/pre-commit/pre-commit-hooks
-    rev: v4.4.0
+    rev: v5.0.0
     hooks:
-    - id: end-of-file-fixer
-      # only include python files
-      files: \.py$
-    - id: trailing-whitespace
-      # only include python files
-      files: \.py$
+      - id: check-added-large-files
+        args: ['--maxkb=1000']
+      - id: check-case-conflict
+      - id: check-yaml
+      - id: detect-private-key
+      - id: end-of-file-fixer
+        exclude: docs/
+      - id: requirements-txt-fixer
+      - id: trailing-whitespace
 
   - repo: https://github.com/astral-sh/ruff-pre-commit
-    rev: "v0.9.9" # Use the appropriate version
+    rev: v0.11.4
     hooks:
-    - id: ruff
-      args: ["--fix"]
-    - id: ruff
-      args: ["check", "--select", "I", "--fix"]
-    - id: ruff-format
+      # Run the linter
+      - id: ruff
+        args: [--fix]  # Enables auto-fixing lint errors
+      # Run the formatter
+      - id: ruff-format
 
-  # - repo: local
-  #   hooks:
-  #     - id: no-underscore-md
-  #       name: "Disallow '_' in Markdown filenames"
-  #       language: system
-  #       entry: |
-  #         bash -c '
-  #           # Report the offending files
-  #           echo "[pre-commit] ERROR: Found Markdown files with underscores:" >&2
-  #           for file in "$@"; do
-  #             echo "  - $file (use hyphens instead)" >&2
-  #           done
-  #           exit 1
-  #         '
-  #       files: '.*\/[^\/]*_[^\/]*\.md$'
-  #       exclude: '^\.github/'
-  #       types: [file]
+  - repo: local
+    hooks:
+      - id: check-signoff
+        name: Check Signed-off-by
+        entry: bash -c 'if ! grep -q "Signed-off-by:" "$1"; then echo "❌ Commit message must be signed off. Use git commit -s to add it automatically."; exit 1; fi' --
+        language: system
+        always_run: true
+        stages: [commit-msg]
+        types: [text]
+
+      - id: pre-commit-reminder
+        name: Pre-commit Installation Reminder
+        entry: echo "⚠️  Remember to install pre-commit and hooks (pip install pre-commit && pre-commit install --install-hooks)"
+        language: system
+        always_run: true
+        pass_filenames: false
+        stages: [pre-commit]
