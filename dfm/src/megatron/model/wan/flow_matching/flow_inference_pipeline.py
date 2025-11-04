@@ -15,7 +15,7 @@ import torch.distributed as dist
 from tqdm import tqdm
 
 from dfm.src.megatron.model.wan.wan_model import WanModel
-from dfm.examples.megatron.recipe.wan.wan_provider import WanModelProvider
+from dfm.src.megatron.model.wan.wan_provider import WanModelProvider
 from dfm.src.megatron.model.wan.modules.t5 import T5EncoderModel
 from dfm.src.megatron.model.wan.modules import WanVAE
 from dfm.src.megatron.model.wan.inference.utils.fm_solvers import (

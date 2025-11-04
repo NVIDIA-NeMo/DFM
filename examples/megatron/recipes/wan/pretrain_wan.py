@@ -14,8 +14,6 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-
-# Goes to examples/megatron/recipe/wan
 """
 Wan Pretraining Script with YAML and CLI Configuration Overrides.
 

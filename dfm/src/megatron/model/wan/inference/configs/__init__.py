@@ -1,8 +1,6 @@
 import copy
 import os
 
-# Change to diffusors
-
 os.environ['TOKENIZERS_PARALLELISM'] = 'false'
 
 from .wan_i2v_14B import i2v_14B

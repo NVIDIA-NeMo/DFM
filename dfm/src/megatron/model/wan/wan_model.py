@@ -31,7 +31,6 @@ from megatron.core.utils import make_sharded_tensor_for_checkpoint
 from dfm.src.megatron.model.wan.wan_layer_spec import (
     get_wan_block_with_transformer_engine_spec as WanLayerWithAdaLNspec,
 )
-from dfm.src.megatron.model.wan.wan_layer_spec import WanLayerNorm
 from torch import Tensor
 from .rope_utils import Wan3DRopeEmbeddings
 
@@ -47,6 +46,7 @@ def sinusoidal_embedding_1d(dim, position):
     x = torch.cat([torch.cos(sinusoid), torch.sin(sinusoid)], dim=1)
     return x
 
+
 class Head(nn.Module):
 
     def __init__(self, dim, out_dim, patch_size, eps=1e-6):
@@ -58,7 +58,7 @@ class Head(nn.Module):
 
         # layers
         out_dim = math.prod(patch_size) * out_dim
-        self.norm = WanLayerNorm(dim, eps)
+        self.norm = nn.LayerNorm(dim, elementwise_affine=False, eps=eps)
         self.head = nn.Linear(dim, out_dim)
 
         # modulation

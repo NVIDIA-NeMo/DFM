@@ -12,12 +12,11 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-# Goes to src/megatron/reicepe/wan
 import os
 from typing import List, Optional, Union
 
 from dfm.src.megatron.data.wan.wan_energon_datamodule import WanDataModuleConfig
-from dfm.examples.megatron.recipe.wan.wan_provider import WanModelProvider
+from dfm.src.megatron.model.wan.wan_provider import WanModelProvider
 import torch
 from megatron.core.distributed import DistributedDataParallelConfig
 

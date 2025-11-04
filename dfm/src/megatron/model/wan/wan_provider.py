@@ -13,7 +13,6 @@
 # limitations under the License.
 
 
-# Goes into the model
 import logging
 from dataclasses import dataclass
 
@@ -40,6 +39,7 @@ class WanModelProvider(TransformerConfig, ModelProviderMixin[VisionModule]):
     layernorm_epsilon: float = 1e-6
     normalization: str = "RMSNorm"
     layernorm_zero_centered_gamma: bool = False
+    layernorm_across_heads: bool = True
     add_qkv_bias: bool = True
     rotary_interleaved: bool = True
     hidden_dropout: float = 0

@@ -1,24 +1,27 @@
-#Let's make a md file instead
+## WAN example commands
 
-### set path to Megatron-Bridge
+### Set paths to Megatron-Bridge
+```bash
 DFM_PATH=/path/to/dfm
 MBRIDGE_PATH=/path/to/megatron-bridge
 export PYTHONPATH="${DFM_PATH}/.:${MBRIDGE_PATH}/src/.:/opt/NeMo-Framework-Launcher/launcher_scripts"
+```
 
-
-### install dependencies
+### Install dependencies
+```bash
 pip install --upgrade git+https://github.com/NVIDIA/Megatron-LM.git@ce8185cbbe04f38beb74360e878450f2e8525885
 python3 -m pip install --upgrade diffusers==0.35.1
 pip install easydict
 pip install imageio
 pip install imageio-ffmpeg
-
+```
 
 ### Convert checkpoint
-# See ${MBRIDGE_PATH}/examples/conversion/convert_wan_checkpoints.py for details.
-
+See `examples/conversion/convert_wan_checkpoints.py` under `MBRIDGE_PATH` for details.
 
 ### Finetuning
+Set environment variables and run training:
+```bash
 export HF_TOKEN=...
 export WANDB_API_KEY=...
 EXP_NAME=...
@@ -52,12 +55,15 @@ NVTE_FUSED_ATTN=1 torchrun --nproc_per_node=8 examples/recipes/wan/pretrain_wan.
   logger.wandb_project="wan" \
   logger.wandb_exp_name=${EXP_NAME} \
   logger.wandb_save_dir=${CHECKPOINT_DIR}
+```
 
+### Inference
+Download T5 and VAE weights from the [Wan-AI/Wan2.1-T2V-1.3B repository](https://huggingface.co/Wan-AI/Wan2.1-T2V-1.3B/tree/main):
+- T5: `models_t5_umt5-xxl-enc-bf16.pth`, provider `google`
+- VAE: `Wan2.1_VAE.pth`
 
-### Inferencing
-# Download T5 weights and VAE weights from "https://huggingface.co/Wan-AI/Wan2.1-T2V-1.3B/tree/main"
-#   T5: models_t5_umt5-xxl-enc-bf16.pth, google
-#   VAE: Wan2.1_VAE.pth
+Then run:
+```bash
 export HF_TOKEN=...
 CHECKPOINT_DIR=/path/to/checkpoint_dir
 T5_DIR=/path/to/t5_weights
@@ -78,3 +84,5 @@ NVTE_FUSED_ATTN=1 torchrun --nproc_per_node=1 examples/recipes/wan/inference_wan
   --sequence_parallel False \
   --base_seed 42 \
   --sample_steps 50
+```
+

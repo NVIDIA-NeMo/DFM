@@ -41,6 +41,8 @@ from megatron.core.transformer.spec_utils import ModuleSpec, build_module
 from megatron.core.transformer.transformer_config import TransformerConfig
 from megatron.core.transformer.transformer_layer import TransformerLayer, TransformerLayerSubmodules
 from megatron.core.utils import make_viewless_tensor
+from dfm.src.megatron.model.common.dit_attention import DiTCrossAttentionSubmodules, DiTSelfAttention, DiTCrossAttention
+from megatron.core.transformer.attention import SelfAttentionSubmodules
 
 
 try:
@@ -54,311 +56,20 @@ except ImportError:
     SplitAlongDim = None
 
 
-class WanLayerNorm(nn.LayerNorm):
-    # Note to parth: Can we replace this with te layer norm or fuse with linear layer?
-    # (@huy) Remove this comment after you have answered the question.
+# class WanLayerNorm(nn.LayerNorm):
+#     # Note to parth: Can we replace this with te layer norm or fuse with linear layer?
+#     # (@huy) Remove this comment after you have answered the question.
 
-    def __init__(self, dim, eps=1e-6, elementwise_affine=False):
-        super().__init__(dim, elementwise_affine=elementwise_affine, eps=eps)
+#     def __init__(self, dim, eps=1e-6, elementwise_affine=False):
+#         super().__init__(dim, elementwise_affine=elementwise_affine, eps=eps)
 
-    def forward(self, x):
-        r"""
-        Args:
-            x(Tensor): Shape [B, L, C]
-        """
-        return super().forward(x).type_as(x)
+#     def forward(self, x):
+#         r"""
+#         Args:
+#             x(Tensor): Shape [B, L, C]
+#         """
+#         return super().forward(x).type_as(x)
 
-
-@dataclass
-class WanSelfAttentionSubmodules: # Call this DiTSelfAttentionSubmodules or DiTSelfAttentionConfig?
-    """
-    Configuration class for specifying the submodules of a self-attention.
-    """
-
-    linear_qkv: Union[ModuleSpec, type] = None
-    core_attention: Union[ModuleSpec, type] = None
-    linear_proj: Union[ModuleSpec, type] = None
-    layernorm_across_head: bool = False # Should be moved to Trasnformer config and not layerspec. (@huy to remove this)
-    q_layernorm: Union[ModuleSpec, type] = None
-    k_layernorm: Union[ModuleSpec, type] = None
-
-
-@dataclass
-class WanCrossAttentionSubmodules: # Call this DiTCrossAttentionSubmodules or DiTCrossAttentionConfig?
-    """
-    Configuration class for specifying the submodules of a cross-attention.
-    """
-    linear_q: Union[ModuleSpec, type] = None
-    linear_kv: Union[ModuleSpec, type] = None
-    core_attention: Union[ModuleSpec, type] = None
-    linear_proj: Union[ModuleSpec, type] = None
-    layernorm_across_head: bool = False # Should be moved to Trasnformer config and not layerspec. (@huy to remove this)
-    q_layernorm: Union[ModuleSpec, type] = None
-    k_layernorm: Union[ModuleSpec, type] = None
-
-
-class WanSelfAttention(SelfAttention): # Call this DitSelfAttention or DiTSelfAttentionConfig?
-    def __init__(
-        self,
-        config: TransformerConfig,
-        submodules: WanSelfAttentionSubmodules,
-        layer_number: int,
-        attn_mask_type: AttnMaskType,
-        cp_comm_type: str = None,
-        pg_collection: Optional[ProcessGroupCollection] = None,
-    ):
-        super().__init__(
-            config,
-            submodules,
-            layer_number,
-            attn_mask_type,
-            cp_comm_type,
-            pg_collection,
-        )
-
-        self.layernorm_across_head = getattr(self.config, "False", submodules.layernorm_across_head)
-
-        # override q_layernorm
-        if submodules.q_layernorm is not None:
-            if self.layernorm_across_head:
-                q_layernorm_size = self.query_projection_size
-            else:
-                q_layernorm_size = self.hidden_size_per_attention_head
-            norm_config = copy.deepcopy(self.config)
-            norm_config.normalization = "RMSNorm"
-            self.q_layernorm = build_module(
-                submodules.q_layernorm,
-                eps=norm_config.layernorm_epsilon,
-                hidden_size=q_layernorm_size,
-                config=norm_config,
-            )
-        else:
-            self.q_layernorm = None
-
-        # override k_layernorm
-        if submodules.k_layernorm is not None:
-            if self.layernorm_across_head:
-                k_layernorm_size = self.kv_projection_size
-            else:
-                k_layernorm_size = self.hidden_size_per_attention_head
-            norm_config = copy.deepcopy(self.config)
-            norm_config.normalization = "RMSNorm"
-            self.k_layernorm = build_module(
-                submodules.k_layernorm,
-                eps=norm_config.layernorm_epsilon,
-                hidden_size=k_layernorm_size,
-                config=norm_config,
-            )
-        else:
-            self.k_layernorm = None
-
-    def get_query_key_value_tensors(self, hidden_states, key_value_states=None):
-        """
-        Derives `query`, `key` and `value` tensors from `hidden_states`.
-        """
-        # Attention heads [sq, b, h] --> [sq, b, ng * (np/ng + 2) * hn)]
-        mixed_qkv, _ = self.linear_qkv(hidden_states)
-
-        # [sq, b, hp] --> [sq, b, ng, (np/ng + 2) * hn]
-        new_tensor_shape = mixed_qkv.size()[:-1] + (
-            self.num_query_groups_per_partition,
-            (
-                (self.num_attention_heads_per_partition // self.num_query_groups_per_partition + 2)
-                * self.hidden_size_per_attention_head
-            ),
-        )
-        mixed_qkv = mixed_qkv.view(*new_tensor_shape)
-
-        split_arg_list = [
-            (
-                self.num_attention_heads_per_partition
-                // self.num_query_groups_per_partition
-                * self.hidden_size_per_attention_head
-            ),
-            self.hidden_size_per_attention_head,
-            self.hidden_size_per_attention_head,
-        ]
-
-        if SplitAlongDim is not None:
-
-            # [sq, b, ng, (np/ng + 2) * hn]
-            # --> [sq, b, ng, np/ng * hn], [sq, b, ng, hn], [sq, b, ng, hn]
-            (query, key, value) = SplitAlongDim(mixed_qkv, 3, split_arg_list)
-        else:
-
-            # [sq, b, ng, (np/ng + 2) * hn]
-            # --> [sq, b, ng, np/ng * hn], [sq, b, ng, hn], [sq, b, ng, hn]
-            (query, key, value) = torch.split(mixed_qkv, split_arg_list, dim=3)
-
-        # [sq, b, ng, np/ng * hn] -> [sq, b, np, hn]
-        query = query.reshape(query.size(0), query.size(1), -1, self.hidden_size_per_attention_head)
-
-        # gather query and key heads across TP ranks if self.layernorm_across_head is True
-        if self.layernorm_across_head and parallel_state.get_tensor_model_parallel_world_size() > 1:
-            query = query.transpose(-2, -1)
-            key = key.transpose(-2, -1)
-            query = tensor_parallel.gather_from_tensor_model_parallel_region(query)
-            key = tensor_parallel.gather_from_tensor_model_parallel_region(key)
-            query = query.transpose(-2, -1)
-            key = key.transpose(-2, -1)
-
-        if self.q_layernorm is not None:
-            if self.layernorm_across_head:                
-                q_flat = query.reshape(query.size(0), query.size(1), -1).contiguous()  # [sq, b, np*hn]
-                q_flat = self.q_layernorm(q_flat)
-                query = q_flat.view(query.size(0), query.size(1), -1, self.hidden_size_per_attention_head)  # [sq, b, np, hn]
-            else:
-                query = self.q_layernorm(query.contiguous())
-
-        if self.k_layernorm is not None:
-            if self.layernorm_across_head:
-                k_flat = key.reshape(key.size(0), key.size(1), -1).contiguous()
-                k_flat = self.k_layernorm(k_flat)
-                key = k_flat.view(key.size(0), key.size(1), -1, self.hidden_size_per_attention_head)
-            else:
-                key = self.k_layernorm(key.contiguous())
-
-        # scatter query and key heads across TP ranks if self.layernorm_across_head is True
-        if self.layernorm_across_head and parallel_state.get_tensor_model_parallel_world_size() > 1:
-            query = query.transpose(-2, -1)
-            key = key.transpose(-2, -1)
-            query = tensor_parallel.scatter_to_tensor_model_parallel_region(query)
-            key = tensor_parallel.scatter_to_tensor_model_parallel_region(key)
-            query = query.transpose(-2, -1)
-            key = key.transpose(-2, -1)
-            query = query.contiguous() # important becuase TE attention expects contiguous tensors
-            key = key.contiguous() # important becuase TE attention expects contiguous tensors
-
-        if self.config.test_mode:
-            self.run_realtime_tests()
-
-        return query, key, value
-
-
-class WanCrossAttention(CrossAttention): # DiTCrossAttention or DiTCrossAttentionConfig?
-    def __init__(
-        self,
-        config: TransformerConfig,
-        submodules: WanCrossAttentionSubmodules,
-        layer_number: int,
-        attn_mask_type: AttnMaskType,
-        cp_comm_type: str = None,
-        pg_collection: Optional[ProcessGroupCollection] = None,
-    ):
-        super().__init__(
-            config,
-            submodules,
-            layer_number,
-            attn_mask_type,
-            cp_comm_type,
-            pg_collection,
-        )
-
-        self.layernorm_across_head = submodules.layernorm_across_head
-
-        # override q_layernorm
-        if submodules.q_layernorm is not None:
-            if self.layernorm_across_head:
-                q_layernorm_size = self.query_projection_size
-            else:
-                q_layernorm_size = self.hidden_size_per_attention_head
-            norm_config = copy.deepcopy(self.config)
-            norm_config.normalization = "RMSNorm"
-            self.q_layernorm = build_module(
-                submodules.q_layernorm,
-                eps=norm_config.layernorm_epsilon,
-                hidden_size=q_layernorm_size,
-                config=norm_config,
-            )
-        else:
-            self.q_layernorm = None
-
-        # override k_layernorm
-        if submodules.k_layernorm is not None:
-            if self.layernorm_across_head:
-                k_layernorm_size = self.kv_projection_size
-            else:
-                k_layernorm_size = self.hidden_size_per_attention_head
-            norm_config = copy.deepcopy(self.config)
-            norm_config.normalization = "RMSNorm"
-            self.k_layernorm = build_module(
-                submodules.k_layernorm,
-                eps=norm_config.layernorm_epsilon,
-                hidden_size=k_layernorm_size,
-                config=norm_config,
-            )
-        else:
-            self.k_layernorm = None
-
-    def get_query_key_value_tensors(self, hidden_states, key_value_states):
-        """
-        Derives `query` tensor from `hidden_states`, and `key`/`value` tensors
-        from `key_value_states`.
-        """
-        # Attention heads [sk, b, h] --> [sk, b, (np * 2 * hn)]
-        mixed_kv, _ = self.linear_kv(key_value_states)
-
-        # [sk, b, (np * 2 * hn)] --> [sk, b, np, 2 * hn]
-        new_tensor_shape = mixed_kv.size()[:-1] + (
-            self.num_attention_heads_per_partition,
-            2 * self.hidden_size_per_attention_head,
-        )
-        mixed_kv = mixed_kv.view(*new_tensor_shape)
-
-        # [sk, b, np, 2 * hn] --> 2 [sk, b, np, hn]
-        (key, value) = tensor_parallel.split_tensor_along_last_dim(mixed_kv, 2)
-
-        # Attention head [sq, b, h] --> [sq, b, hp]
-        query, _ = self.linear_q(hidden_states)
-
-        # [sq, b, hp] --> [sq, b, np, hn]
-        new_tensor_shape = query.size()[:-1] + (
-            self.num_attention_heads_per_partition,
-            self.hidden_size_per_attention_head,
-        )
-        query = query.view(*new_tensor_shape)
-
-        # replace with our own implementation (Todo: @huy )
-        query, key, value = super().get_query_key_value_tensors(hidden_states, key_value_states)
-
-        # gather query and key heads across TP ranks if self.layernorm_across_head is True
-        if self.layernorm_across_head and parallel_state.get_tensor_model_parallel_world_size() > 1:
-            query = query.transpose(-2, -1)
-            key = key.transpose(-2, -1)
-            query = tensor_parallel.gather_from_tensor_model_parallel_region(query)
-            key = tensor_parallel.gather_from_tensor_model_parallel_region(key)
-            query = query.transpose(-2, -1)
-            key = key.transpose(-2, -1)
-
-        if self.q_layernorm is not None:
-            if self.layernorm_across_head:
-                q_flat = query.reshape(query.size(0), query.size(1), -1).contiguous()  # [sq, b, np*hn]
-                q_flat = self.q_layernorm(q_flat)
-                query = q_flat.view(query.size(0), query.size(1), -1, self.hidden_size_per_attention_head)  # [sq, b, np, hn]
-            else:
-                query = self.q_layernorm(query.contiguous())
-
-        if self.k_layernorm is not None:
-            if self.layernorm_across_head:
-                k_flat = key.reshape(key.size(0), key.size(1), -1).contiguous()
-                k_flat = self.k_layernorm(k_flat)
-                key = k_flat.view(key.size(0), key.size(1), -1, self.hidden_size_per_attention_head)
-            else:
-                key = self.k_layernorm(key.contiguous())
-
-        # scatter query and key heads across TP ranks if self.layernorm_across_head is True
-        if self.layernorm_across_head and parallel_state.get_tensor_model_parallel_world_size() > 1:
-            query = query.transpose(-2, -1)
-            key = key.transpose(-2, -1)
-            query = tensor_parallel.scatter_to_tensor_model_parallel_region(query)
-            key = tensor_parallel.scatter_to_tensor_model_parallel_region(key)
-            query = query.transpose(-2, -1)
-            key = key.transpose(-2, -1)
-            query = query.contiguous() # important becuase TE attention expects contiguous tensors
-            key = key.contiguous() # important becuase TE attention expects contiguous tensors
-
-        return query, key, value
-        
 
 @dataclass
 class WanWithAdaLNSubmodules(TransformerLayerSubmodules):
@@ -437,19 +148,19 @@ class WanLayerWithAdaLN(TransformerLayer):
         self.adaLN = WanAdaLN(config=self.config)
         self.norm1 = build_module(
             submodules.norm1,
-            dim=config.hidden_size,
+            normalized_shape=config.hidden_size,
             eps=config.layernorm_epsilon,
             elementwise_affine=False
         )
         self.norm3 = build_module(
             submodules.norm3,
-            dim=config.hidden_size,
+            normalized_shape=config.hidden_size,
             eps=config.layernorm_epsilon,
             elementwise_affine=True,
         )
         self.norm2 = build_module(
             submodules.norm2,
-            dim=config.hidden_size,
+            normalized_shape=config.hidden_size,
             eps=config.layernorm_epsilon,
             elementwise_affine=False,
         )
@@ -544,37 +255,33 @@ class WanLayerWithAdaLN(TransformerLayer):
         return output, context
 
 
-
-
 def get_wan_block_with_transformer_engine_spec() -> ModuleSpec:
     params = {"attn_mask_type": AttnMaskType.padding}
     return ModuleSpec(
         module=WanLayerWithAdaLN,
         submodules=WanWithAdaLNSubmodules(
-            norm1=WanLayerNorm,
-            norm3=WanLayerNorm,
-            norm2=WanLayerNorm,
+            norm1=nn.LayerNorm,
+            norm3=nn.LayerNorm,
+            norm2=nn.LayerNorm,
             full_self_attention=ModuleSpec(
-                module=WanSelfAttention,
+                module=DiTSelfAttention,
                 params=params,
-                submodules=WanSelfAttentionSubmodules(
+                submodules=SelfAttentionSubmodules(
                     linear_qkv=TEColumnParallelLinear,
                     core_attention=TEDotProductAttention,
                     linear_proj=TERowParallelLinear,
-                    layernorm_across_head=True,     
                     q_layernorm=TENorm,
                     k_layernorm=TENorm,         
                 ),
             ),
             cross_attention=ModuleSpec(
-                module=WanCrossAttention,
+                module=DiTCrossAttention,
                 params=params,
-                submodules=WanCrossAttentionSubmodules(
+                submodules=DiTCrossAttentionSubmodules(
                     linear_q=TEColumnParallelLinear,
                     linear_kv=TEColumnParallelLinear,
                     core_attention=TEDotProductAttention,
                     linear_proj=TERowParallelLinear,
-                    layernorm_across_head=True,
                     q_layernorm=TENorm,
                     k_layernorm=TENorm,
                 ),
