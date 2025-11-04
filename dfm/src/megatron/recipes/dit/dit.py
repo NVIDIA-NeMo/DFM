@@ -15,7 +15,7 @@
 import os
 from typing import List, Optional, Union
 
-from dfm.src.common.data.dit.diffusion_energon_datamodule import DiffusionDataModuleConfig
+from dfm.src.megatron.model.dit.data.diffusion_energon_datamodule import DiffusionDataModuleConfig
 from dfm.src.megatron.model.dit.dit_provider import DiTModelProvider
 import torch
 from megatron.core.distributed import DistributedDataParallelConfig
