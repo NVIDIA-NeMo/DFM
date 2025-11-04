@@ -17,8 +17,8 @@ from typing import Any, Callable, Dict, Optional, Tuple
 import numpy as np
 import torch
 from megatron.core import parallel_state
-from dfm.src.megatron.model.dit.sampler.batch_ops import batch_mul
-from dfm.src.megatron.model.dit.sampler.context_parallel import cat_outputs_cp
+from dfm.src.common.utils.batch_ops import batch_mul
+from dfm.src.common.utils.torch_split_tensor_for_cp import cat_outputs_cp
 from dfm.src.megatron.model.dit.edm.edm import EDMSDE, EDMSampler, EDMScaling
 from torch import Tensor
 

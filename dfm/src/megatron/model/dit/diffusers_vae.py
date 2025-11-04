@@ -18,7 +18,8 @@ import torch
 from diffusers import AutoencoderKL
 from einops import rearrange
 
-# Get rid of it (Sajad to check) ---> Rename and move it to common
+# I used vae = CausalVideoTokenizer.from_pretrained("Cosmos-0.1-Tokenizer-CV4x8x8") in on_validation_start 
+# instead of AutoencoderKLVAE(path), we have to discuss about this use-case.
 
 class AutoencoderKLVAE(torch.nn.Module):
     def __init__(self, path):
