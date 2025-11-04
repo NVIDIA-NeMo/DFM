@@ -1,4 +1,4 @@
-# Cosmos Autoregressive-based World Foundation Models: Changing the Video Tokenizer
+﻿# Cosmos Autoregressive-based World Foundation Models: Changing the Video Tokenizer
 
 Learn how to post-train Cosmos Autoregressive-based World Foundation Models (WFMs) using the NVIDIA NeMo Framework when swapping out the original tokenizer for a new one. This recipe provides a conceptual overview of how to adapt your existing model to handle a different discrete video (DV) tokenizer, ensuring high-quality video generation under a new compression setting.
 
@@ -49,20 +49,20 @@ The NeMo Framework supports the following Cosmos Autoregressive (AR) models for 
 
 ## Why Change Tokenizers?
 
-Cosmos Autoregressive models are typically trained on a specific tokenizer configuration (e.g., 8×16×16). If you’d like to reduce patch size or change compression (e.g., to 4×8×8), you can post-train the existing weights so that the model effectively aligns its internal representations with the new token embeddings—without re-training the tokenizer.
+Cosmos Autoregressive models are typically trained on a specific tokenizer configuration (e.g., 8Ã—16Ã—16). If youâ€™d like to reduce patch size or change compression (e.g., to 4Ã—8Ã—8), you can post-train the existing weights so that the model effectively aligns its internal representations with the new token embeddingsâ€”without re-training the tokenizer.
 
 ## Tutorial: Finetuning Cosmos-4B on 10k Videos with a New Tokenizer
 
 In this tutorial, we will:
-- Take a model originally trained on an 8×16×16 tokenizer.
-- Post-train it on a 4×8×8 tokenizer.
+- Take a model originally trained on an 8Ã—16Ã—16 tokenizer.
+- Post-train it on a 4Ã—8Ã—8 tokenizer.
 - Demonstrate using a sample dataset of 10 (in production, we recommend using 10k videos from a distribution similar to that of pretraining).
 
 ### 1. Calculate Sequence Lengths
 
-- **Original Sequence Length:** 12,800 tokens (33 frames * 640 px width * 1024 px height, when tokenized with an 8×16×16 tokenizer becomes ⌈33/8⌉ * (640/16) * (1024/16) = 5 * 64 * 80 = 12,800 tokens)
-- **New Sequence Length:** 12,800 tokens (17 frames * 320 px width * 512 px height, when tokenized with a 4×8×8 tokenizer becomes ⌈17/8⌉ * (320/4) * (512/8) = 5 * 80 * 64 = 12,800 tokens)
-- For other resolutions or frame counts, recalculate your maximum tokens to ensure you do not exceed the model’s capacity.
+- **Original Sequence Length:** 12,800 tokens (33 frames * 640 px width * 1024 px height, when tokenized with an 8Ã—16Ã—16 tokenizer becomes âŒˆ33/8âŒ‰ * (640/16) * (1024/16) = 5 * 64 * 80 = 12,800 tokens)
+- **New Sequence Length:** 12,800 tokens (17 frames * 320 px width * 512 px height, when tokenized with a 4Ã—8Ã—8 tokenizer becomes âŒˆ17/8âŒ‰ * (320/4) * (512/8) = 5 * 80 * 64 = 12,800 tokens)
+- For other resolutions or frame counts, recalculate your maximum tokens to ensure you do not exceed the modelâ€™s capacity.
 
 ```bash
 export WIDTH=512
@@ -137,7 +137,7 @@ torchrun --nproc-per-node=$NUM_GPUS cosmos1/models/autoregressive/nemo/post_trai
 ```
 
 - Adjust parameters such as `--max_steps`, `--global_batch_size`, and `--lr` to suit your needs.
-- Ensure that `--model_path` matches the checkpoint originally trained on an 8×16×16 tokenizer.
+- Ensure that `--model_path` matches the checkpoint originally trained on an 8Ã—16Ã—16 tokenizer.
 - For an explanation on other configuration options, please see [the general post-training tutorial](https://github.com/NVIDIA/Cosmos/blob/main/cosmos1/models/autoregressive/nemo/post_training/README.md#configuration-options).
 
 ### 5. Monitor Quality
@@ -145,7 +145,7 @@ torchrun --nproc-per-node=$NUM_GPUS cosmos1/models/autoregressive/nemo/post_trai
 After training, monitor checkpoints and generate sample outputs. Please keep in mind that you will have to
 disable the diffusion decoder, as this is not yet supported for non-standard tokenizers.
 
-1. **Checkpoints:**  
+1. **Checkpoints:**
    Checkpoints are saved under `./experiments/example_log_dir/default/checkpoints/`. For example:
    ```bash
    epoch=1-step=49
@@ -154,7 +154,7 @@ disable the diffusion decoder, as this is not yet supported for non-standard tok
    ```
    Choose a checkpoint (e.g., `epoch=1-step=99`) for inference.
 
-2. **Run Inference:**  
+2. **Run Inference:**
    Generate sample video outputs:
    ```bash
    # Set the checkpoint directory
@@ -177,7 +177,7 @@ disable the diffusion decoder, as this is not yet supported for non-standard tok
        --tokenizer_compression_factor $TOKENIZER_COMPRESSION_FACTOR
    ```
 
-3. **(Optional) Evaluate with TokenBench:**  
+3. **(Optional) Evaluate with TokenBench:**
    To compute quantitative metrics (e.g., PSNR, SSIM), generate a large number of videos using the script above and place them into the `evals`
    folder of the checkpoint. Please ensure that the input filename in the original folder (e.g. `my-video.mp4` matches the output filename in the
    `evals` folder). This is because PSNR and SSIM compare video quality against a reference, and our script will match the output video with
@@ -245,7 +245,7 @@ python cosmos1/models/autoregressive/nemo/post_training/video2world_prepare_data
 
 ### 3. Training/Finetuning for Video2World
 
-Fine-tune a Video2World–specific checkpoint (or any compatible Cosmos AR model) on your new data. For example, using the 5B Video2World model:
+Fine-tune a Video2Worldâ€“specific checkpoint (or any compatible Cosmos AR model) on your new data. For example, using the 5B Video2World model:
 
 ```bash
 torchrun --nproc-per-node=$NUM_GPUS cosmos1/models/autoregressive/nemo/post_training/video2world_finetuning.py \

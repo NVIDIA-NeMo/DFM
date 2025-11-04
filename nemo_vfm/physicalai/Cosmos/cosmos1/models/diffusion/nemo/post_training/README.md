@@ -1,4 +1,4 @@
-# Cosmos Diffusion-based World Foundation Models: NeMo Framework User Guide
+﻿# Cosmos Diffusion-based World Foundation Models: NeMo Framework User Guide
 
 Learn how to [post-train](#post-train) Cosmos Diffusion-based World Foundation Models (WFMs) using the [NVIDIA NeMo Framework](https://docs.nvidia.com/nemo-framework/user-guide/latest/overview.html) for your custom Physical AI tasks by following this guide.
 
@@ -439,7 +439,7 @@ srun \
    torchrun --nproc_per_node=8 cosmos1/models/diffusion/nemo/post_training/multicamera.py  --factory cosmos_multicamera_diffusion_7b_text2world_overfit   --yes   trainer.max_steps=1000     optim.config.lr=1e-6
    ```
 
-4. (Optional) Run Largescale Full Post-Training  
+4. (Optional) Run Largescale Full Post-Training
    You will need to prepare you own data similar with the overfit dataset in step 3. Change XDG_CACHE_HOME to point to the custom dataset
    ```bash
    torchrun --nproc_per_node=8 cosmos1/models/diffusion/nemo/post_training/multicamera.py --yes   trainer.max_steps=1000     optim.config.lr=1e-6
@@ -461,26 +461,26 @@ srun \
    # --factory cosmos_multicamera_diffusion_7b_image2world_finetune_w_traj
    ```
 
-For different post-training recipes make sure to change the autoresume directory so that checkpoints generated from recipe A are not used for recipe B. Modify 'recipe.trainer.callbacks.dirpath' and 'recipe.resume.resume_from_directory'.  
+For different post-training recipes make sure to change the autoresume directory so that checkpoints generated from recipe A are not used for recipe B. Modify 'recipe.trainer.callbacks.dirpath' and 'recipe.resume.resume_from_directory'.
 
-'recipe.trainer.val_check_interval' and 'recipe.trainer.limit_val_batches' can be set to 0 to disable validation during post-training.  
+'recipe.trainer.val_check_interval' and 'recipe.trainer.limit_val_batches' can be set to 0 to disable validation during post-training.
 
 Under `HF_HOME`, there should be a `hub` folder, which contains the base checkpoints. Under `multicamera` folder, there should be view embeddings, `mkdir -p $HF_HOME/multicamera && symlink -s cosmos1/models/diffusion/nemo/post_training/multicamera/*.pt $HF_HOME/multicamera`
 ```
 hub/
-├── models--nvidia--Cosmos-1.0-Diffusion-7B-Text2World/
-├── models--nvidia--Cosmos-1.0-Diffusion-7B-Video2World/
-└── models--nvidia--Cosmos-1.0-Tokenizer-CV8x8x8/
+â”œâ”€â”€ models--nvidia--Cosmos-1.0-Diffusion-7B-Text2World/
+â”œâ”€â”€ models--nvidia--Cosmos-1.0-Diffusion-7B-Video2World/
+â””â”€â”€ models--nvidia--Cosmos-1.0-Tokenizer-CV8x8x8/
 
 multicamera/
-├── video_camera_embeddings_v0_camera_front_tele_30fov.pt
-├── video_camera_embeddings_v0_camera_rear_tele_30fov.pt
-├── video_camera_embeddings_v0_camera_front_wide_120fov.pt
-├── video_neg_prompt_embeddings_v0.pt
-├── video_camera_embeddings_v0_camera_cross_left_120fov.pt
-├── video_camera_embeddings_v0_camera_cross_right_120fov.pt
-├── video_camera_embeddings_v0_camera_rear_left_70fov.pt
-└── video_camera_embeddings_v0_camera_rear_right_70fov.pt
+â”œâ”€â”€ video_camera_embeddings_v0_camera_front_tele_30fov.pt
+â”œâ”€â”€ video_camera_embeddings_v0_camera_rear_tele_30fov.pt
+â”œâ”€â”€ video_camera_embeddings_v0_camera_front_wide_120fov.pt
+â”œâ”€â”€ video_neg_prompt_embeddings_v0.pt
+â”œâ”€â”€ video_camera_embeddings_v0_camera_cross_left_120fov.pt
+â”œâ”€â”€ video_camera_embeddings_v0_camera_cross_right_120fov.pt
+â”œâ”€â”€ video_camera_embeddings_v0_camera_rear_left_70fov.pt
+â””â”€â”€ video_camera_embeddings_v0_camera_rear_right_70fov.pt
 ```
 
 ## DiT Video2World Camera-Control Post-Training
