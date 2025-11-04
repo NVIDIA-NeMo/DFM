@@ -14,7 +14,7 @@
 
 import logging
 from dataclasses import dataclass
-from typing import Dict
+from typing import Callable, Dict
 
 from dfm.src.megatron.model.dit.dit_layer_spec import get_dit_adaln_block_with_transformer_engine_spec
 from dfm.src.megatron.model.dit.dit_model import DiTCrossAttentionModel
@@ -22,10 +22,11 @@ import torch
 from megatron.core import parallel_state
 from megatron.core.transformer import ModuleSpec
 from megatron.core.transformer.transformer_config import TransformerConfig
-from dfm.src.megatron.model.dit.dit_utils import dynamic_import
+from dfm.src.common.utils.dynamic_import import dynamic_import
 
 from megatron.bridge.models.model_provider import ModelProviderMixin
 from megatron.core.models.common.vision_module.vision_module import VisionModule
+
 
 logger = logging.getLogger(__name__)
 
@@ -123,9 +124,9 @@ class DiTModelProvider(TransformerConfig, ModelProviderMixin[VisionModule]):
     num_attention_heads: int = 16
     layernorm_epsilon = 1e-6
     normalization = "RMSNorm"
-    add_bias_linear = False
-    qk_layernorm_per_head = True
-    layernorm_zero_centered_gamma = False
+    add_bias_linear: bool = False
+    qk_layernorm_per_head: bool = True
+    layernorm_zero_centered_gamma: bool = False
 
     fp16_lm_cross_entropy: bool = False
     parallel_output: bool = True
@@ -140,12 +141,7 @@ class DiTModelProvider(TransformerConfig, ModelProviderMixin[VisionModule]):
     vae_module: str = "megatron.bridge.models.DiTModel.diffusers_vae.AutoencoderKLVAE"
     vae_path: str = None
     sigma_data: float = 0.5
-
     in_channels: int = 16
-
-    # remove these 2 parameters
-    # data_step_fn = dit_data_step
-    # forward_step_fn = dit_forward_step
 
     replicated_t_embedder = True
     qkv_format: str = 'sbhd'
@@ -181,107 +177,55 @@ class DiTModelProvider(TransformerConfig, ModelProviderMixin[VisionModule]):
         return dynamic_import(self.vae_module)(self.vae_path)
 
 
-# TODO: Add all the DIT configs here like DIT7B, 14B, cosmos, etc, etc,
-# @dataclass
-# class GPTProvider126M(GPTModelProvider):
-#     """Configuration for a 126M parameter GPT model.
-
-#     Predefined configuration for a small GPT model with 12 layers,
-#     768 hidden size, and 12 attention heads.
-#     """
-
-#     seq_length: int = 2048
-#     num_layers: int = 12
-#     hidden_size: int = 768
-#     ffn_hidden_size: int = 3072
-#     num_attention_heads: int = 12
-#     bias_activation_fusion: bool = True
-#     bias_dropout_add_fusion: bool = True
+@dataclass
+class DiT7BModelProvider(DiTModelProvider):
+    hidden_size: int = 4096
+    max_img_h: int = 240
+    max_img_w: int = 240
+    max_frames: int = 128
+    num_attention_heads: int = 32
+    apply_rope_fusion: bool = True        # TODO: do we support this?
+    additional_timestamp_channels = None  # TODO: do we support this?
+    bf16: bool = True
+    vae_module: str = "nemo.collections.diffusion.vae.video_vae.video_vae3_512"
+    vae_path: str = None
 
 
-# @dataclass
-# class GPTProvider5B(GPTModelProvider):
-#     """Configuration for a 5B parameter GPT model.
-
-#     Predefined configuration for a medium-sized GPT model with 24 layers,
-#     4096 hidden size, and 32 attention heads.
-#     """
-
-#     seq_length: int = 2048
-#     num_layers: int = 24
-#     hidden_size: int = 4096
-#     ffn_hidden_size: int = 16384
-#     num_attention_heads: int = 32
-#     bias_activation_fusion: bool = True
-#     bias_dropout_add_fusion: bool = True
-
-
-# @dataclass
-# class GPTProvider7B(GPTModelProvider):
-#     """Configuration for a 7B parameter GPT model.
-
-#     Predefined configuration for a medium-sized GPT model with 32 layers,
-#     4096 hidden size, and 32 attention heads.
-#     """
-
-#     seq_length: int = 2048
-#     num_layers: int = 32
-#     hidden_size: int = 4096
-#     ffn_hidden_size: int = 10880
-#     num_attention_heads: int = 32
-#     bias_activation_fusion: bool = True
-#     bias_dropout_add_fusion: bool = True
+@dataclass
+class DiT14BModelProvider(DiTModelProvider):
+    num_layers: int = 36
+    hidden_size: int = 5120
+    crossattn_emb_size: int = 1024
+    max_img_h: int = 240
+    max_img_w: int = 240
+    max_frames: int = 128
+    num_attention_heads: int = 40
+    apply_rope_fusion: bool = True
+    layernorm_zero_centered_gamma: bool = False
+    additional_timestamp_channels = None
+    bf16: bool = True
+    vae_module: str = "nemo.collections.diffusion.vae.video_vae.video_vae3_512"
+    vae_path: str = None
+    loss_add_logvar: bool = True
 
 
-# @dataclass
-# class GPTProvider20B(GPTModelProvider):
-#     """Configuration for a 20B parameter GPT model.
-
-#     Predefined configuration for a large GPT model with 44 layers,
-#     6144 hidden size, and 48 attention heads.
-#     """
-
-#     seq_length: int = 2048
-#     num_layers: int = 44
-#     hidden_size: int = 6144
-#     ffn_hidden_size: int = 24576
-#     num_attention_heads: int = 48
-#     bias_activation_fusion: bool = True
-#     bias_dropout_add_fusion: bool = True
-
-
-# @dataclass
-# class GPTProvider40B(GPTModelProvider):
-#     """Configuration for a 40B parameter GPT model.
-
-#     Predefined configuration for a large GPT model with 48 layers,
-#     8192 hidden size, and 64 attention heads.
-#     """
-
-#     seq_length: int = 2048
-#     num_layers: int = 48
-#     hidden_size: int = 8192
-#     ffn_hidden_size: int = 32768
-#     num_attention_heads: int = 64
-#     bias_activation_fusion: bool = True
-#     bias_dropout_add_fusion: bool = True
-
-
-# @dataclass
-# class GPTProvider175B(GPTModelProvider):
-#     """Configuration for a 175B parameter GPT model.
-
-#     Predefined configuration for a massive GPT model with 96 layers,
-#     12288 hidden size, and 96 attention heads.
-#     """
-
-#     seq_length: int = 2048
-#     num_layers: int = 96
-#     hidden_size: int = 12288
-#     ffn_hidden_size: int = 49152
-#     num_attention_heads: int = 96
-#     hidden_dropout: float = 0.0
-#     attention_dropout: float = 0.0
-#     bias_activation_fusion: bool = True
-#     bias_dropout_add_fusion: bool = True
-#     layernorm_zero_centered_gamma: bool = True
+@dataclass
+class DiTLlama30BConfig(DiTModelProvider):
+    num_layers: int = 48
+    hidden_size: int = 6144
+    ffn_hidden_size: int = 16384
+    num_attention_heads: int = 48
+    num_query_groups: int = 8
+    gated_linear_unit: int = True
+    bias_activation_fusion: int = True
+    activation_func: Callable = torch.nn.functional.silu
+    layernorm_epsilon: float = 1e-5
+    max_frames: int = 128
+    max_img_h: int = 240
+    max_img_w: int = 240
+    init_method_std: float = 0.01
+    add_bias_linear: bool = False
+    seq_length: int = 256
+    masked_softmax_fusion: bool = True
+    persist_layer_norm: bool = True
+    bias_dropout_fusion: bool = True
