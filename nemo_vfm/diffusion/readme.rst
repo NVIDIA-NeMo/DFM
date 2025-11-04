@@ -4,7 +4,7 @@
 Overview
 --------
 
-The NeMo Diffusion Training Framework provides a scalable training platform for diffusion models with transformer backbones.  Our new features streamline the training process, allowing developers to efficiently train state-of-the-art models with ease.
+The NeMo Diffusion Training Framework provides a scalable training platform for diffusion models with transformer backbones. Our new features streamline the training process, allowing developers to efficiently train state-of-the-art models with ease.
 
 
 Some of the features we currently support include:
