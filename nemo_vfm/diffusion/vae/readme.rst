@@ -1,4 +1,4 @@
-============================
+﻿============================
 Pretraining Variational AutoEncoder
 ============================
 
@@ -49,11 +49,11 @@ Data Preparation
     .. code-block:: bash
 
         000000.tar
-        ├── 1.jpg
-        ├── 2.jpg
+        â”œâ”€â”€ 1.jpg
+        â”œâ”€â”€ 2.jpg
         000001.tar
-        ├── 3.jpg
-        ├── 4.jpg
+        â”œâ”€â”€ 3.jpg
+        â”œâ”€â”€ 4.jpg
 
 2. next we need to index the webdataset with `energon <https://nvidia.github.io/Megatron-Energon/>`_. navigate to the dataset directory and run the following command:
 
@@ -64,7 +64,7 @@ Data Preparation
 3. then select dataset type `ImageWebdataset` and specify the type `jpg`. Below is an example of the interactive setup:
 
     .. code-block:: bash
-        
+
         Found 2925 tar files in total. The first and last ones are:
         - 000000.tar
         - 002924.tar
