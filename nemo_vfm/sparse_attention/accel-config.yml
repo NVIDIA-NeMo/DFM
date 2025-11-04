@@ -2,12 +2,12 @@ num_model_invocations_per_inference_step: 1
 
 model_config:
   name: cosmos
-  
+
   latent_vector_shape:
     width: 80
     height: 44
     depth: 16
-  
+
   num_heads: 32
   num_layers: 28
 
