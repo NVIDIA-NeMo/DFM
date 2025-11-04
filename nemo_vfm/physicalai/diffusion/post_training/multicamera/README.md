@@ -77,7 +77,7 @@ export HF_TOKEN="your huggingface access token"
 export WANDB_API_KEY="your wandb API key"
 export WANDB_PROJECT="name of your wandb project"
 export WANDB_RESUME=allow
-export NVTE_FUSED_ATTN=0 
+export NVTE_FUSED_ATTN=0
 export CUDA_DEVICE_MAX_CONNECTIONS=1
 export PYTORCH_CUDA_ALLOC_CONF=expandable_segments:True
 
@@ -88,6 +88,6 @@ export XDG_CACHE_HOME=/path/to/.cache
 
 ### 5. Post-Train the model
 ```bash
-torchrun --nproc_per_node=8 nemo/collections/physicalai/diffusion/post_training/multicamera/multicamera.py 
+torchrun --nproc_per_node=8 nemo/collections/physicalai/diffusion/post_training/multicamera/multicamera.py
 ```
 

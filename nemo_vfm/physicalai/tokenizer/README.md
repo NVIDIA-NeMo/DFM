@@ -88,14 +88,14 @@ Complete the following steps to finetune the Cosmos tokenizer Cosmos-1.0-Tokeniz
 2. Install Cosmos project to get the tokenizer model:
    ```bash
    git clone https://github.com/NVIDIA/Cosmos.git
-   cd Cosmos   
+   cd Cosmos
    pip install --no-deps .
    ```
 3. Run the following command for finetuning Cosmos-1.0-Tokenizer-CV8x8x8:
    ```bash
     export CKPT_PTH="<path/to/your/HF/checkpoints/folder>"
     export DATA="<path/to/your/data>"
-    
+
     # Optionally, you can monitor training progress with Weights and Biases (wandb).
     export WANDB_API_KEY="</your/wandb/api/key>"
     export WANDB_PROJECT_NAME="cosmos-diffusion-nemo-post-training"
