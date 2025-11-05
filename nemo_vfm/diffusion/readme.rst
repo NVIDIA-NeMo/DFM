@@ -29,7 +29,7 @@ We support image diffusion training. Video training incoming.
 +---------------------------+------------------+
 | CP+TP+SP+PP+distopt       | ✅ Supported     |
 +---------------------------+------------------+
-| CP+TP+SP+FSDP             | 🕐 Coming Soon   |
+| CP+TP+SP+FSDP             | 🕒 Coming Soon   |
 +---------------------------+------------------+
 
 
@@ -46,9 +46,9 @@ We support image diffusion training. Video training incoming.
 +==============+===================+=================+
 | DiT 30B+     | 256px image       | ✅ Supported    |
 +--------------+-------------------+-----------------+
-| DiT 30B+     | 256px image+video | 🕐 Coming Soon  |
+| DiT 30B+     | 256px image+video | 🕒 Coming Soon  |
 +--------------+-------------------+-----------------+
-| DiT 30B+     | 768px image+video | 🕐 Coming Soon  |
+| DiT 30B+     | 768px image+video | 🕒 Coming Soon  |
 +--------------+-------------------+-----------------+
 
 
