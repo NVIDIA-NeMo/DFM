@@ -67,11 +67,9 @@ class FlowPipeline:
         batch_size = video_latents.shape[1]
         device = video_latents.device
 
-        # # # DEBUGGING precision
-        # # import torch.cuda.amp as amp
-        # # with amp.autocast(dtype=torch.bfloat16):
-        # #     # Pass through model
-        # #     ...
+        # TODO: should we do as in Wan Github repo:
+        # with amp.autocast(dtype=torch.bfloat16)
+        #     # Pass through model
 
         # ========================================================================
         # Flow Matching Timestep Sampling
@@ -175,13 +173,6 @@ class FlowPipeline:
             noise = noise
             context_embeddings = context_embeddings
             split_loss_mask = loss_mask
-
-        # # DEBUGGING
-        # print(f"[DEBUG] [flow_pipeline] video_latents shape: {video_latents.shape}")
-        # print(f"[DEBUG] [flow_pipeline] noisy_latents shape: {noisy_latents.shape}")
-        # print(f"[DEBUG] [flow_pipeline] noise shape: {noise.shape}")
-        # print(f"[DEBUG] [flow_pipeline] context_embeddings shape: {context_embeddings.shape}")
-        # print(f"[DEBUG] [flow_pipeline] split_loss_mask shape: {split_loss_mask.shape}")
 
         # ========================================================================
         # Forward Pass

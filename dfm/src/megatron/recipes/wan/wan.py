@@ -94,14 +94,7 @@ def pretrain_config(
     lr: float = 0.9e-4,
     lr_warmup_iters: int = 2000,
     # Precision recipe
-    # DEBUGGING
     precision_config: Optional[Union[MixedPrecisionConfig, str]] = "bf16_mixed",
-    # precision_config: Optional[Union[MixedPrecisionConfig, str]] = MixedPrecisionConfig(
-    #     fp32=True,
-    #     params_dtype=torch.float32,
-    #     pipeline_dtype=torch.float32,
-    #     autocast_enabled=False,
-    # ),
     comm_overlap_config: Optional[CommOverlapConfig] = None,
 ) -> ConfigContainer:
     """

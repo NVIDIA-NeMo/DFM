@@ -135,9 +135,13 @@ class WanModel(VisionModule):
             nn.Linear(self.config.text_dim, self.config.hidden_size), nn.GELU(approximate='tanh'),
             nn.Linear(self.config.hidden_size, self.config.hidden_size))
 
-        self.time_embedding = nn.Sequential(
-            nn.Linear(self.freq_dim, self.config.hidden_size), nn.SiLU(), nn.Linear(self.config.hidden_size, self.config.hidden_size))
-        self.time_projection = nn.Sequential(nn.SiLU(), nn.Linear(self.config.hidden_size, self.config.hidden_size * 6))
+        # As in diffuser's Wan implementation
+        from diffusers.models.embeddings import Timesteps
+        from nemo.collections.diffusion.models.dit.dit_embeddings import ParallelTimestepEmbedding
+        self.timesteps_proj = Timesteps(num_channels=self.freq_dim, flip_sin_to_cos=True, downscale_freq_shift=0)
+        self.time_embedder = ParallelTimestepEmbedding(in_channels=self.freq_dim, time_embed_dim=self.config.hidden_size)
+        self.time_proj_act_fn = nn.SiLU()
+        self.time_proj = nn.Linear(self.config.hidden_size, self.config.hidden_size * 6)
 
         self.rope_embeddings = Wan3DRopeEmbeddings(dim_head = self.config.hidden_size // self.num_heads, max_position_len = 1024)
 
@@ -205,10 +209,8 @@ class WanModel(VisionModule):
             x = self.decoder.input_tensor
 
         # time embeddings
-        e = self.time_embedding(
-            sinusoidal_embedding_1d(self.freq_dim, t).to(x.dtype)
-        )
-        e0 = self.time_projection(e).unflatten(1, (6, self.config.hidden_size))
+        e = self.time_embedder(self.timesteps_proj(t).to(x.dtype))
+        e0 = self.time_proj(self.time_proj_act_fn(e)).unflatten(1, (6, self.config.hidden_size))
 
         # context embeddings
         context = self.text_embedding(context) # shape [text_len, b, hidden_size]

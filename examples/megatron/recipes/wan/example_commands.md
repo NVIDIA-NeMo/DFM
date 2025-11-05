@@ -1,6 +1,16 @@
 ## WAN example commands
 
+### Launch container
+Example command on EOS cluster:
+```
+CONT="nvcr.io/nvidia/nemo:25.09.00"
+MOUNT="/lustre/fsw/:/lustre/fsw/"
+srun -t 02:00:00 --account coreai_dlalgo_llm -N 1 -J coreai_dlalgo_llm:* -p interactive --exclusive --container-image="${CONT}" --container-mounts="${MOUNT}" --pty bash
+```
+
+
 ### Set paths to Megatron-Bridge
+Inside container:
 ```bash
 DFM_PATH=/path/to/dfm
 MBRIDGE_PATH=/path/to/megatron-bridge

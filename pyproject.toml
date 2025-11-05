@@ -54,7 +54,12 @@ classifiers = [
     "Topic :: Software Development :: Libraries",
     "Topic :: Utilities",
 ]
-dependencies = []
+dependencies = [
+    "diffusers==0.35.1",
+    "easydict",
+    "imageio",
+    "imageio-ffmpeg",
+]
 
 [build-system]
 requires = ["setuptools>=61"]

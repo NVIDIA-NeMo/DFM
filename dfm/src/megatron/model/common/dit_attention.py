@@ -1,3 +1,17 @@
+# Copyright (c) 2024, NVIDIA CORPORATION.  All rights reserved.
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+#     http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+
 from typing import Optional
 
 import copy
@@ -47,7 +61,7 @@ class DiTSelfAttention(SelfAttention):
             pg_collection,
         )
 
-        self.layernorm_across_heads = self.config.layernorm_across_heads
+        self.layernorm_across_heads = getattr(self.config, "layernorm_across_heads", False)
 
         # override q_layernorm
         if submodules.q_layernorm is not None:
@@ -185,7 +199,7 @@ class DiTCrossAttention(CrossAttention):
             pg_collection,
         )
 
-        self.layernorm_across_heads = self.config.layernorm_across_heads
+        self.layernorm_across_heads = getattr(self.config, "layernorm_across_heads", False)
 
         # override q_layernorm
         if submodules.q_layernorm is not None:
@@ -226,30 +240,7 @@ class DiTCrossAttention(CrossAttention):
         Derives `query` tensor from `hidden_states`, and `key`/`value` tensors
         from `key_value_states`.
         """
-        # Attention heads [sk, b, h] --> [sk, b, (np * 2 * hn)]
-        mixed_kv, _ = self.linear_kv(key_value_states)
-
-        # [sk, b, (np * 2 * hn)] --> [sk, b, np, 2 * hn]
-        new_tensor_shape = mixed_kv.size()[:-1] + (
-            self.num_attention_heads_per_partition,
-            2 * self.hidden_size_per_attention_head,
-        )
-        mixed_kv = mixed_kv.view(*new_tensor_shape)
-
-        # [sk, b, np, 2 * hn] --> 2 [sk, b, np, hn]
-        (key, value) = tensor_parallel.split_tensor_along_last_dim(mixed_kv, 2)
-
-        # Attention head [sq, b, h] --> [sq, b, hp]
-        query, _ = self.linear_q(hidden_states)
-
-        # [sq, b, hp] --> [sq, b, np, hn]
-        new_tensor_shape = query.size()[:-1] + (
-            self.num_attention_heads_per_partition,
-            self.hidden_size_per_attention_head,
-        )
-        query = query.view(*new_tensor_shape)
-
-        # replace with our own implementation (Todo: @huy )
+        
         query, key, value = super().get_query_key_value_tensors(hidden_states, key_value_states)
 
         # gather query and key heads across TP ranks if self.layernorm_across_heads is True

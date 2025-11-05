@@ -1,3 +1,17 @@
+# Copyright (c) 2024, NVIDIA CORPORATION.  All rights reserved.
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+#     http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+
 import gc
 import logging
 import math
@@ -8,6 +22,10 @@ import types
 import re
 from contextlib import contextmanager
 from functools import partial
+from megatron.core import parallel_state
+from megatron.core.inference.communication_utils import broadcast_from_last_pipeline_stage, recv_from_prev_pipeline_rank_, send_to_next_pipeline_rank
+from megatron.core.packed_seq_params import PackedSeqParams
+from megatron.bridge.training.model_load_save import load_megatron_model as _load_megatron_model
 
 import torch
 import torch.cuda.amp as amp
@@ -148,7 +166,6 @@ class FlowInferencePipeline:
         provider.initialize_model_parallel(seed=0)
         
         ## Read from megatron checkpoint
-        from megatron.bridge.training.model_load_save import load_megatron_model as _load_megatron_model
         model = _load_megatron_model(
             checkpoint_dir,
             mp_overrides={
@@ -209,9 +226,6 @@ class FlowInferencePipeline:
         """
         Forward pass supporting pipeline parallelism.
         """
-
-        from megatron.core import parallel_state
-        from megatron.core.inference.communication_utils import broadcast_from_last_pipeline_stage, recv_from_prev_pipeline_rank_, send_to_next_pipeline_rank
 
         pp_world_size = parallel_state.get_pipeline_model_parallel_world_size()
         is_pp_first = parallel_state.is_pipeline_first_stage(ignore_virtual=True)
@@ -444,7 +458,6 @@ class FlowInferencePipeline:
             # sample videos
             latents = noises
 
-            from megatron.core.packed_seq_params import PackedSeqParams
             cu_q = torch.cat([torch.tensor([0]), torch.cumsum(torch.tensor(seq_lens), dim=0)])
             cu_q = cu_q.to(torch.int32).to(self.device)
             cu_kv_self = cu_q

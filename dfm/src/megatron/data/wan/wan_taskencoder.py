@@ -72,7 +72,7 @@ class WanTaskEncoder(DefaultTaskEncoder):
         self.patch_temporal = patch_temporal
         self.seq_length = seq_length
 
-
+    ## actual encode_sample() for production
     def encode_sample(self, sample: dict) -> dict:
 
         video_latent = sample["pth"]
@@ -103,12 +103,14 @@ class WanTaskEncoder(DefaultTaskEncoder):
             video_metadata=video_metadata,
         )
 
-
+    ## mock encode_sample() for debugging
     # def encode_sample(self, sample: dict) -> dict:
 
     #     # mock encode sample
-    #     video_latent = torch.tensor(torch.randn(16, 3, 104, 60), dtype=torch.float32)
-    #     # video_latent = torch.tensor(torch.randn(16, 24, 104, 60), dtype=torch.float32)
+    #     F_latents = 24
+    #     H_latents = 104
+    #     W_latents = 60
+    #     video_latent = torch.tensor(torch.randn(16, F_latents, H_latents, W_latents), dtype=torch.float32)
     #     grid_size = torch.tensor([video_latent.shape[1] // self.patch_temporal, video_latent.shape[2] // self.patch_spatial, video_latent.shape[3] // self.patch_spatial], dtype=torch.int32)
     #     context_embeddings = torch.tensor(torch.randn(512, 4096), dtype=torch.float32)
     #     video_metadata = {}
