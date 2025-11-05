@@ -69,7 +69,7 @@ class DiTModelProvider(TransformerConfig, ModelProviderMixin[VisionModule]):
     in_channels: int = 16
 
     replicated_t_embedder = True
-    qkv_format: str = 'thd'
+    qkv_format: str = 'sbhd'
 
     seq_length: int = 2048
     vocab_size: int = None

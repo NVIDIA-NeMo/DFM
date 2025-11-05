@@ -1,6 +1,5 @@
 import torch
 from megatron.core.packed_seq_params import PackedSeqParams
-from dfm.src.common.utils.save_video import print_dict
 
 
 def dit_data_step(qkv_format, dataloader_iter):
@@ -8,8 +7,6 @@ def dit_data_step(qkv_format, dataloader_iter):
     batch = get_batch_on_this_cp_rank(batch)
     batch = {k: v.to(device="cuda", non_blocking=True) if torch.is_tensor(v) else v for k, v in batch.items()}
     batch["is_preprocessed"] = True  # assume data is preprocessed
-
-    print_dict(batch)
     return encode_seq_length(batch, format=qkv_format)
 
 def encode_seq_length(batch, format):
