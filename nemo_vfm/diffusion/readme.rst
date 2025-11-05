@@ -23,13 +23,13 @@ We support image diffusion training. Video training incoming.
 +---------------------------+------------------+
 | Parallelism               | Status           |
 +===========================+==================+
-| FSDP                      | âœ… Supported     |
+| FSDP                      | ✅ Supported     |
 +---------------------------+------------------+
-| CP+TP+SP+distopt          | âœ… Supported     |
+| CP+TP+SP+distopt          | ✅ Supported     |
 +---------------------------+------------------+
-| CP+TP+SP+PP+distopt       | âœ… Supported     |
+| CP+TP+SP+PP+distopt       | ✅ Supported     |
 +---------------------------+------------------+
-| CP+TP+SP+FSDP             | ðŸ•’ Coming Soon   |
+| CP+TP+SP+FSDP             | 🕐 Coming Soon   |
 +---------------------------+------------------+
 
 
@@ -44,11 +44,11 @@ We support image diffusion training. Video training incoming.
 +--------------+-------------------+-----------------+
 | Model Size   | Modality          | Status          |
 +==============+===================+=================+
-| DiT 30B+     | 256px image       | âœ… Supported    |
+| DiT 30B+     | 256px image       | ✅ Supported    |
 +--------------+-------------------+-----------------+
-| DiT 30B+     | 256px image+video | ðŸ•’ Coming Soon  |
+| DiT 30B+     | 256px image+video | 🕐 Coming Soon  |
 +--------------+-------------------+-----------------+
-| DiT 30B+     | 768px image+video | ðŸ•’ Coming Soon  |
+| DiT 30B+     | 768px image+video | 🕐 Coming Soon  |
 +--------------+-------------------+-----------------+
 
 
@@ -116,13 +116,13 @@ this will generate a folder a tar files. .pth contains image/video latent repres
 .. code-block:: bash
 
    shard_000.tar
-   â”œâ”€â”€ samples/sample_0000.pth
-   â”œâ”€â”€ samples/sample_0000.pickle
-   â”œâ”€â”€ samples/sample_0000.json
-   â”œâ”€â”€ samples/sample_0001.pth
-   â”œâ”€â”€ samples/sample_0001.pickle
-   â”œâ”€â”€ samples/sample_0001.json
-   â””â”€â”€ ...
+   ├── samples/sample_0000.pth
+   ├── samples/sample_0000.pickle
+   ├── samples/sample_0000.json
+   ├── samples/sample_0001.pth
+   ├── samples/sample_0001.pickle
+   ├── samples/sample_0001.json
+   └── ...
    shard_001.tar
 
 The following is a sample command to prepare prepare webdataset into energon dataset:
