@@ -16,18 +16,16 @@
 
 import copy
 from dataclasses import dataclass
-from poplib import CR
 from typing import Literal, Optional, Union
 
 import torch
 import torch.nn as nn
 # to be imported from common
-from dfm.src.megatron.model.dit.attention_wan import WanCrossAttention, WanCrossAttentionSubmodules
+from dfm.src.common.attention_wan import WanCrossAttention, WanCrossAttentionSubmodules
 from megatron.core.transformer.attention import (
     SelfAttention,
     SelfAttentionSubmodules,
 )
-from megatron.core.transformer.cuda_graphs import CudaGraphManager
 from megatron.core.transformer.custom_layers.transformer_engine import (
     TEColumnParallelLinear,
     TEDotProductAttention,
@@ -44,22 +42,15 @@ from megatron.core.transformer.transformer_config import TransformerConfig
 from megatron.core.transformer.transformer_layer import TransformerLayer, TransformerLayerSubmodules
 from megatron.core.utils import make_viewless_tensor
 
-# pylint: disable=C0116
+
 @dataclass
 class DiTWithAdaLNSubmodules(TransformerLayerSubmodules):
     temporal_self_attention: Union[ModuleSpec, type] = IdentityOp
     full_self_attention: Union[ModuleSpec, type] = IdentityOp
 
 
-@dataclass
-class STDiTWithAdaLNSubmodules(TransformerLayerSubmodules):
-    spatial_self_attention: Union[ModuleSpec, type] = IdentityOp
-    temporal_self_attention: Union[ModuleSpec, type] = IdentityOp
-    full_self_attention: Union[ModuleSpec, type] = IdentityOp
-
-
 class RMSNorm(nn.Module):
-    def __init__(self, hidden_size: int, config, eps: float = 1e-6):
+    def __init__(self, hidden_size: int, config=None, eps: float = 1e-6):
         super().__init__()
         self.eps = eps
         self.weight = nn.Parameter(torch.ones(hidden_size))
@@ -110,14 +101,9 @@ class AdaLN(MegatronModule):
         return residual + gate * x
 
     def modulated_layernorm(self, x, shift, scale):
-        # Optional Input Layer norm
-        # import pdb; pdb.set_trace()
         input_layernorm_output = self.ln(x).type_as(x)
-
-        # DiT block specific
         return self.modulate(input_layernorm_output, shift, scale)
 
-    # @jit_fuser
     def scaled_modulated_layernorm(self, residual, x, gate, shift, scale):
         hidden_states = self.scale_add(residual, x, gate)
         shifted_pre_mlp_layernorm_output = self.modulated_layernorm(hidden_states, shift, scale)
@@ -162,7 +148,6 @@ class DiTLayerWithAdaLN(TransformerLayer):
             cp_override_config = copy.deepcopy(config)
             cp_override_config.context_parallel_size = 1
             cp_override_config.tp_comm_overlap = False
-            # import pdb;pdb.set_trace()
             self.cross_attention = build_module(
                 submodules.cross_attention,
                 config=cp_override_config,
@@ -195,10 +180,8 @@ class DiTLayerWithAdaLN(TransformerLayer):
         inference_context=None,
         rotary_pos_cos_sin=None
     ):
-        # timestep embedding
         timestep_emb = attention_mask
 
-        # ******************************************** full self attention ********************************************
         if self.cross_attention:
             shift_full, scale_full, gate_full, shift_ca, scale_ca, gate_ca, shift_mlp, scale_mlp, gate_mlp = (
                 self.adaLN(timestep_emb)
@@ -206,13 +189,9 @@ class DiTLayerWithAdaLN(TransformerLayer):
         else:
             shift_full, scale_full, gate_full, shift_mlp, scale_mlp, gate_mlp = self.adaLN(timestep_emb)
 
-        # import pdb; pdb.set_trace()
-
-        # adaLN with scale + shift
         pre_full_attn_layernorm_output_ada = self.adaLN.modulated_layernorm(
             hidden_states, shift=shift_full, scale=scale_full
         )
-        # import pdb;pdb.set_trace()
         attention_output, _ = self.full_self_attention(
             pre_full_attn_layernorm_output_ada,
             attention_mask=None,
@@ -220,8 +199,6 @@ class DiTLayerWithAdaLN(TransformerLayer):
         )
 
         if self.cross_attention:
-            # ******************************************** cross attention ********************************************
-            # adaLN with scale + shift
             hidden_states, pre_cross_attn_layernorm_output_ada = self.adaLN.scaled_modulated_layernorm(
                 residual=hidden_states,
                 x=attention_output,
@@ -229,7 +206,6 @@ class DiTLayerWithAdaLN(TransformerLayer):
                 shift=shift_ca,
                 scale=scale_ca,
             )
-            #import pdb; pdb.set_trace()
             attention_output, _ = self.cross_attention(
                 pre_cross_attn_layernorm_output_ada,
                 attention_mask=context_mask,
@@ -237,7 +213,6 @@ class DiTLayerWithAdaLN(TransformerLayer):
                 packed_seq_params=None if packed_seq_params is None else packed_seq_params["cross_attention"],
             )
 
-        # ******************************************** mlp ******************************************************
         hidden_states, pre_mlp_layernorm_output_ada = self.adaLN.scaled_modulated_layernorm(
             residual=hidden_states,
             x=attention_output,
@@ -283,7 +258,6 @@ def get_dit_adaln_block_with_transformer_engine_spec() -> ModuleSpec:
                     linear_kv=TEColumnParallelLinear,
                     core_attention=TEDotProductAttention,
                     linear_proj=TERowParallelLinear,
-                    # Cross attention no longer is supports q and k layernorms
                     q_layernorm=RMSNorm,
                     k_layernorm=RMSNorm,
                 ),

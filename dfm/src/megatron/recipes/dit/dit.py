@@ -16,9 +16,9 @@ import os
 from typing import List, Optional, Union
 
 from dfm.src.megatron.model.dit.data.diffusion_energon_datamodule import DiffusionDataModuleConfig
-from dfm.src.megatron.model.dit.dit_provider import DiTModelProvider
-import torch
+from dfm.src.megatron.model.dit.dit_model_provider import DiTModelProvider
 from megatron.core.distributed import DistributedDataParallelConfig
+import torch
 
 from megatron.bridge.recipes.utils.optimizer_utils import distributed_fused_adam_with_cosine_annealing
 from megatron.bridge.recipes.utils.tokenizer_utils import DEFAULT_NULL_TOKENIZER_VOCAB_SIZE
@@ -71,6 +71,7 @@ def pretrain_config(
     dir: Optional[str] = None,
     name: str = "default",
     # Dataset configuration
+    dataset_path: str = None,
     data_paths: Optional[List[str]] = None,
     data_args_path: Optional[str] = None,
     train_data_path: Optional[List[str]] = None,
@@ -88,8 +89,8 @@ def pretrain_config(
     use_megatron_fsdp: bool = False,
     # Training hyperparameters
     train_iters: int = 10000,
-    global_batch_size: int = 4,
-    micro_batch_size: int = 2,
+    global_batch_size: int = 8,
+    micro_batch_size: int = 4,
     lr: float = 0.9e-4,
     lr_warmup_iters: int = 2000,
     # Precision recipe
@@ -104,6 +105,7 @@ def pretrain_config(
     Args:
         dir (Optional[str]): Base directory for saving logs and checkpoints.
         name (str): Name of the pre-training run.
+        dataset_path (str): Path to the dataset directory for DiffusionDataModuleConfig.
         data_paths (Optional[List[str]]): List of paths to dataset files. If None, mock data will be used.
         data_args_path (Optional[str]): Path to file containing data arguments.
         train_data_path (Optional[List[str]]): List of training data paths.
@@ -183,7 +185,7 @@ def pretrain_config(
             use_megatron_fsdp=use_megatron_fsdp,  # need use_distributed_optimizer=True
         ),
         dataset= DiffusionDataModuleConfig(
-            path="/opt/VFM/butterfly_webdataset",
+            path=dataset_path,
             seq_length=2048,
             task_encoder_seq_length=2048,
             micro_batch_size=micro_batch_size,
