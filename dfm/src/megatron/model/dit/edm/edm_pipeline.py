@@ -19,7 +19,7 @@ import torch
 from megatron.core import parallel_state
 from dfm.src.common.utils.batch_ops import batch_mul
 from dfm.src.common.utils.torch_split_tensor_for_cp import cat_outputs_cp
-from dfm.src.megatron.model.dit.edm.edm import EDMSDE, EDMSampler, EDMScaling
+from dfm.src.megatron.model.dit.edm.edm_utils import EDMSDE, EDMSampler, EDMScaling
 from torch import Tensor
 
 
@@ -208,17 +208,6 @@ class EDMPipeline:
             Predicted clean data (x0) and noise (eps_pred).
         """
 
-        # print('x shape: ', xt.shape)
-        # print('sigma shape: ', sigma.shape)
-        # for key, value in condition.items():
-        #     if isinstance(value, torch.Tensor):
-        #         print(key, value.shape)
-        #     else:
-        #         print(key, value)
-
-        # print('seq len_q', condition['seq_len_q'])
-        # print('seq len_kv', condition['seq_len_kv'])
-
         xt = xt.to(**self.tensor_kwargs)
         sigma = sigma.to(**self.tensor_kwargs)
         # get precondition for the network
@@ -343,6 +332,7 @@ class EDMPipeline:
 
     def generate_samples_from_batch(
         self,
+        model,
         data_batch: Dict,
         guidance: float = 1.5,
         state_shape: Tuple | None = None,
@@ -363,6 +353,7 @@ class EDMPipeline:
         Returns:
             Generated samples from diffusion model.
         """
+        self.net = model
         cp_enabled = parallel_state.get_context_parallel_world_size() > 1
 
         if self._noise_generator is None:

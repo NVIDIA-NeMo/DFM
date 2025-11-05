@@ -85,6 +85,12 @@ def parse_cli_args() -> Tuple[argparse.Namespace, list[str]]:
         help="Path to the YAML OmegaConf override file. Default: conf/llama3_8b_pretrain_override_example.yaml",
     )
     parser.add_argument("--debug", action="store_true", help="Enable debug logging")
+    parser.add_argument(
+        "--dataset-path",
+        type=str,
+        default="/opt/VFM/butterfly_webdataset",
+        help="Path to the dataset directory. Default: /opt/VFM/butterfly_webdataset",
+    )
 
     # Parse known args for the script, remaining will be treated as overrides
     args, cli_dotlist_overrides = parser.parse_known_args()
@@ -125,7 +131,7 @@ def main() -> None:
     logger.info("------------------------------------------------------------------")
 
     # Load base configuration from the recipe as a Python dataclass
-    cfg: ConfigContainer = pretrain_config()
+    cfg: ConfigContainer = pretrain_config(dataset_path=args.dataset_path)
     logger.info("Loaded base configuration")
 
     # Print configuration on rank 0

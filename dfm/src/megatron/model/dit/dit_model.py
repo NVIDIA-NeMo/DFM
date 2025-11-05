@@ -11,15 +11,13 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
-
 # pylint: disable=C0115,C0116,C0301
-
-from typing import Dict, Literal, Optional
 
 import torch
 import torch.nn as nn
 from diffusers.models.embeddings import Timesteps
-from einops import rearrange, repeat
+from typing import Dict, Literal, Optional
+from einops import rearrange
 from megatron.core import parallel_state, tensor_parallel
 from megatron.core.dist_checkpointing.mapping import ShardedStateDict
 from megatron.core.models.common.vision_module.vision_module import VisionModule
@@ -28,53 +26,17 @@ from megatron.core.transformer.enums import ModelType
 from megatron.core.transformer.transformer_block import TransformerBlock
 from megatron.core.transformer.transformer_config import TransformerConfig
 from megatron.core.utils import make_sharded_tensor_for_checkpoint
+from dfm.src.common.time_pos_embeddings import (
+    ParallelTimestepEmbedding,
+    SinCosPosEmb3D,
+    FactorizedLearnable3DEmbedding,
+)
 
-from dfm.src.megatron.model.dit.dit_embeddings import ParallelTimestepEmbedding
-from dfm.src.megatron.model.dit import dit_embeddings
 from dfm.src.megatron.model.dit.dit_layer_spec import (
     get_dit_adaln_block_with_transformer_engine_spec as DiTLayerWithAdaLNspec,
+    RMSNorm,
 )
 from torch import Tensor
-
-
-def modulate(x, shift, scale):
-    return x * (1 + scale.unsqueeze(1)) + shift.unsqueeze(1)
-
-
-class RMSNorm(nn.Module):
-    def __init__(self, channel: int, eps: float = 1e-6):
-        super().__init__()
-        self.eps = eps
-        self.weight = nn.Parameter(torch.ones(channel))
-
-    def _norm(self, x):
-        return x * torch.rsqrt(x.pow(2).mean(-1, keepdim=True) + self.eps)
-
-    def forward(self, x):
-        output = self._norm(x.float()).type_as(x)
-        return output * self.weight
-
-
-class FinalLayer(nn.Module):
-    """
-    The final layer of DiT.
-    """
-
-    def __init__(self, hidden_size, spatial_patch_size, temporal_patch_size, out_channels):
-        super().__init__()
-        self.norm_final = nn.LayerNorm(hidden_size, elementwise_affine=False, eps=1e-6)
-        self.linear = nn.Linear(
-            hidden_size, spatial_patch_size * spatial_patch_size * temporal_patch_size * out_channels, bias=False
-        )
-        self.adaLN_modulation = nn.Sequential(nn.SiLU(), nn.Linear(hidden_size, 2 * hidden_size, bias=False))
-
-    def forward(self, x_BT_HW_D, emb_B_D):
-        shift_B_D, scale_B_D = self.adaLN_modulation(emb_B_D).chunk(2, dim=1)
-        T = x_BT_HW_D.shape[0] // emb_B_D.shape[0]
-        shift_BT_D, scale_BT_D = repeat(shift_B_D, "b d -> (b t) d", t=T), repeat(scale_B_D, "b d -> (b t) d", t=T)
-        x_BT_HW_D = modulate(self.norm_final(x_BT_HW_D), shift_BT_D, scale_BT_D)
-        x_BT_HW_D = self.linear(x_BT_HW_D)
-        return x_BT_HW_D
 
 
 class DiTCrossAttentionModel(VisionModule):
@@ -104,7 +66,7 @@ class DiTCrossAttentionModel(VisionModule):
         decoder (TransformerBlock): Transformer decoder block.
         t_embedder (torch.nn.Sequential): Time embedding layer.
         x_embedder (nn.Conv3d): Convolutional layer for input embedding.
-        pos_embedder (dit_embeddings.SinCosPosEmb3D): Position embedding layer.
+        pos_embedder (SinCosPosEmb3D): Position embedding layer.
         final_layer_linear (torch.nn.Linear): Final linear layer.
         affline_norm (RMSNorm): Affine normalization layer.
     Methods:
@@ -134,7 +96,7 @@ class DiTCrossAttentionModel(VisionModule):
         in_channels: int = 16,
         out_channels: int = 16,
         transformer_decoder_layer_spec=DiTLayerWithAdaLNspec,
-        pos_embedder=dit_embeddings.SinCosPosEmb3D,
+        pos_embedder=SinCosPosEmb3D,
         **kwargs,
     ):
         super(DiTCrossAttentionModel, self).__init__(config=config)
@@ -170,7 +132,7 @@ class DiTCrossAttentionModel(VisionModule):
 
         self.t_embedder = torch.nn.Sequential(
             Timesteps(self.config.hidden_size, flip_sin_to_cos=False, downscale_freq_shift=0),
-            dit_embeddings.ParallelTimestepEmbedding(self.config.hidden_size, self.config.hidden_size, seed=1234),
+            ParallelTimestepEmbedding(self.config.hidden_size, self.config.hidden_size, seed=1234),
         )
 
         self.fps_embedder = nn.Sequential(
@@ -181,7 +143,7 @@ class DiTCrossAttentionModel(VisionModule):
         if self.pre_process:
             self.x_embedder = torch.nn.Linear(in_channels * patch_spatial**2, self.config.hidden_size)
 
-        if pos_embedder is dit_embeddings.SinCosPosEmb3D:
+        if pos_embedder is SinCosPosEmb3D:
             if self.pre_process:
                 self.pos_embedder = pos_embedder(
                     config,
@@ -246,7 +208,7 @@ class DiTCrossAttentionModel(VisionModule):
         if self.pre_process:
             # transpose to match
             x_B_S_D = self.x_embedder(x)
-            if isinstance(self.pos_embedder, dit_embeddings.SinCosPosEmb3D):
+            if isinstance(self.pos_embedder, SinCosPosEmb3D):
                 pos_emb = None
                 x_B_S_D += self.pos_embedder(pos_ids)
             else:
@@ -256,7 +218,7 @@ class DiTCrossAttentionModel(VisionModule):
         else:
             # intermediate stage of pipeline
             x_S_B_D = None  ### should it take encoder_hidden_states
-            if (not hasattr(self, "pos_embedder")) or isinstance(self.pos_embedder, dit_embeddings.SinCosPosEmb3D):
+            if (not hasattr(self, "pos_embedder")) or isinstance(self.pos_embedder, SinCosPosEmb3D):
                 pos_emb = None
             else:
                 # if transformer blocks need pos_emb, then pos_embedder should
@@ -277,7 +239,7 @@ class DiTCrossAttentionModel(VisionModule):
         if self.config.sequence_parallel:
             if self.pre_process:
                 x_S_B_D = tensor_parallel.scatter_to_sequence_parallel_region(x_S_B_D)
-                if isinstance(self.pos_embedder, dit_embeddings.FactorizedLearnable3DEmbedding):
+                if isinstance(self.pos_embedder, FactorizedLearnable3DEmbedding):
                     pos_emb = tensor_parallel.scatter_to_sequence_parallel_region(pos_emb)
 
             crossattn_emb = tensor_parallel.scatter_to_sequence_parallel_region(crossattn_emb)

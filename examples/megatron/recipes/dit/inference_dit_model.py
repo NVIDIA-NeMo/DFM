@@ -13,30 +13,18 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-# pylint: disable=C0115,C0116,C0301
-
-import argparse
-import os
-from functools import partial
-
-import numpy as np
-import torch
-from huggingface_hub import snapshot_download
 from megatron.core.tensor_parallel.random import model_parallel_cuda_manual_seed
-
-from nemo import lightning as nl
 from nemo.lightning.megatron_parallel import MegatronParallel
-import imageio
-
 from transformers import T5EncoderModel, T5TokenizerFast
-
 from dfm.src.megatron.model.dit.edm.edm_pipeline import EDMPipeline
 from nemo.collections.common.video_tokenizers.cosmos_tokenizer import CausalVideoTokenizer
-from einops import rearrange
-from dfm.src.megatron.model.dit.dit_provider import DiTModelProvider
-
+from dfm.src.megatron.model.dit.dit_model_provider import DiTModelProvider
+from dfm.src.common.utils.save_video import save_video
 from nemo_vfm.diffusion.utils.mcore_parallel_utils import Utils
-from dfm.src.megatron.model.dit.dit_inference import run_diffusion_inference
+from einops import rearrange
+import argparse
+import numpy as np
+import torch
 
 
 MegatronParallel.init_ddp = lambda self: None
@@ -194,6 +182,7 @@ def prepare_data_batch(args, t5_embeding_max_length=512):
         "num_frames": torch.tensor([[args.num_video_frames]] * B, dtype=torch.bfloat16).cuda(),
         "padding_mask": torch.zeros((B, 1, args.height, args.width), dtype=torch.bfloat16).cuda(),
         "pos_ids": pos_ids,
+        'latent_shape': [16, t//pt, h//8//ph, w//8//pw],
     }
     return data_batch, state_shape
 
@@ -207,11 +196,11 @@ def setup_diffusion_pipeline(args):
     model = model.cuda().to(torch.bfloat16)
     diffusion_pipeline = EDMPipeline(seed=args.seed)
     diffusion_pipeline.net = model
-    return model, diffusion_pipeline
+    return model, diffusion_pipeline, model_config
     
 
 def data_preprocess(data_batch, state_shape):
-    from dfm.src.megatron.model.dit.dit_step import encode_seq_length
+    from dfm.src.megatron.model.dit.dit_data_process import encode_seq_length
     data_batch = {k: v.cuda() if torch.is_tensor(v) else v for k, v in data_batch.items()}
     data_batch["inference_fwd"] = True
 
@@ -219,8 +208,6 @@ def data_preprocess(data_batch, state_shape):
     data_batch['seq_len_kv'] = torch.tensor([data_batch['t5_text_embeddings'].shape[1]] * state_shape[0]).cuda()
     data_batch = encode_seq_length(data_batch, format="sbhd")
     return data_batch
-
-
 
 
 def main(args):
@@ -243,10 +230,8 @@ def main(args):
         torch.backends.cudnn.deterministic = True
         torch.backends.cudnn.benchmark = False
     set_seed(42)
+    model, diffusion_pipeline, model_config = setup_diffusion_pipeline(args)
 
-    model, diffusion_pipeline = setup_diffusion_pipeline(args)
-
-    # load old cehckpoint
     new_state = {}
     print("loading model....")
     state = torch.load('model.pth')
@@ -260,10 +245,38 @@ def main(args):
     data_batch, state_shape = prepare_data_batch(args)
     vae = CausalVideoTokenizer.from_pretrained("Cosmos-0.1-Tokenizer-CV4x8x8")
     vae.to("cuda")
+
     print_rank_0("generating video...")
     data_batch = data_preprocess(data_batch, state_shape)
-    run_diffusion_inference(diffusion_pipeline, args, data_batch, state_shape, vae)
-
+    C, T, H, W = data_batch["latent_shape"]
+    latent = diffusion_pipeline.generate_samples_from_batch(
+        data_batch,
+        guidance=args.guidance,
+        state_shape=state_shape,
+        num_steps=args.num_steps,
+        is_negative_prompt=True if "neg_t5_text_embeddings" in data_batch else False,
+    )
+    rank = torch.distributed.get_rank()
+    latent = latent[0, None, :state_shape[1]]
+    latent = rearrange(
+            latent,
+            'b (T H W) (ph pw pt c) -> b c (T pt) (H ph) (W pw)',
+            ph=model_config.patch_spatial, pw=model_config.patch_spatial,
+            pt=model_config.patch_temporal,
+            c=C, T=T, H=H, W=W,
+    )
+    decoded_video = (1.0 + vae.decode(latent / model_config.sigma_data)).clamp(0, 2) / 2
+    decoded_video = (decoded_video * 255).to(torch.uint8).permute(0, 2, 3, 4, 1).cpu().numpy()
+    for i in range(len(decoded_video)):
+        save_video(
+            grid=decoded_video[i],
+            fps=args.fps,
+            H=args.height,
+            W=args.width,
+            video_save_quality=5,
+            video_save_path=f'idx={i}_rank={rank}_' + args.video_save_path,
+        )
+        print_rank_0(f"saved video to idx={i}_rank={rank}_{args.video_save_path}")
 
 if __name__ == "__main__":
     args = parse_args()

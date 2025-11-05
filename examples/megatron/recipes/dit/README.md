@@ -73,5 +73,5 @@ pip install imageio[ffmpeg]
 Execute the DiT model training with the following command:
 
 ```bash
-torchrun --nproc-per-node 2 examples/megatron/recipes/dit/pretrain_dit_model.py
+torchrun --nproc-per-node 2 examples/megatron/recipes/dit/pretrain_dit_model.py --dataset_path "/opt/VFM/butterfly_webdataset"
 ```
