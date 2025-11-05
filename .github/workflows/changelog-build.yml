@@ -16,7 +16,7 @@ on:
         type: string
         required: false
         default: ''
-    
+
 jobs:
   changelog:
     runs-on: ubuntu-latest
@@ -41,7 +41,7 @@ jobs:
           toTag: ${{ inputs.release-branch }}
 
       - name: Update changelog file
-        env: 
+        env:
           RELEASE_BRANCH: ${{ inputs.release-branch }}
           CHANGELOG: ${{ steps.github_tag.outputs.changelog }}
           MAIN_CONTENT: ${{ inputs.changelog-main-content }}

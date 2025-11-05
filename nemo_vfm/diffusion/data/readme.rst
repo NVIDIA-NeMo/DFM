@@ -1,4 +1,4 @@
-Preparing Image / Video Megatron Energon WebDataset with Cosmos Tokenizer
+﻿Preparing Image / Video Megatron Energon WebDataset with Cosmos Tokenizer
 ===========================
 
 This script is an example on preparing a WebDataset for an image / video + text dataset using distributed processing with the Cosmos Tokenizer. It processes each sample by generating a **continuous** image / video latent using the Cosmos video tokenizer and a T5 embedding from the text caption. Then, the processed data is stored in a WebDataset-compatible format.
@@ -22,5 +22,5 @@ Usage
 
 3. **Running the Script**:
    To run the script on 8 GPUs, use the following command:
-   
+
    ``bash torchrun --nproc_per_node=8 nemo/collections/diffusion/data/prepare_energon_dataset.py``

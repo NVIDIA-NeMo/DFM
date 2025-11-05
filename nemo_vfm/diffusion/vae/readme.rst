@@ -1,4 +1,4 @@
-============================
+﻿============================
 Pretraining Variational AutoEncoder
 ============================
 
@@ -64,7 +64,7 @@ Data Preparation
 3. then select dataset type `ImageWebdataset` and specify the type `jpg`. Below is an example of the interactive setup:
 
     .. code-block:: bash
-        
+
         Found 2925 tar files in total. The first and last ones are:
         - 000000.tar
         - 002924.tar
@@ -124,8 +124,3 @@ We provide a sample training script for launching multi-node training. Simply co
 
    bash nemo/collections/diffusion/vae/train_vae.sh \
    data.path=xxx
-
-
-
-
-
