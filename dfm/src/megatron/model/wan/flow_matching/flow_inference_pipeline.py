@@ -17,51 +17,69 @@ import logging
 import math
 import os
 import random
-import sys
-import types
 import re
+import sys
 from contextlib import contextmanager
-from functools import partial
-from megatron.core import parallel_state
-from megatron.core.inference.communication_utils import broadcast_from_last_pipeline_stage, recv_from_prev_pipeline_rank_, send_to_next_pipeline_rank
-from megatron.core.packed_seq_params import PackedSeqParams
-from megatron.bridge.training.model_load_save import load_megatron_model as _load_megatron_model
+from typing import Tuple
 
 import torch
 import torch.cuda.amp as amp
 import torch.distributed as dist
-from tqdm import tqdm
-
-from dfm.src.megatron.model.wan.wan_model import WanModel
-from dfm.src.megatron.model.wan.wan_provider import WanModelProvider
-from dfm.src.megatron.model.wan.modules.t5 import T5EncoderModel
-from dfm.src.megatron.model.wan.modules import WanVAE
-from dfm.src.megatron.model.wan.inference.utils.fm_solvers import (
-    FlowDPMSolverMultistepScheduler,
-    get_sampling_sigmas,
-    retrieve_timesteps,
-)
-from dfm.src.megatron.model.wan.inference.utils.fm_solvers_unipc import FlowUniPCMultistepScheduler
-from dfm.src.megatron.model.wan.utils.utils import grid_sizes_calculation, patchify
+from diffusers import AutoencoderKLWan
+from diffusers.schedulers import FlowMatchEulerDiscreteScheduler
+from diffusers.schedulers.scheduling_unipc_multistep import UniPCMultistepScheduler
+from megatron.bridge.training.model_load_save import load_megatron_model as _load_megatron_model
 from megatron.core import parallel_state
+from megatron.core.inference.communication_utils import (
+    broadcast_from_last_pipeline_stage,
+    recv_from_prev_pipeline_rank_,
+    send_to_next_pipeline_rank,
+)
+from megatron.core.packed_seq_params import PackedSeqParams
 from torch.nn import functional as F
+from tqdm import tqdm
+from transformers import AutoTokenizer, UMT5EncoderModel
 
-import math
-from typing import Tuple, Union
+from dfm.src.megatron.model.wan.utils.utils import grid_sizes_calculation, patchify
+from dfm.src.megatron.model.wan.wan_provider import WanModelProvider
+
+
+@torch.no_grad()
+def _encode_text(
+    tokenizer: AutoTokenizer,
+    text_encoder: UMT5EncoderModel,
+    device: str,
+    caption: str,
+) -> torch.Tensor:
+    caption = caption.strip()
+    inputs = tokenizer(
+        caption,
+        max_length=512,
+        padding="max_length",
+        truncation=True,
+        return_tensors="pt",
+        return_attention_mask=True,
+    )
+    inputs = {k: v.to(device) for k, v in inputs.items()}
+    outputs = text_encoder(input_ids=inputs["input_ids"], attention_mask=inputs["attention_mask"]).last_hidden_state
+    # Trim to the true (unpadded) sequence length using the attention mask
+    true_len = int(inputs["attention_mask"].sum(dim=-1).item())
+    outputs = outputs[0, :true_len, :]
+    return outputs
 
 class FlowInferencePipeline:
 
     def __init__(
         self,
         config,
-        checkpoint_dir,
+        model_id="Wan-AI/Wan2.1-T2V-14B-Diffusers",
+        checkpoint_dir=None,
         checkpoint_step=None,
         t5_checkpoint_dir=None,
         vae_checkpoint_dir=None,
         device_id=0,
         rank=0,
         t5_cpu=False,
-
         tensor_parallel_size=1,
         context_parallel_size=1,
         pipeline_parallel_size=1,
@@ -89,6 +107,7 @@ class FlowInferencePipeline:
         """
         self.device = torch.device(f"cuda:{device_id}")
         self.config = config
+        self.model_id = model_id
         self.rank = rank
         self.t5_cpu = t5_cpu
         self.tensor_parallel_size = tensor_parallel_size
@@ -99,19 +118,24 @@ class FlowInferencePipeline:
         self.num_train_timesteps = config.num_train_timesteps
         self.param_dtype = config.param_dtype
 
-        self.text_encoder = T5EncoderModel(
-            text_len=config.text_len,
-            dtype=config.t5_dtype,
-            device=torch.device('cpu'),
-            checkpoint_path=os.path.join(t5_checkpoint_dir, config.t5_checkpoint),
-            tokenizer_path=os.path.join(t5_checkpoint_dir, config.t5_tokenizer),
-            shard_fn=None)
+        self.text_encoder = UMT5EncoderModel.from_pretrained(
+            model_id,
+            subfolder="text_encoder",
+            torch_dtype=config.t5_dtype,
+        )
+        self.tokenizer = AutoTokenizer.from_pretrained(
+            model_id,
+            subfolder="tokenizer",
+        )
 
         self.vae_stride = config.vae_stride
-        self.patch_size = config.patch_size        
-        self.vae = WanVAE(
-            vae_pth=os.path.join(vae_checkpoint_dir, config.vae_checkpoint),
-            device=self.device)
+        self.patch_size = config.patch_size      
+        self.vae = AutoencoderKLWan.from_pretrained(
+            model_id,
+            subfolder="vae",
+            torch_dtype=config.param_dtype,
+        )
+        self.vae.to(self.device)
 
         wan_checkpoint_dir = self._select_checkpoint_dir(checkpoint_dir, checkpoint_step)
         self.model = self.setup_model_from_checkpoint(wan_checkpoint_dir)
@@ -302,7 +326,6 @@ class FlowInferencePipeline:
                  sizes,
                  frame_nums,
                  shift=5.0,
-                 sample_solver='unipc',
                  sampling_steps=50,
                  guide_scale=5.0,
                  n_prompt="",
@@ -320,8 +343,6 @@ class FlowInferencePipeline:
                 How many frames to sample from a video. The number should be 4n+1
             shift (`float`, *optional*, defaults to 5.0):
                 Noise schedule shift parameter. Affects temporal dynamics
-            sample_solver (`str`, *optional*, defaults to 'unipc'):
-                Solver used to sample the video.
             sampling_steps (`int`, *optional*, defaults to 40):
                 Number of diffusion sampling steps. Higher values improve quality but slow generation
             guide_scale (`float`, *optional*, defaults 5.0):
@@ -345,7 +366,7 @@ class FlowInferencePipeline:
         # preprocess
         target_shapes = []
         for size, frame_num in zip(sizes, frame_nums):
-            target_shapes.append((self.vae.model.z_dim, (frame_num - 1) // self.vae_stride[0] + 1,
+            target_shapes.append((self.vae.config.z_dim, (frame_num - 1) // self.vae_stride[0] + 1,
                                 size[1] // self.vae_stride[1],
                                 size[0] // self.vae_stride[2]))
 
@@ -366,23 +387,27 @@ class FlowInferencePipeline:
 
 
         ## process context
+        # we implement similar to Wan's diffuser setup
+        # (https://github.com/huggingface/diffusers/blob/0f252be0ed42006c125ef4429156cb13ae6c1d60/src/diffusers/pipelines/wan/pipeline_wan.py#L157)
+        # in which we pad the text to 512, pass through text encoder, and truncate to the actual tokens, then pad with 0s to 512.
         context_max_len = 512
         context_lens = []
         contexts = []
         contexts_null = []
         for prompt in prompts:
             if not self.t5_cpu:
-                self.text_encoder.model.to(self.device)
-                context = self.text_encoder([prompt], self.device)[0]
-                context_null = self.text_encoder([n_prompt], self.device)[0]
+                self.text_encoder.to(self.device)
+                context = _encode_text(self.tokenizer, self.text_encoder, self.device, prompt)
+                context_null = _encode_text(self.tokenizer, self.text_encoder, self.device, n_prompt)
                 if offload_model:
-                    self.text_encoder.model.cpu()
+                    self.text_encoder.cpu()
             else:
                 context = self.text_encoder([prompt], torch.device('cpu'))[0].to(self.device)
                 context_null = self.text_encoder([n_prompt], torch.device('cpu'))[0].to(self.device)
             context_lens.append(context_max_len) # all samples have the same context_max_len
             contexts.append(context)
             contexts_null.append(context_null)
+
         # pad to context_max_len tokens, and stack to a tensor of shape [s, b, hidden]
         contexts = [F.pad(context, (0, 0, 0, context_max_len - context.shape[0])) for context in contexts]
         contexts_null = [F.pad(context_null, (0, 0, 0, context_max_len - context_null.shape[0])) for context_null in contexts_null]
@@ -421,39 +446,18 @@ class FlowInferencePipeline:
 
         # evaluation mode
         with amp.autocast(dtype=self.param_dtype), torch.no_grad(), no_sync():
+            # Instantiate per-sample schedulers so each sample maintains its own state
+            batch_size_for_schedulers = len(noises)
+            schedulers = []
+            for _ in range(batch_size_for_schedulers):
+                base_sched = FlowMatchEulerDiscreteScheduler.from_pretrained(
+                    self.model_id, subfolder="scheduler"
+                )
+                s = UniPCMultistepScheduler.from_config(base_sched.config, flow_shift=shift)
+                s.set_timesteps(sampling_steps, device=self.device)
 
-            if sample_solver == 'unipc':
-                # Create a prototype scheduler to compute shared timesteps
-                sample_scheduler = FlowUniPCMultistepScheduler(
-                    num_train_timesteps=self.num_train_timesteps,
-                    shift=1,
-                    use_dynamic_shifting=False)
-                sample_scheduler.set_timesteps(
-                    sampling_steps, device=self.device, shift=shift)
-                timesteps = sample_scheduler.timesteps
-
-                # Instantiate per-sample schedulers so each sample maintains its own state
-                batch_size_for_schedulers = len(noises)
-                schedulers = []
-                for _ in range(batch_size_for_schedulers):
-                    s = FlowUniPCMultistepScheduler(
-                        num_train_timesteps=self.num_train_timesteps,
-                        shift=1,
-                        use_dynamic_shifting=False)
-                    s.set_timesteps(sampling_steps, device=self.device, shift=shift)
-                    schedulers.append(s)
-            elif sample_solver == 'dpm++':
-                sample_scheduler = FlowDPMSolverMultistepScheduler(
-                    num_train_timesteps=self.num_train_timesteps,
-                    shift=1,
-                    use_dynamic_shifting=False)
-                sampling_sigmas = get_sampling_sigmas(sampling_steps, shift)
-                timesteps, _ = retrieve_timesteps(
-                    sample_scheduler,
-                    device=self.device,
-                    sigmas=sampling_sigmas)
-            else:
-                raise NotImplementedError("Unsupported solver.")
+                schedulers.append(s)
+            timesteps = schedulers[0].timesteps
 
             # sample videos
             latents = noises
@@ -508,11 +512,11 @@ class FlowInferencePipeline:
                 unpatchified_noise_pred_cond = noise_pred_cond
                 unpatchified_noise_pred_cond = unpatchified_noise_pred_cond.transpose(0, 1) # bring sbhd -> bshd
                 # when unpatchifying, the code will truncate the padded videos into the original video shape, based on the grid_sizes.
-                unpatchified_noise_pred_cond = self.unpatchify(unpatchified_noise_pred_cond, grid_sizes, self.vae.model.z_dim)
+                unpatchified_noise_pred_cond = self.unpatchify(unpatchified_noise_pred_cond, grid_sizes, self.vae.config.z_dim)
                 unpatchified_noise_pred_uncond = noise_pred_uncond
                 unpatchified_noise_pred_uncond = unpatchified_noise_pred_uncond.transpose(0, 1) # bring sbhd -> bshd
                 # when unpatchifying, the code will truncate the padded videos into the original video shape, based on the grid_sizes.
-                unpatchified_noise_pred_uncond = self.unpatchify(unpatchified_noise_pred_uncond, grid_sizes, self.vae.model.z_dim)
+                unpatchified_noise_pred_uncond = self.unpatchify(unpatchified_noise_pred_uncond, grid_sizes, self.vae.config.z_dim)
 
                 noise_preds = []
                 for i in range(batch_size):
@@ -523,21 +527,11 @@ class FlowInferencePipeline:
                 # step and update latents
                 latents = []
                 for i in range(batch_size):
-
-                    if sample_solver == 'unipc':
-                        temp_x0 = schedulers[i].step(
-                            noise_preds[i].unsqueeze(0),
-                            t,
-                            unpatchified_latents[i].unsqueeze(0),
-                            return_dict=False,
-                            generator=seed_g)[0]
-                    else:
-                        temp_x0 = sample_scheduler.step(
-                            noise_preds[i].unsqueeze(0),
-                            t,
-                            unpatchified_latents[i].unsqueeze(0),
-                            return_dict=False,
-                            generator=seed_g)[0]
+                    temp_x0 =schedulers[i].step(
+                        noise_preds[i].unsqueeze(0), 
+                        t, 
+                        unpatchified_latents[i].unsqueeze(0), 
+                        return_dict=False)[0]
                     latents.append(temp_x0.squeeze(0))
 
             x0 = latents
@@ -545,15 +539,24 @@ class FlowInferencePipeline:
                 self.model.cpu()
                 torch.cuda.empty_cache()
             if self.rank == 0:
-                videos = self.vae.decode(x0)
+                # Diffusers' VAE decoding
+                latents = torch.stack(x0, dim=0)
+                latents = latents.to(self.vae.dtype)
+                latents_mean = (
+                    torch.tensor(self.vae.config.latents_mean)
+                    .view(1, self.vae.config.z_dim, 1, 1, 1)
+                    .to(latents.device, latents.dtype)
+                )
+                latents_std = 1.0 / torch.tensor(self.vae.config.latents_std).view(1, self.vae.config.z_dim, 1, 1, 1).to(
+                    latents.device, latents.dtype
+                )
+                latents = latents / latents_std + latents_mean
+                videos = self.vae.decode(latents).sample
             else:
                 videos = None
 
         del noises, latents
-        if sample_solver == 'unipc':
-            del schedulers
-        else:
-            del sample_scheduler
+        del schedulers
         if offload_model:
             gc.collect()
             torch.cuda.synchronize()

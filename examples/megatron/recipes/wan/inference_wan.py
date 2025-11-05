@@ -31,7 +31,7 @@ from PIL import Image
 
 from dfm.src.megatron.model.wan.flow_matching.flow_inference_pipeline import FlowInferencePipeline
 from dfm.src.megatron.model.wan.inference.configs import SIZE_CONFIGS, SUPPORTED_SIZES, WAN_CONFIGS
-from dfm.src.megatron.model.wan.inference.utils.utils import cache_video, str2bool
+from dfm.src.megatron.model.wan.inference.utils import cache_video, str2bool
 
 EXAMPLE_PROMPT = {
     "t2v-1.3B": {
@@ -149,12 +149,6 @@ def _parse_args():
         default=-1,
         help="The seed to use for generating the image or video.")
     parser.add_argument(
-        "--sample_solver",
-        type=str,
-        default='unipc',
-        choices=['unipc', 'dpm++'],
-        help="The solver used to sample.")
-    parser.add_argument(
         "--sample_steps", type=int, default=None, help="The sampling steps.")
     parser.add_argument(
         "--sample_shift",
@@ -263,6 +257,7 @@ def generate(args):
         pipeline = FlowInferencePipeline(
             config=cfg,
             checkpoint_dir=args.checkpoint_dir,
+            model_id="Wan-AI/Wan2.1-T2V-14B-Diffusers",
             checkpoint_step=args.checkpoint_step,
             t5_checkpoint_dir=args.t5_checkpoint_dir,
             vae_checkpoint_dir=args.vae_checkpoint_dir,
@@ -292,7 +287,6 @@ def generate(args):
             sizes=[SIZE_CONFIGS[size] for size in size_keys],
             frame_nums=frame_nums,
             shift=args.sample_shift,
-            sample_solver=args.sample_solver,
             sampling_steps=args.sample_steps,
             guide_scale=args.sample_guide_scale,
             seed=args.base_seed,
