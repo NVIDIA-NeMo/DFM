@@ -14,11 +14,10 @@
 
 # pylint: disable=C0115,C0116,C0301
 
-from typing import Dict, Literal, Optional, Tuple, List, Union
-
 import math
+from typing import Dict, Optional, Tuple
+
 import torch
-import torch.cuda.amp as amp
 import torch.nn as nn
 from megatron.core import parallel_state, tensor_parallel
 from megatron.core.dist_checkpointing.mapping import ShardedStateDict
@@ -28,11 +27,14 @@ from megatron.core.transformer.enums import ModelType
 from megatron.core.transformer.transformer_block import TransformerBlock
 from megatron.core.transformer.transformer_config import TransformerConfig
 from megatron.core.utils import make_sharded_tensor_for_checkpoint
+from torch import Tensor
+
 from dfm.src.megatron.model.wan.wan_layer_spec import (
     get_wan_block_with_transformer_engine_spec as WanLayerWithAdaLNspec,
 )
-from torch import Tensor
+
 from .rope_utils import Wan3DRopeEmbeddings
+
 
 def sinusoidal_embedding_1d(dim, position):
     # preprocess

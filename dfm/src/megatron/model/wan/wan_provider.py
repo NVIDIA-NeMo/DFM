@@ -17,12 +17,13 @@ import logging
 from dataclasses import dataclass
 
 import torch
-from megatron.core import parallel_state
-from megatron.bridge.models.transformer_config import TransformerConfig
-
 from megatron.bridge.models.model_provider import ModelProviderMixin
+from megatron.bridge.models.transformer_config import TransformerConfig
+from megatron.core import parallel_state
 from megatron.core.models.common.vision_module.vision_module import VisionModule
+
 from dfm.src.megatron.model.wan.wan_model import WanModel
+
 
 logger = logging.getLogger(__name__)
 

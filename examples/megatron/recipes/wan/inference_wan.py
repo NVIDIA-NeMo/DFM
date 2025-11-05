@@ -1,18 +1,17 @@
-# Example of running script for Wan inference.
-#     NVTE_FUSED_ATTN=1 torchrun --nproc_per_node=1 examples/recipes/wan/inference_wan.py  \
-#     --task t2v-1.3B \
-#     --sizes 480*832 \
-#     --checkpoint_dir /path/to/wan_checkpoint_dir \
-#     --t5_checkpoint_dir /path/to/t5_checkpoint_dir \
-#     --vae_checkpoint_dir /path/to/vae_checkpoint_dir \
-#     --frame_nums 81 \
-#     --prompts "Two anthropomorphic cats in comfy boxing gear and bright gloves fight intensely on a spotlighted stage." \
-#     --tensor_parallel_size 1 \
-#     --context_parallel_size 1 \
-#     --pipeline_parallel_size 1 \
-#     --sequence_parallel False \
-#     --base_seed 42 \
-#     --sample_steps 50
+#!/usr/bin/env python3
+# Copyright (c) 2025, NVIDIA CORPORATION.  All rights reserved.
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+#     http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
 
 import argparse
 import logging
@@ -20,6 +19,7 @@ import os
 import sys
 import warnings
 from datetime import datetime
+
 
 warnings.filterwarnings('ignore')
 
@@ -32,6 +32,7 @@ from PIL import Image
 from dfm.src.megatron.model.wan.flow_matching.flow_inference_pipeline import FlowInferencePipeline
 from dfm.src.megatron.model.wan.inference.configs import SIZE_CONFIGS, SUPPORTED_SIZES, WAN_CONFIGS
 from dfm.src.megatron.model.wan.inference.utils import cache_video, str2bool
+
 
 EXAMPLE_PROMPT = {
     "t2v-1.3B": {

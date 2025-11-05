@@ -1,4 +1,3 @@
-
 #!/usr/bin/env python3
 # Copyright (c) 2025, NVIDIA CORPORATION.  All rights reserved.
 #
@@ -56,11 +55,7 @@ import sys
 from pathlib import Path
 from typing import Tuple
 
-from omegaconf import OmegaConf
-
-from dfm.src.megatron.recipes.wan.wan import pretrain_config
 from megatron.bridge.training.config import ConfigContainer
-from dfm.src.megatron.model.wan.wan_step import WanForwardStep
 from megatron.bridge.training.pretrain import pretrain
 from megatron.bridge.training.utils.omegaconf_utils import (
     apply_overrides,
@@ -68,6 +63,10 @@ from megatron.bridge.training.utils.omegaconf_utils import (
     parse_hydra_overrides,
 )
 from megatron.bridge.utils.common_utils import get_rank_safe
+from omegaconf import OmegaConf
+
+from dfm.src.megatron.model.wan.wan_step import WanForwardStep
+from dfm.src.megatron.recipes.wan.wan import pretrain_config
 
 
 logger: logging.Logger = logging.getLogger(__name__)
@@ -80,11 +79,6 @@ SCRIPT_DIR: Path = Path(__file__).parent.resolve()
 DEFAULT_CONFIG_FILENAME: str = "wan_pretrain_override_example.yaml"
 DEFAULT_CONFIG_FILE_PATH: Path = SCRIPT_DIR / "conf" / DEFAULT_CONFIG_FILENAME
 
-# DEBUGGING
-import numpy as np
-import torch
-np.set_printoptions(precision=10, suppress=False)
-torch.set_printoptions(precision=10, sci_mode=False)
 
 def parse_cli_args() -> Tuple[argparse.Namespace, list[str]]:
     """Parse command line arguments, separating known script args from OmegaConf overrides."""

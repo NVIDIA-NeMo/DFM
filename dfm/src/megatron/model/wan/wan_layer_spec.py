@@ -15,19 +15,14 @@
 
 # pylint: disable=C0115,C0116,C0301
 
-import copy
 from dataclasses import dataclass
 from typing import Optional, Union
 
 import torch
 import torch.nn as nn
-from megatron.core import parallel_state, tensor_parallel
 from megatron.core.extensions.transformer_engine import TENorm
 from megatron.core.process_groups_config import ProcessGroupCollection
-from megatron.core.transformer.attention import (
-    CrossAttention,
-    SelfAttention,
-)
+from megatron.core.transformer.attention import SelfAttentionSubmodules
 from megatron.core.transformer.custom_layers.transformer_engine import (
     TEColumnParallelLinear,
     TEDotProductAttention,
@@ -41,34 +36,12 @@ from megatron.core.transformer.spec_utils import ModuleSpec, build_module
 from megatron.core.transformer.transformer_config import TransformerConfig
 from megatron.core.transformer.transformer_layer import TransformerLayer, TransformerLayerSubmodules
 from megatron.core.utils import make_viewless_tensor
-from dfm.src.megatron.model.common.dit_attention import DiTCrossAttentionSubmodules, DiTSelfAttention, DiTCrossAttention
-from megatron.core.transformer.attention import SelfAttentionSubmodules
 
-
-try:
-    import transformer_engine  # pylint: disable=unused-import
-
-    HAVE_TE = True
-    from megatron.core.extensions.transformer_engine import SplitAlongDim
-    
-except ImportError:
-    HAVE_TE = False
-    SplitAlongDim = None
-
-
-# class WanLayerNorm(nn.LayerNorm):
-#     # Note to parth: Can we replace this with te layer norm or fuse with linear layer?
-#     # (@huy) Remove this comment after you have answered the question.
-
-#     def __init__(self, dim, eps=1e-6, elementwise_affine=False):
-#         super().__init__(dim, elementwise_affine=elementwise_affine, eps=eps)
-
-#     def forward(self, x):
-#         r"""
-#         Args:
-#             x(Tensor): Shape [B, L, C]
-#         """
-#         return super().forward(x).type_as(x)
+from dfm.src.megatron.model.common.dit_attention import (
+    DiTCrossAttention,
+    DiTCrossAttentionSubmodules,
+    DiTSelfAttention,
+)
 
 
 @dataclass
