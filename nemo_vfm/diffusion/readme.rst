@@ -1,10 +1,10 @@
-Diffusion Training Framework
+﻿Diffusion Training Framework
 =============
 
 Overview
 --------
 
-The NeMo Diffusion Training Framework provides a scalable training platform for diffusion models with transformer backbones.  Our new features streamline the training process, allowing developers to efficiently train state-of-the-art models with ease. 
+The NeMo Diffusion Training Framework provides a scalable training platform for diffusion models with transformer backbones. Our new features streamline the training process, allowing developers to efficiently train state-of-the-art models with ease.
 
 
 Some of the features we currently support include:
@@ -58,7 +58,7 @@ Energon Dataloader for Webscale Dataloading
 Webscale Dataloading
 ^^^^^^^^^^^^^^^^^^^^
 
-Megatron-Energon is an optimized multi-modal dataloader for large-scale deep learning with Megatron. Energon allows for distributed loading of large training training data for multi-modal model training. Energon allows for blending many datasets together and distributing the dataloading workflow across multiple cluster nodes/processes while ensuring reproducibility and resumability. 
+Megatron-Energon is an optimized multi-modal dataloader for large-scale deep learning with Megatron. Energon allows for distributed loading of large training training data for multi-modal model training. Energon allows for blending many datasets together and distributing the dataloading workflow across multiple cluster nodes/processes while ensuring reproducibility and resumability.
 
 Dataloader Checkpointing
 ^^^^^^^^^^^^^^^^^^^^^^^^
@@ -84,7 +84,7 @@ Our dataloader provides support for mixed image-video training by using the NeMo
 
 Model and Data Parallelism
 --------------------------
-NeMo provides support for training models using tensor parallelism, sequence parallelism, pipeline parallelism, and context parallelism. To support pipeline parallelism with conditional diffusion training, we duplicate the conditional embeddings across the pipeline stages, and perform an all-reduce during the backward pass. This approach uses more compute, but it has a lower communication cost than sending the conditional embeddings through different pipeline stages. 
+NeMo provides support for training models using tensor parallelism, sequence parallelism, pipeline parallelism, and context parallelism. To support pipeline parallelism with conditional diffusion training, we duplicate the conditional embeddings across the pipeline stages, and perform an all-reduce during the backward pass. This approach uses more compute, but it has a lower communication cost than sending the conditional embeddings through different pipeline stages.
 
 .. image:: assets/pipeline_conditioning.png
    :alt: Conditioning mechanism for pipeline parallelism
@@ -123,7 +123,7 @@ this will generate a folder a tar files. .pth contains image/video latent repres
    ├── samples/sample_0001.pickle
    ├── samples/sample_0001.json
    └── ...
-   shard_001.tar   
+   shard_001.tar
 
 The following is a sample command to prepare prepare webdataset into energon dataset:
 

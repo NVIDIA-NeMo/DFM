@@ -150,4 +150,3 @@ jobs:
             -H 'Content-type: application/json' \
             --data "{\"text\":\":robot_joy: <https://github.com/${GITHUB_REPOSITORY}/actions/runs/${GITHUB_RUN_ID}|Test-queue-approval-bot workflow> failed. Please review manually.\n\ncc ${SLACK_WEBHOOK_ADMIN}\"}" \
             $SLACK_WEBHOOK
-

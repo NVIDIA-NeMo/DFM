@@ -439,7 +439,7 @@ srun \
    torchrun --nproc_per_node=8 cosmos1/models/diffusion/nemo/post_training/multicamera.py  --factory cosmos_multicamera_diffusion_7b_text2world_overfit   --yes   trainer.max_steps=1000     optim.config.lr=1e-6
    ```
 
-4. (Optional) Run Largescale Full Post-Training  
+4. (Optional) Run Largescale Full Post-Training
    You will need to prepare you own data similar with the overfit dataset in step 3. Change XDG_CACHE_HOME to point to the custom dataset
    ```bash
    torchrun --nproc_per_node=8 cosmos1/models/diffusion/nemo/post_training/multicamera.py --yes   trainer.max_steps=1000     optim.config.lr=1e-6
@@ -461,9 +461,9 @@ srun \
    # --factory cosmos_multicamera_diffusion_7b_image2world_finetune_w_traj
    ```
 
-For different post-training recipes make sure to change the autoresume directory so that checkpoints generated from recipe A are not used for recipe B. Modify 'recipe.trainer.callbacks.dirpath' and 'recipe.resume.resume_from_directory'.  
+For different post-training recipes make sure to change the autoresume directory so that checkpoints generated from recipe A are not used for recipe B. Modify 'recipe.trainer.callbacks.dirpath' and 'recipe.resume.resume_from_directory'.
 
-'recipe.trainer.val_check_interval' and 'recipe.trainer.limit_val_batches' can be set to 0 to disable validation during post-training.  
+'recipe.trainer.val_check_interval' and 'recipe.trainer.limit_val_batches' can be set to 0 to disable validation during post-training.
 
 Under `HF_HOME`, there should be a `hub` folder, which contains the base checkpoints. Under `multicamera` folder, there should be view embeddings, `mkdir -p $HF_HOME/multicamera && symlink -s cosmos1/models/diffusion/nemo/post_training/multicamera/*.pt $HF_HOME/multicamera`
 ```
