@@ -1,4 +1,4 @@
-﻿# Cosmos Diffusion-based World Foundation Models: NeMo Framework User Guide
+# Cosmos Diffusion-based World Foundation Models: NeMo Framework User Guide
 
 Learn how to [post-train](#post-train) Cosmos Diffusion-based World Foundation Models (WFMs) using the [NVIDIA NeMo Framework](https://docs.nvidia.com/nemo-framework/user-guide/latest/overview.html) for your custom Physical AI tasks by following this guide.
 
