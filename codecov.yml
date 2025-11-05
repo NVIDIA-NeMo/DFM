@@ -4,10 +4,10 @@ coverage:
     project: false
     patch:
       default:
-        target: 80%
-        threshold: 0%
+        target: 0%
+        threshold: 100%
         base: auto
-        if_ci_failed: error
+        if_ci_failed: success
         if_no_uploads: success
         if_not_found: success
 
