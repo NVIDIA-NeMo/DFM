@@ -49,11 +49,11 @@ Data Preparation
     .. code-block:: bash
 
         000000.tar
-        â”œâ”€â”€ 1.jpg
-        â”œâ”€â”€ 2.jpg
+        ├── 1.jpg
+        ├── 2.jpg
         000001.tar
-        â”œâ”€â”€ 3.jpg
-        â”œâ”€â”€ 4.jpg
+        ├── 3.jpg
+        ├── 4.jpg
 
 2. next we need to index the webdataset with `energon <https://nvidia.github.io/Megatron-Energon/>`_. navigate to the dataset directory and run the following command:
 
