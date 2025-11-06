@@ -12,9 +12,9 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-
 import imageio
 import numpy as np
+import torch
 
 
 def save_video(
@@ -25,7 +25,6 @@ def save_video(
     video_save_quality: int,
     video_save_path: str,
 ):
-
     kwargs = {
         "fps": fps,
         "quality": video_save_quality,
@@ -34,5 +33,14 @@ def save_video(
         "output_params": ["-f", "mp4"],
     }
 
-    print('video_save_path', video_save_path)
+    print("video_save_path", video_save_path)
     imageio.mimsave(video_save_path, grid, "mp4", **kwargs)
+
+
+def print_dict(dict):
+    for key, value in dict.items():
+        if isinstance(value, torch.Tensor):
+            print(key, value.shape)
+        else:
+            print(key, value)
+    print("-" * 40)

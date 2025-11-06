@@ -23,10 +23,10 @@ import torch
 import torch.distributed as dist
 import webdataset as wds
 from einops import rearrange
-from transformers import T5EncoderModel, T5TokenizerFast
-
 from nemo.collections.common.video_tokenizers.cosmos_tokenizer import CausalVideoTokenizer
 from nemo.collections.common.video_tokenizers.utils import read_image, resize_video
+from transformers import T5EncoderModel, T5TokenizerFast
+
 
 # examples/megatron/receipes/dit
 def initialize_text_encoder(t5_cache_dir):
@@ -56,7 +56,7 @@ df = pd.read_parquet("hf://datasets/huggan/smithsonian_butterflies_subset/data/t
 autoencoder = CausalVideoTokenizer.from_pretrained("Cosmos-0.1-Tokenizer-CV4x8x8")
 
 # Load T5-XXL text encoder
-t5_cache_dir = ''  # Use your own custom cache path
+t5_cache_dir = ""  # Use your own custom cache path
 tokenizer, text_encoder = initialize_text_encoder(t5_cache_dir)
 
 
@@ -214,19 +214,19 @@ def butterfly_process_func(index, rank):
 
     # Process image
     video = read_image(image_url)
-    video = rearrange(video, 'h w (t c) -> t h w c', t=1)
+    video = rearrange(video, "h w (t c) -> t h w c", t=1)
 
     # import pdb; pdb.set_trace()
     video = resize_video(video, short_size=512)
     import mediapy as media
+
     # Ensure that h and w are divisible by 16
     h, w = video.shape[1:3]
     video = media.resize_video(video, shape=(h // 16 * 16, w // 16 * 16))
     batch_video = video[np.newaxis, ...]
 
-
     # Bx3xTxHxW
-    batch_video = rearrange(batch_video, 'b t h w c -> b c t h w')
+    batch_video = rearrange(batch_video, "b t h w c -> b c t h w")
     # make video -1...1. Currenlty it has 0-255
     batch_video = (batch_video / 255.0) * 2 - 1
     # Run autoencoder to get latents
@@ -253,7 +253,7 @@ def butterfly_process_func(index, rank):
 
 @torch.no_grad()
 @run.cli.entrypoint
-def prepare(process_func: Callable, output_dir: str = 'output_butterfly'):
+def prepare(process_func: Callable, output_dir: str = "output_butterfly"):
     """
     Prepares a WebDataset using the specified processing function, for distributed settings.
 
@@ -264,8 +264,8 @@ def prepare(process_func: Callable, output_dir: str = 'output_butterfly'):
     """
     rank = dist.get_rank()
     world_size = torch.distributed.get_world_size()
-        # rank = 0
-        # world_size = 1
+    # rank = 0
+    # world_size = 1
     # import pdb; pdb.set_trace()
     print(f"Rank {rank} of {world_size} processing {len(df)} samples")
     start_idx, end_idx = get_start_end_idx_for_this_rank(len(df), rank, world_size)
@@ -276,6 +276,7 @@ def prepare(process_func: Callable, output_dir: str = 'output_butterfly'):
     with wds.ShardWriter(output_tar, maxcount=10000) as sink:
         # for i in range(start_idx, end_idx):
         from tqdm import tqdm
+
         for i in tqdm(range(start_idx, end_idx)):
             # convert to tqdm
             sample = process_func(i, rank)
@@ -291,12 +292,12 @@ def prepare_butterfly_dataset() -> run.Partial:
     Returns:
         run.Partial: Partially configured run for WebDataset preparation.
     """
-    recipe = run.Partial(prepare, process_func=butterfly_process_func, output_dir='butterfly_webdataset')
+    recipe = run.Partial(prepare, process_func=butterfly_process_func, output_dir="butterfly_webdataset")
     return recipe
 
 
-if __name__ == '__main__':
+if __name__ == "__main__":
     dist.init_process_group("nccl")
-    local_rank = int(os.environ['LOCAL_RANK'])
+    local_rank = int(os.environ["LOCAL_RANK"])
     torch.cuda.set_device(local_rank)
     run.cli.main(prepare, default_factory=prepare_butterfly_dataset)

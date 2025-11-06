@@ -20,8 +20,6 @@ from typing import Literal, Optional, Union
 
 import torch
 import torch.nn as nn
-# to be imported from common
-from dfm.src.megatron.model.common.dit_attention import DiTCrossAttention, DiTCrossAttentionSubmodules
 from megatron.core.transformer.attention import (
     SelfAttention,
     SelfAttentionSubmodules,
@@ -41,6 +39,9 @@ from megatron.core.transformer.transformer_block import TransformerConfig
 from megatron.core.transformer.transformer_config import TransformerConfig
 from megatron.core.transformer.transformer_layer import TransformerLayer, TransformerLayerSubmodules
 from megatron.core.utils import make_viewless_tensor
+
+# to be imported from common
+from dfm.src.megatron.model.common.dit_attention import DiTCrossAttention, DiTCrossAttentionSubmodules
 
 
 @dataclass
@@ -126,7 +127,7 @@ class DiTLayerWithAdaLN(TransformerLayer):
         layer_number: int = 1,
         hidden_dropout: float = None,
         position_embedding_type: Literal["learned_absolute", "rope"] = "learned_absolute",
-        pg_collection= None,
+        pg_collection=None,
         vp_stage: Optional[int] = None,
     ):
         def _replace_no_cp_submodules(submodules):
@@ -178,7 +179,7 @@ class DiTLayerWithAdaLN(TransformerLayer):
         packed_seq_params=None,
         sequence_len_offset=None,
         inference_context=None,
-        rotary_pos_cos_sin=None
+        rotary_pos_cos_sin=None,
     ):
         timestep_emb = attention_mask
 

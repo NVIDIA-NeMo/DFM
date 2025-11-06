@@ -16,14 +16,14 @@ import logging
 from dataclasses import dataclass
 from typing import Callable
 
-from dfm.src.megatron.model.dit.dit_model import DiTCrossAttentionModel
 import torch
-from megatron.core import parallel_state
-from megatron.core.transformer.transformer_config import TransformerConfig
-from dfm.src.common.utils.dynamic_import import dynamic_import
-
 from megatron.bridge.models.model_provider import ModelProviderMixin
+from megatron.core import parallel_state
 from megatron.core.models.common.vision_module.vision_module import VisionModule
+from megatron.core.transformer.transformer_config import TransformerConfig
+
+from dfm.src.common.utils.dynamic_import import dynamic_import
+from dfm.src.megatron.model.dit.dit_model import DiTCrossAttentionModel
 
 
 logger = logging.getLogger(__name__)
@@ -69,12 +69,11 @@ class DiTModelProvider(TransformerConfig, ModelProviderMixin[VisionModule]):
     in_channels: int = 16
 
     replicated_t_embedder = True
-    qkv_format: str = 'sbhd'
+    qkv_format: str = "thd"
 
     seq_length: int = 2048
     vocab_size: int = None
     make_vocab_size_divisible_by: int = 128
-
 
     def provide(self, pre_process=None, post_process=None, vp_stage=None) -> DiTCrossAttentionModel:
         vp_size = self.virtual_pipeline_model_parallel_size
@@ -109,7 +108,7 @@ class DiT7BModelProvider(DiTModelProvider):
     max_img_w: int = 240
     max_frames: int = 128
     num_attention_heads: int = 32
-    apply_rope_fusion: bool = True        # TODO: do we support this?
+    apply_rope_fusion: bool = True  # TODO: do we support this?
     additional_timestamp_channels = None  # TODO: do we support this?
     bf16: bool = True
     vae_module: str = "nemo.collections.diffusion.vae.video_vae.video_vae3_512"

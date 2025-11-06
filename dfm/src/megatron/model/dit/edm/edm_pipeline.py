@@ -17,10 +17,11 @@ from typing import Any, Callable, Dict, Optional, Tuple
 import numpy as np
 import torch
 from megatron.core import parallel_state
+from torch import Tensor
+
 from dfm.src.common.utils.batch_ops import batch_mul
 from dfm.src.common.utils.torch_split_tensor_for_cp import cat_outputs_cp
 from dfm.src.megatron.model.dit.edm.edm_utils import EDMSDE, EDMSampler, EDMScaling
-from torch import Tensor
 
 
 class EDMPipeline:

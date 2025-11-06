@@ -13,17 +13,19 @@
 # limitations under the License.
 
 
+import random
+from typing import List
+
 import torch
 import torch.nn.functional as F
 from einops import rearrange
-from megatron.energon import DefaultTaskEncoder, SkipSample
-from megatron.energon.task_encoder.cooking import Cooker, basic_sample_keys
-from megatron.energon.task_encoder.base import stateless
-from dfm.src.megatron.data.dit.sequence_packing_utils import first_fit_decreasing
-from dfm.src.megatron.data.dit.dit_sample import DiffusionSample
-from typing import List
 from megatron.core import parallel_state
-import random
+from megatron.energon import DefaultTaskEncoder, SkipSample
+from megatron.energon.task_encoder.base import stateless
+from megatron.energon.task_encoder.cooking import Cooker, basic_sample_keys
+
+from dfm.src.megatron.data.dit.dit_sample import DiffusionSample
+from dfm.src.megatron.data.dit.sequence_packing_utils import first_fit_decreasing
 
 
 def cook(sample: dict) -> dict:
@@ -123,7 +125,7 @@ class BasicDiffusionTaskEncoder(DefaultTaskEncoder):
         if parallel_state.get_context_parallel_world_size() > 1:
             tpcp_size *= parallel_state.get_context_parallel_world_size() * 2
         if (T * H * W) % tpcp_size != 0:
-            warnings.warn(f'skipping {video_latent.shape=} not divisible by {tpcp_size=}')
+            warnings.warn(f"skipping {video_latent.shape=} not divisible by {tpcp_size=}")
             raise SkipSample()
 
         video_latent = rearrange(
@@ -178,10 +180,10 @@ class BasicDiffusionTaskEncoder(DefaultTaskEncoder):
             loss_mask = torch.ones(seq_len, dtype=torch.bfloat16)
 
         return DiffusionSample(
-            __key__=sample['__key__'],
-            __restore_key__=sample['__restore_key__'],
+            __key__=sample["__key__"],
+            __restore_key__=sample["__restore_key__"],
             __subflavor__=None,
-            __subflavors__=sample['__subflavors__'],
+            __subflavors__=sample["__subflavors__"],
             video=video_latent,
             t5_text_embeddings=t5_text_embeddings,
             t5_text_mask=t5_text_mask,
@@ -217,14 +219,14 @@ class BasicDiffusionTaskEncoder(DefaultTaskEncoder):
             __restore_key__=(),  # Will be set by energon based on `samples`
             __subflavor__=None,
             __subflavors__=samples[0].__subflavors__,
-            video=cat('video'),
-            t5_text_embeddings=cat('t5_text_embeddings'),
-            t5_text_mask=cat('t5_text_mask'),
-            loss_mask=cat('loss_mask'),
-            seq_len_q=cat('seq_len_q'),
-            seq_len_kv=cat('seq_len_kv'),
-            pos_ids=cat('pos_ids'),
-            latent_shape=stack('latent_shape'),
+            video=cat("video"),
+            t5_text_embeddings=cat("t5_text_embeddings"),
+            t5_text_mask=cat("t5_text_mask"),
+            loss_mask=cat("loss_mask"),
+            seq_len_q=cat("seq_len_q"),
+            seq_len_kv=cat("seq_len_kv"),
+            pos_ids=cat("pos_ids"),
+            latent_shape=stack("latent_shape"),
         )
 
     @stateless
@@ -246,6 +248,7 @@ class BasicDiffusionTaskEncoder(DefaultTaskEncoder):
             pos_ids=sample.pos_ids.unsqueeze_(0),
             latent_shape=sample.latent_shape,
         )
+
 
 class PosID3D:
     def __init__(self, *, max_t=32, max_h=128, max_w=128):

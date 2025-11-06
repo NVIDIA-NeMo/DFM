@@ -13,23 +13,22 @@
 # limitations under the License.
 
 import logging
+import os
 from functools import partial
 from typing import Iterable
+
 import torch
+from einops import rearrange
+from megatron.bridge.training.losses import masked_next_token_loss
+from megatron.bridge.training.state import GlobalState
 from megatron.core import parallel_state
 from megatron.core.models.gpt import GPTModel
 from megatron.core.utils import get_model_config
-from megatron.bridge.training.losses import masked_next_token_loss
-from megatron.bridge.training.state import GlobalState
-from dfm.src.megatron.model.dit.edm.edm_pipeline import EDMPipeline
 from nemo.collections.common.video_tokenizers.cosmos_tokenizer import CausalVideoTokenizer
-from dfm.src.megatron.model.dit.dit_data_process import dit_data_step
-from megatron.core import parallel_state
-from einops import rearrange
-from dfm.src.common.utils.save_video import save_video
-import wandb
-import os
 
+from dfm.src.common.utils.save_video import save_video
+from dfm.src.megatron.model.dit.dit_data_process import dit_data_step
+from dfm.src.megatron.model.dit.edm.edm_pipeline import EDMPipeline
 
 
 logger = logging.getLogger(__name__)
@@ -52,13 +51,17 @@ class DITForwardStep:
             num_steps=35,
             is_negative_prompt=True if "neg_t5_text_embeddings" in batch else False,
         )
-        latent = latent[0, None, :batch["seq_len_q"][0]]
+        latent = latent[0, None, : batch["seq_len_q"][0]]
         latent = rearrange(
             latent,
-            'b (T H W) (ph pw pt c) -> b c (T pt) (H ph) (W pw)',
-            ph=model.config.patch_spatial, pw=model.config.patch_spatial,
+            "b (T H W) (ph pw pt c) -> b c (T pt) (H ph) (W pw)",
+            ph=model.config.patch_spatial,
+            pw=model.config.patch_spatial,
             pt=model.config.patch_temporal,
-            c=C, T=T//model.config.patch_temporal, H=H//model.config.patch_spatial, W=W//model.config.patch_spatial,
+            c=C,
+            T=T // model.config.patch_temporal,
+            H=H // model.config.patch_spatial,
+            W=W // model.config.patch_spatial,
         )
         vae = CausalVideoTokenizer.from_pretrained("Cosmos-0.1-Tokenizer-CV4x8x8")
         vae.to("cuda")
@@ -66,7 +69,7 @@ class DITForwardStep:
         decoded_video = (1.0 + vae.decode(latent / self.diffusion_pipeline.sigma_data)).clamp(0, 2) / 2
         decoded_video = (decoded_video * 255).to(torch.uint8).permute(0, 2, 3, 4, 1).cpu().numpy()
         rank = torch.distributed.get_rank()
-        image_folder = 'validation_images'
+        image_folder = "validation_images"
         os.makedirs(image_folder, exist_ok=True)
         save_video(
             grid=decoded_video[0],
@@ -74,9 +77,8 @@ class DITForwardStep:
             H=decoded_video.shape[2],
             W=decoded_video.shape[3],
             video_save_quality=5,
-            video_save_path=f'{image_folder}/validation_step={step}_rank={rank}.mp4',
+            video_save_path=f"{image_folder}/validation_step={step}_rank={rank}.mp4",
         )
-
 
     def __call__(
         self, state: GlobalState, data_iterator: Iterable, model: GPTModel, return_schedule_plan: bool = False
@@ -103,19 +105,18 @@ class DITForwardStep:
             self.on_validation_start(batch, model, step=self.validation_step)
         return self.forward_step(state, batch, model, return_schedule_plan)
 
-    def data_process(self, state: GlobalState, data_iterator: Iterable, model: GPTModel, return_schedule_plan: bool = False
+    def data_process(
+        self, state: GlobalState, data_iterator: Iterable, model: GPTModel, return_schedule_plan: bool = False
     ) -> tuple[torch.Tensor, partial]:
         timers = state.timers
         straggler_timer = state.straggler_timer
 
         config = get_model_config(model)
- 
+
         timers("batch-generator", log_level=2).start()
-        qkv_format =getattr(config, "qkv_format", "sbhd")
+        qkv_format = getattr(config, "qkv_format", "sbhd")
         with straggler_timer(bdata=True):
-            batch = dit_data_step(
-                qkv_format, data_iterator
-            )
+            batch = dit_data_step(qkv_format, data_iterator)
         return batch
 
     def forward_step(self, state, batch, model, return_schedule_plan: bool = False):
@@ -142,8 +143,9 @@ class DITForwardStep:
         loss_function = self._create_loss_function(loss_mask, check_for_nan_in_loss, check_for_spiky_loss)
         return output_tensor, loss_function
 
-
-    def _create_loss_function(self, loss_mask: torch.Tensor, check_for_nan_in_loss: bool, check_for_spiky_loss: bool) -> partial:
+    def _create_loss_function(
+        self, loss_mask: torch.Tensor, check_for_nan_in_loss: bool, check_for_spiky_loss: bool
+    ) -> partial:
         """Create a partial loss function with the specified configuration.
 
         Args:
