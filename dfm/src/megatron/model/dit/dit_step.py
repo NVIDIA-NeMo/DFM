@@ -24,8 +24,8 @@ from megatron.bridge.training.state import GlobalState
 from megatron.core import parallel_state
 from megatron.core.models.gpt import GPTModel
 from megatron.core.utils import get_model_config
-from nemo.collections.common.video_tokenizers.cosmos_tokenizer import CausalVideoTokenizer
 
+from dfm.src.common.models.cosmos.cosmos1.causal_video_tokenizer import CausalVideoTokenizer
 from dfm.src.common.utils.save_video import save_video
 from dfm.src.megatron.model.dit.dit_data_process import dit_data_step
 from dfm.src.megatron.model.dit.edm.edm_pipeline import EDMPipeline
@@ -63,6 +63,7 @@ class DITForwardStep:
             H=H // model.config.patch_spatial,
             W=W // model.config.patch_spatial,
         )
+
         vae = CausalVideoTokenizer.from_pretrained("Cosmos-0.1-Tokenizer-CV4x8x8")
         vae.to("cuda")
 
