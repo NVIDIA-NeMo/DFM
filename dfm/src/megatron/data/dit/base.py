@@ -12,14 +12,13 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-from copy import deepcopy
+import logging
 from typing import Any, Dict, Literal, Optional
 
 from megatron.core import parallel_state
 from megatron.energon import WorkerConfig, get_savable_loader, get_train_dataset
-from torch.utils.data import DataLoader
-from typing_extensions import Self
-import logging
+
+
 logger = logging.getLogger(__name__)
 
 
