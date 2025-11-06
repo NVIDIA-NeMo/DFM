@@ -28,7 +28,8 @@ from megatron.core.transformer.transformer_block import TransformerBlock
 from megatron.core.transformer.transformer_config import TransformerConfig
 from megatron.core.utils import make_sharded_tensor_for_checkpoint
 from torch import Tensor
-
+from diffusers.models.embeddings import Timesteps
+from nemo.collections.diffusion.models.dit.dit_embeddings import ParallelTimestepEmbedding
 from dfm.src.megatron.model.wan.wan_layer_spec import (
     get_wan_block_with_transformer_engine_spec as WanLayerWithAdaLNspec,
 )
@@ -43,14 +44,12 @@ def sinusoidal_embedding_1d(dim, position):
     position = position
 
     # calculation
-    sinusoid = torch.outer(
-        position, torch.pow(10000, -torch.arange(half).to(position).div(half)))
+    sinusoid = torch.outer(position, torch.pow(10000, -torch.arange(half).to(position).div(half)))
     x = torch.cat([torch.cos(sinusoid), torch.sin(sinusoid)], dim=1)
     return x
 
 
 class Head(nn.Module):
-
     def __init__(self, dim, out_dim, patch_size, eps=1e-6):
         super().__init__()
         self.dim = dim
@@ -73,7 +72,7 @@ class Head(nn.Module):
             e(Tensor): Shape [B, C]
         """
         e = (self.modulation + e.unsqueeze(1)).chunk(2, dim=1)
-        x = (self.head(self.norm(x) * (1 + e[1]) + e[0]))
+        x = self.head(self.norm(x) * (1 + e[1]) + e[0])
         return x
 
 
@@ -131,21 +130,26 @@ class WanModel(VisionModule):
         # embeddings
         if self.pre_process:
             self.patch_embedding = nn.Conv3d(
-                self.in_channels, self.config.hidden_size, kernel_size=self.patch_size, stride=self.patch_size)
+                self.in_channels, self.config.hidden_size, kernel_size=self.patch_size, stride=self.patch_size
+            )
 
         self.text_embedding = nn.Sequential(
-            nn.Linear(self.config.text_dim, self.config.hidden_size), nn.GELU(approximate='tanh'),
-            nn.Linear(self.config.hidden_size, self.config.hidden_size))
+            nn.Linear(self.config.text_dim, self.config.hidden_size),
+            nn.GELU(approximate="tanh"),
+            nn.Linear(self.config.hidden_size, self.config.hidden_size),
+        )
 
         # As in diffuser's Wan implementation
-        from diffusers.models.embeddings import Timesteps
-        from nemo.collections.diffusion.models.dit.dit_embeddings import ParallelTimestepEmbedding
         self.timesteps_proj = Timesteps(num_channels=self.freq_dim, flip_sin_to_cos=True, downscale_freq_shift=0)
-        self.time_embedder = ParallelTimestepEmbedding(in_channels=self.freq_dim, time_embed_dim=self.config.hidden_size)
+        self.time_embedder = ParallelTimestepEmbedding(
+            in_channels=self.freq_dim, time_embed_dim=self.config.hidden_size
+        )
         self.time_proj_act_fn = nn.SiLU()
         self.time_proj = nn.Linear(self.config.hidden_size, self.config.hidden_size * 6)
 
-        self.rope_embeddings = Wan3DRopeEmbeddings(dim_head = self.config.hidden_size // self.num_heads, max_position_len = 1024)
+        self.rope_embeddings = Wan3DRopeEmbeddings(
+            dim_head=self.config.hidden_size // self.num_heads, max_position_len=1024
+        )
 
         # decoder blocks
         self.decoder = TransformerBlock(
@@ -158,7 +162,7 @@ class WanModel(VisionModule):
 
         # output head
         if self.post_process:
-            self.head = Head(self.config.hidden_size, self.out_channels, self.patch_size, eps = 1e-6)
+            self.head = Head(self.config.hidden_size, self.out_channels, self.patch_size, eps=1e-6)
 
 
     def forward(
@@ -195,16 +199,18 @@ class WanModel(VisionModule):
             seq_len, batch_size, _ = x.shape
             c = self.out_channels
             pF, pH, pW = self.patch_size
-            x = x.reshape(seq_len * batch_size, pF, pH, pW, c) # output: x.shape [s * b, pF, pH, pW, c]
-            x = x.permute(0, 4, 1, 2, 3) # output: x.shape [s * b, c, pF, pH, pW]
-            x = self.patch_embedding(x) # output: x.shape [s * b, hidden_size, 1, 1, 1]
-            x = x.flatten(1) # output: x.shape [s * b, hidden_size]
-            x = x.reshape(seq_len, batch_size, -1) # output: x.shape [s, b, hidden_size]
+            x = x.reshape(seq_len * batch_size, pF, pH, pW, c)  # output: x.shape [s * b, pF, pH, pW, c]
+            x = x.permute(0, 4, 1, 2, 3)  # output: x.shape [s * b, c, pF, pH, pW]
+            x = self.patch_embedding(x)  # output: x.shape [s * b, hidden_size, 1, 1, 1]
+            x = x.flatten(1)  # output: x.shape [s * b, hidden_size]
+            x = x.reshape(seq_len, batch_size, -1)  # output: x.shape [s, b, hidden_size]
 
             # split sequence for sequence_parallel
             # TODO: for PP, do we move scatter_to_sequence_parallel_region here or after "x = self.decoder.input_tensor" ???
             if self.config.sequence_parallel:
-                x = tensor_parallel.scatter_to_sequence_parallel_region(x) # output: x.shape [s * b // tp_size, hidden_size]
+                x = tensor_parallel.scatter_to_sequence_parallel_region(
+                    x
+                )  # output: x.shape [s * b // tp_size, hidden_size]
 
         else:
             # intermediate stage of pipeline
@@ -215,13 +221,14 @@ class WanModel(VisionModule):
         e0 = self.time_proj(self.time_proj_act_fn(e)).unflatten(1, (6, self.config.hidden_size))
 
         # context embeddings
-        context = self.text_embedding(context) # shape [text_len, b, hidden_size]
-
+        context = self.text_embedding(context)  # shape [text_len, b, hidden_size]
 
         # ============= decoder =============
         # calculate rotary pos emb
         n_head, dim_head = self.num_heads, self.config.hidden_size // self.num_heads
-        rotary_pos_emb = self.rope_embeddings(n_head, dim_head, max_seq_len, grid_sizes, t.device) # output: rotary_pos_emb.shape [s, b, 1, dim_head]
+        rotary_pos_emb = self.rope_embeddings(
+            n_head, dim_head, max_seq_len, grid_sizes, t.device
+        )  # output: rotary_pos_emb.shape [s, b, 1, dim_head]
 
         # run decoder
         x = self.decoder(
@@ -240,18 +247,17 @@ class WanModel(VisionModule):
             return x
 
         # head
-        x = x.transpose(0, 1) # head expects shape [b, s, hidden_size]
-        x = self.head(x, e) # output: x.shape [b, s, c * pF * pH * pW]
-        x = x.transpose(0, 1) # reshape back to shape [s, b, c * pF * pH * pW]
+        x = x.transpose(0, 1)  # head expects shape [b, s, hidden_size]
+        x = self.head(x, e)  # output: x.shape [b, s, c * pF * pH * pW]
+        x = x.transpose(0, 1)  # reshape back to shape [s, b, c * pF * pH * pW]
 
         # gather outputs for sequence_parallel
-        # Note: in GPT models, because the vocab projection matrix is ColumnParallelLinear, the sequence is 
+        # Note: in GPT models, because the vocab projection matrix is ColumnParallelLinear, the sequence is
         #   automatically gathered in ColumnParallelLinear forward pass.
         #   However, in Wan models, we need to gather the outputs manually.
         if self.config.sequence_parallel:
             x = tensor_parallel.gather_from_sequence_parallel_region(x)
-
-        return x # output: x.shape [s, b, c * pF * pH * pW]
+        return x  # output: x.shape [s, b, c * pF * pH * pW]
 
 
     def set_input_tensor(self, input_tensor: Tensor) -> None:
@@ -269,7 +275,6 @@ class WanModel(VisionModule):
 
         assert len(input_tensor) == 1, "input_tensor should only be length 1 for gpt/bert"
         self.decoder.set_input_tensor(input_tensor[0])
-
 
     def sharded_state_dict(
         self, prefix: str = "module.", sharded_offsets: tuple = (), metadata: Optional[Dict] = None
@@ -301,7 +306,6 @@ class WanModel(VisionModule):
                         self._set_embedder_weights_replica_id(param, sharded_state_dict, weight_key)
 
         return sharded_state_dict
-
 
     def _set_embedder_weights_replica_id(
         self, tensor: Tensor, sharded_state_dict: ShardedStateDict, embedder_weight_key: str

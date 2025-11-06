@@ -55,8 +55,9 @@ def patchify(x, patch_size):
     for u in x:
         c, F_pF, H_pH, W_pW = u.shape
         pF, pH, pW = patch_size
-        assert F_pF % pF == 0 and H_pH % pH == 0 and W_pW % pW == 0, \
-            "Spatial dimensions must be divisible by patch size."
+        assert F_pF % pF == 0 and H_pH % pH == 0 and W_pW % pW == 0, (
+             "Spatial dimensions must be divisible by patch size."
+        )
 
         F_patches, H_patches, W_patches = F_pF // pF, H_pH // pH, W_pW // pW
 
@@ -72,7 +73,9 @@ def patchify(x, patch_size):
     return out
 
 
-def unpatchify(x: list[torch.Tensor], grid_sizes: list[Tuple[int, int, int]], out_dim: int, patch_size: Tuple[int, int, int]) -> list[torch.Tensor]:
+def unpatchify(
+    x: list[torch.Tensor], grid_sizes: list[Tuple[int, int, int]], out_dim: int, patch_size: Tuple[int, int, int]
+) -> list[torch.Tensor]:
     """
     Reconstruct video tensors from patch embeddings into a list of videotensors.
 
@@ -90,8 +93,8 @@ def unpatchify(x: list[torch.Tensor], grid_sizes: list[Tuple[int, int, int]], ou
     c = out_dim
     out = []
     for u, v in zip(x, grid_sizes):
-        u = u[:math.prod(v)].view(*v, *patch_size, c)
-        u = torch.einsum('fhwpqrc->cfphqwr', u)
+        u = u[: math.prod(v)].view(*v, *patch_size, c)
+        u = torch.einsum("fhwpqrc->cfphqwr", u)
         u = u.reshape(c, *[i * j for i, j in zip(v, patch_size)])
         out.append(u)
     return out
@@ -146,9 +149,9 @@ def cat_outputs_cp(x: torch.Tensor, seq_dim: int) -> torch.Tensor:
         return x
 
 
-def thd_split_inputs_cp(x: torch.Tensor,
-                           cu_seqlens_q_padded: torch.Tensor,
-                           cp_group: dist.ProcessGroup) -> torch.Tensor:
+def thd_split_inputs_cp(
+    x: torch.Tensor, cu_seqlens_q_padded: torch.Tensor, cp_group: dist.ProcessGroup
+) -> torch.Tensor:
     """
     Split a THD-packed tensor across CP ranks for inputs shaped [S, B, ...].
 

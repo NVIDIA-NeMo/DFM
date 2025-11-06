@@ -68,7 +68,6 @@ def _encode_text(
     return outputs
 
 class FlowInferencePipeline:
-
     def __init__(
         self,
         config,
@@ -129,7 +128,7 @@ class FlowInferencePipeline:
         )
 
         self.vae_stride = config.vae_stride
-        self.patch_size = config.patch_size      
+        self.patch_size = config.patch_size
         self.vae = AutoencoderKLWan.from_pretrained(
             model_id,
             subfolder="vae",
@@ -139,9 +138,9 @@ class FlowInferencePipeline:
 
         wan_checkpoint_dir = self._select_checkpoint_dir(checkpoint_dir, checkpoint_step)
         self.model = self.setup_model_from_checkpoint(wan_checkpoint_dir)
-        
+
         # if we use context parallelism, we need to set qkv_format to "thd" for context parallelism
-        self.model.config.qkv_format = "thd" # "sbhd"
+        self.model.config.qkv_format = "thd"  # "sbhd"
 
         # set self.sp_size=1 for later use, just to respect the original Wan inference code
         self.sp_size = 1
@@ -151,7 +150,7 @@ class FlowInferencePipeline:
         self.model.to(self.device)
 
         self.sample_neg_prompt = config.sample_neg_prompt
-        
+
 
     def setup_model_from_checkpoint(self, checkpoint_dir):
         provider = WanModelProvider()
@@ -163,7 +162,7 @@ class FlowInferencePipeline:
         # Once all overrides are set, finalize the model provider to ensure the post initialization logic is run
         provider.finalize()
         provider.initialize_model_parallel(seed=0)
-        
+
         ## Read from megatron checkpoint
         model = _load_megatron_model(
             checkpoint_dir,
@@ -210,6 +209,7 @@ class FlowInferencePipeline:
             raise FileNotFoundError(
                 f"No checkpoints found under {base_dir}. Expected subdirectories named like 'iter_0001800'.")
 
+
         logging.info(f"Auto-selected latest checkpoint: {latest_path}")
         return latest_path
 
@@ -220,7 +220,7 @@ class FlowInferencePipeline:
         grid_sizes: list[Tuple[int, int, int]],
         max_video_seq_len: int,
         timestep: torch.Tensor,
-        arg_c: dict,        
+        arg_c: dict,
     ) -> torch.Tensor:
         """
         Forward pass supporting pipeline parallelism.
@@ -232,11 +232,7 @@ class FlowInferencePipeline:
 
         # PP=1: no pipeline parallelism
         if pp_world_size == 1:
-            noise_pred_pp = self.model(
-                latent_model_input,
-                grid_sizes=grid_sizes,
-                t=timestep,
-                **arg_c)
+            noise_pred_pp = self.model(latent_model_input, grid_sizes=grid_sizes, t=timestep, **arg_c)
             return noise_pred_pp
 
         # PP>1: pipeline parallelism
@@ -247,11 +243,7 @@ class FlowInferencePipeline:
 
         if is_pp_first:
             # First stage: compute multimodal + first PP slice, send activations, then receive sampled token
-            hidden_states = self.model(
-                latent_model_input,
-                grid_sizes=grid_sizes,
-                t=timestep,
-                **arg_c)
+            hidden_states = self.model(latent_model_input, grid_sizes=grid_sizes, t=timestep, **arg_c)
             send_to_next_pipeline_rank(hidden_states)
 
             noise_pred_pp = broadcast_from_last_pipeline_stage(noise_pred_pp_shape, dtype=torch.float32)
@@ -265,15 +257,13 @@ class FlowInferencePipeline:
                 device=latent_model_input[0].device,
             )
             recv_from_prev_pipeline_rank_(recv_buffer)
-            recv_buffer = recv_buffer.to(torch.bfloat16) # ????
+            recv_buffer = recv_buffer.to(torch.bfloat16)
             self.model.set_input_tensor(recv_buffer)
-            noise_pred_pp = self.model(
-                latent_model_input,
-                grid_sizes=grid_sizes,
-                t=timestep,
-                **arg_c)
+            noise_pred_pp = self.model(latent_model_input, grid_sizes=grid_sizes, t=timestep, **arg_c)
 
-            noise_pred_pp = broadcast_from_last_pipeline_stage(noise_pred_pp_shape, dtype=noise_pred_pp.dtype, tensor=noise_pred_pp.contiguous())
+            noise_pred_pp = broadcast_from_last_pipeline_stage(
+                noise_pred_pp_shape, dtype=noise_pred_pp.dtype, tensor=noise_pred_pp.contiguous()
+            )
             return noise_pred_pp
 
         # Intermediate stages: recv -> run local slice -> send -> receive broadcast token
@@ -283,29 +273,27 @@ class FlowInferencePipeline:
             device=latent_model_input[0].device,
         )
         recv_from_prev_pipeline_rank_(recv_buffer)
-        recv_buffer = recv_buffer.to(torch.bfloat16) # ????
+        recv_buffer = recv_buffer.to(torch.bfloat16)
         self.model.set_input_tensor(recv_buffer)
-        hidden_states = self.model(
-            latent_model_input,
-            grid_sizes=grid_sizes,
-            t=timestep,
-            **arg_c)
+        hidden_states = self.model(latent_model_input, grid_sizes=grid_sizes, t=timestep, **arg_c)
         send_to_next_pipeline_rank(hidden_states)
 
         noise_pred_pp = broadcast_from_last_pipeline_stage(noise_pred_pp_shape, dtype=torch.float32)
         return noise_pred_pp
 
 
-    def generate(self,
-                 prompts,
-                 sizes,
-                 frame_nums,
-                 shift=5.0,
-                 sampling_steps=50,
-                 guide_scale=5.0,
-                 n_prompt="",
-                 seed=-1,
-                 offload_model=True):
+    def generate(
+        self,
+        prompts,
+        sizes,
+        frame_nums,
+        shift=5.0,
+        sampling_steps=50,
+        guide_scale=5.0,
+        n_prompt="",
+        seed=-1,
+        offload_model=True,
+    ):
         r"""
         Generates video frames from text prompt using diffusion process.
 
@@ -337,20 +325,30 @@ class FlowInferencePipeline:
                 - H: Frame height (from size)
                 - W: Frame width from size)
         """
-    
+
         # preprocess
         target_shapes = []
         for size, frame_num in zip(sizes, frame_nums):
-            target_shapes.append((self.vae.config.z_dim, (frame_num - 1) // self.vae_stride[0] + 1,
-                                size[1] // self.vae_stride[1],
-                                size[0] // self.vae_stride[2]))
-
+            target_shapes.append(
+                (
+                    self.vae.config.z_dim,
+                    (frame_num - 1) // self.vae_stride[0] + 1,
+                    size[1] // self.vae_stride[1],
+                    size[0] // self.vae_stride[2],
+                )
+            )
         max_video_seq_len = 0
         seq_lens = []
         for target_shape in target_shapes:
-            seq_len = math.ceil((target_shape[2] * target_shape[3]) /
-                                (self.patch_size[1] * self.patch_size[2]) *
-                                target_shape[1] / self.sp_size) * self.sp_size
+            seq_len = (
+                math.ceil(
+                    (target_shape[2] * target_shape[3])
+                    / (self.patch_size[1] * self.patch_size[2])
+                    * target_shape[1]
+                    / self.sp_size
+                )
+                * self.sp_size
+            )
             seq_lens.append(seq_len)
         max_video_seq_len = max(seq_lens)
 
@@ -359,7 +357,6 @@ class FlowInferencePipeline:
         seed = seed if seed >= 0 else random.randint(0, sys.maxsize)
         seed_g = torch.Generator(device=self.device)
         seed_g.manual_seed(seed)
-
 
         ## process context
         # we implement similar to Wan's diffuser setup
@@ -377,15 +374,17 @@ class FlowInferencePipeline:
                 if offload_model:
                     self.text_encoder.cpu()
             else:
-                context = self.text_encoder([prompt], torch.device('cpu'))[0].to(self.device)
-                context_null = self.text_encoder([n_prompt], torch.device('cpu'))[0].to(self.device)
-            context_lens.append(context_max_len) # all samples have the same context_max_len
+                context = self.text_encoder([prompt], torch.device("cpu"))[0].to(self.device)
+                context_null = self.text_encoder([n_prompt], torch.device("cpu"))[0].to(self.device)
+            context_lens.append(context_max_len)  # all samples have the same context_max_len
             contexts.append(context)
             contexts_null.append(context_null)
 
         # pad to context_max_len tokens, and stack to a tensor of shape [s, b, hidden]
         contexts = [F.pad(context, (0, 0, 0, context_max_len - context.shape[0])) for context in contexts]
-        contexts_null = [F.pad(context_null, (0, 0, 0, context_max_len - context_null.shape[0])) for context_null in contexts_null]
+        contexts_null = [
+            F.pad(context_null, (0, 0, 0, context_max_len - context_null.shape[0])) for context_null in contexts_null
+        ]
         contexts = torch.stack(contexts, dim=1)
         contexts_null = torch.stack(contexts_null, dim=1)
 
@@ -401,23 +400,26 @@ class FlowInferencePipeline:
                     target_shape[3],
                     dtype=torch.float32,
                     device=self.device,
-                    generator=seed_g)
+                    generator=seed_g,
+                )
             )
 
 
         # calculate grid_sizes
-        grid_sizes = [grid_sizes_calculation(
-            input_shape =u.shape[1:], 
-            patch_size=self.model.patch_size,
-            ) for u in noises]
+        grid_sizes = [
+            grid_sizes_calculation(
+                input_shape=u.shape[1:],
+                patch_size=self.model.patch_size,
+            )
+            for u in noises
+        ]
         grid_sizes = torch.tensor(grid_sizes, dtype=torch.long)
-
 
         @contextmanager
         def noop_no_sync():
             yield
 
-        no_sync = getattr(self.model, 'no_sync', noop_no_sync)
+        no_sync = getattr(self.model, "no_sync", noop_no_sync)
 
         # evaluation mode
         with amp.autocast(dtype=self.param_dtype), torch.no_grad(), no_sync():
@@ -425,9 +427,7 @@ class FlowInferencePipeline:
             batch_size_for_schedulers = len(noises)
             schedulers = []
             for _ in range(batch_size_for_schedulers):
-                base_sched = FlowMatchEulerDiscreteScheduler.from_pretrained(
-                    self.model_id, subfolder="scheduler"
-                )
+                base_sched = FlowMatchEulerDiscreteScheduler.from_pretrained(self.model_id, subfolder="scheduler")
                 s = UniPCMultistepScheduler.from_config(base_sched.config, flow_shift=shift)
                 s.set_timesteps(sampling_steps, device=self.device)
 
@@ -454,13 +454,15 @@ class FlowInferencePipeline:
                     qkv_format=self.model.config.qkv_format,
                 ),
             }
-            
 
-            arg_c = {'context': contexts, 'max_seq_len': max_video_seq_len, 'packed_seq_params': packed_seq_params}
-            arg_null = {'context': contexts_null, 'max_seq_len': max_video_seq_len, 'packed_seq_params': packed_seq_params}
+            arg_c = {"context": contexts, "max_seq_len": max_video_seq_len, "packed_seq_params": packed_seq_params}
+            arg_null = {
+                "context": contexts_null,
+                "max_seq_len": max_video_seq_len,
+                "packed_seq_params": packed_seq_params,
+            }
 
             for _, t in enumerate(tqdm(timesteps)):
-
                 batch_size = len(latents)
 
                 # patchify latents
@@ -471,42 +473,54 @@ class FlowInferencePipeline:
                     latents[i] = F.pad(latents[i], (0, 0, 0, max_video_seq_len - latents[i].shape[0]))
                 latents = torch.stack(latents, dim=1)
 
-
                 latent_model_input = latents
                 timestep = [t] * batch_size
                 timestep = torch.stack(timestep)
 
                 self.model.to(self.device)
                 noise_pred_cond = self.forward_pp_step(
-                    latent_model_input, grid_sizes=grid_sizes, max_video_seq_len=max_video_seq_len, timestep=timestep, arg_c=arg_c)
+                    latent_model_input,
+                    grid_sizes=grid_sizes,
+                    max_video_seq_len=max_video_seq_len,
+                    timestep=timestep,
+                    arg_c=arg_c,
+                )
 
                 noise_pred_uncond = self.forward_pp_step(
-                    latent_model_input, grid_sizes=grid_sizes, max_video_seq_len=max_video_seq_len, timestep=timestep, arg_c=arg_null)
+                    latent_model_input,
+                    grid_sizes=grid_sizes,
+                    max_video_seq_len=max_video_seq_len,
+                    timestep=timestep,
+                    arg_c=arg_null,
+                )
 
                 # run unpatchify
                 unpatchified_noise_pred_cond = noise_pred_cond
-                unpatchified_noise_pred_cond = unpatchified_noise_pred_cond.transpose(0, 1) # bring sbhd -> bshd
+                unpatchified_noise_pred_cond = unpatchified_noise_pred_cond.transpose(0, 1)  # bring sbhd -> bshd
                 # when unpatchifying, the code will truncate the padded videos into the original video shape, based on the grid_sizes.
-                unpatchified_noise_pred_cond = unpatchify(unpatchified_noise_pred_cond, grid_sizes, self.vae.config.z_dim, self.patch_size)
+                unpatchified_noise_pred_cond = unpatchify(
+                    unpatchified_noise_pred_cond, grid_sizes, self.vae.config.z_dim, self.patch_size
+                )
                 unpatchified_noise_pred_uncond = noise_pred_uncond
-                unpatchified_noise_pred_uncond = unpatchified_noise_pred_uncond.transpose(0, 1) # bring sbhd -> bshd
+                unpatchified_noise_pred_uncond = unpatchified_noise_pred_uncond.transpose(0, 1)  # bring sbhd -> bshd
                 # when unpatchifying, the code will truncate the padded videos into the original video shape, based on the grid_sizes.
-                unpatchified_noise_pred_uncond = unpatchify(unpatchified_noise_pred_uncond, grid_sizes, self.vae.config.z_dim, self.patch_size)
+                unpatchified_noise_pred_uncond = unpatchify(
+                    unpatchified_noise_pred_uncond, grid_sizes, self.vae.config.z_dim, self.patch_size
+                )
 
                 noise_preds = []
                 for i in range(batch_size):
                     noise_pred = unpatchified_noise_pred_uncond[i] + guide_scale * (
-                        unpatchified_noise_pred_cond[i] - unpatchified_noise_pred_uncond[i])
+                        unpatchified_noise_pred_cond[i] - unpatchified_noise_pred_uncond[i]
+                    )
                     noise_preds.append(noise_pred)
 
                 # step and update latents
                 latents = []
                 for i in range(batch_size):
-                    temp_x0 =schedulers[i].step(
-                        noise_preds[i].unsqueeze(0), 
-                        t, 
-                        unpatchified_latents[i].unsqueeze(0), 
-                        return_dict=False)[0]
+                    temp_x0 = schedulers[i].step(
+                        noise_preds[i].unsqueeze(0), t, unpatchified_latents[i].unsqueeze(0), return_dict=False
+                    )[0]
                     latents.append(temp_x0.squeeze(0))
 
             x0 = latents
@@ -522,9 +536,9 @@ class FlowInferencePipeline:
                     .view(1, self.vae.config.z_dim, 1, 1, 1)
                     .to(latents.device, latents.dtype)
                 )
-                latents_std = 1.0 / torch.tensor(self.vae.config.latents_std).view(1, self.vae.config.z_dim, 1, 1, 1).to(
-                    latents.device, latents.dtype
-                )
+                latents_std = 1.0 / torch.tensor(self.vae.config.latents_std).view(
+                    1, self.vae.config.z_dim, 1, 1, 1
+                ).to(latents.device, latents.dtype)
                 latents = latents / latents_std + latents_mean
                 videos = self.vae.decode(latents).sample
             else:

@@ -1,4 +1,3 @@
-
 # Copyright (c) 2024, NVIDIA CORPORATION.  All rights reserved.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
@@ -58,9 +57,7 @@ class WanAdaLN(MegatronModule):
     Adaptive Layer Normalization Module for DiT.
     """
 
-    def __init__(
-        self, config: TransformerConfig
-    ):
+    def __init__(self, config: TransformerConfig):
         super().__init__(config)
         # modulation
         self.modulation = nn.Parameter(torch.randn(1, 6, config.hidden_size) / config.hidden_size**0.5)
@@ -123,7 +120,7 @@ class WanLayerWithAdaLN(TransformerLayer):
             submodules.norm1,
             normalized_shape=config.hidden_size,
             eps=config.layernorm_epsilon,
-            elementwise_affine=False
+            elementwise_affine=False,
         )
         self.norm3 = build_module(
             submodules.norm3,
@@ -137,7 +134,6 @@ class WanLayerWithAdaLN(TransformerLayer):
             eps=config.layernorm_epsilon,
             elementwise_affine=False,
         )
-
 
     def forward(
         self,
@@ -182,7 +178,7 @@ class WanLayerWithAdaLN(TransformerLayer):
             rotary_pos_emb=rope_emb,
             rotary_pos_cos=rotary_pos_cos,
             rotary_pos_sin=rotary_pos_sin,
-            packed_seq_params=packed_seq_params['self_attention'],
+            packed_seq_params=packed_seq_params["self_attention"],
         )
         if bias is not None:
             attention_output = attention_output + bias
@@ -195,7 +191,7 @@ class WanLayerWithAdaLN(TransformerLayer):
             self.norm3(hidden_states),
             attention_mask=context_mask,
             key_value_states=context,
-            packed_seq_params=packed_seq_params['cross_attention'],
+            packed_seq_params=packed_seq_params["cross_attention"],
         )
         if bias is not None:
             attention_output = attention_output + bias
@@ -212,7 +208,7 @@ class WanLayerWithAdaLN(TransformerLayer):
 
         mlp_output, bias = self.mlp(pre_mlp_layernorm_output_ada)
         if bias is not None:
-           mlp_output = mlp_output + bias
+            mlp_output = mlp_output + bias
 
         hidden_states = self.adaLN.scale_add(residual=hidden_states, x=mlp_output, gate=gate_mlp)
 
@@ -244,7 +240,7 @@ def get_wan_block_with_transformer_engine_spec() -> ModuleSpec:
                     core_attention=TEDotProductAttention,
                     linear_proj=TERowParallelLinear,
                     q_layernorm=TENorm,
-                    k_layernorm=TENorm,         
+                    k_layernorm=TENorm,
                 ),
             ),
             cross_attention=ModuleSpec(

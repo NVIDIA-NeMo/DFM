@@ -30,6 +30,7 @@ from dfm.src.megatron.model.wan.flow_matching.flow_pipeline import FlowPipeline
 
 logger = logging.getLogger(__name__)
 
+
 def wan_data_step(qkv_format, dataloader_iter):
     batch = next(iter(dataloader_iter.iterable))
 
@@ -75,16 +76,14 @@ class WanForwardStep:
         straggler_timer = state.straggler_timer
 
         config = get_model_config(model)
- 
+
         timers("batch-generator", log_level=2).start()
 
         qkv_format = getattr(config, "qkv_format", "sbhd")
         with straggler_timer(bdata=True):
-            batch = wan_data_step(
-                qkv_format, data_iterator
-            )
+            batch = wan_data_step(qkv_format, data_iterator)
         timers("batch-generator").stop()
-        
+
         check_for_nan_in_loss = state.cfg.rerun_state_machine.check_for_nan_in_loss
         check_for_spiky_loss = state.cfg.rerun_state_machine.check_for_spiky_loss
 
@@ -105,13 +104,15 @@ class WanForwardStep:
         if "loss_mask" not in batch or batch["loss_mask"] is None:
             loss_mask = torch.ones_like(loss)
         loss_mask = batch["loss_mask"]
-        
+
         loss_function = self._create_loss_function(loss_mask, check_for_nan_in_loss, check_for_spiky_loss)
 
         return output_tensor, loss_function
 
 
-    def _create_loss_function(self, loss_mask: torch.Tensor, check_for_nan_in_loss: bool, check_for_spiky_loss: bool) -> partial:
+    def _create_loss_function(
+        self, loss_mask: torch.Tensor, check_for_nan_in_loss: bool, check_for_spiky_loss: bool
+    ) -> partial:
         """Create a partial loss function with the specified configuration.
 
         Args:

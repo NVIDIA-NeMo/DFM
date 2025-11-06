@@ -27,6 +27,7 @@ from dfm.src.megatron.model.wan.wan_model import WanModel
 
 logger = logging.getLogger(__name__)
 
+
 @dataclass
 class WanModelProvider(TransformerConfig, ModelProviderMixin[VisionModule]):
     crossattn_emb_size: int = 1536
@@ -49,7 +50,7 @@ class WanModelProvider(TransformerConfig, ModelProviderMixin[VisionModule]):
     parallel_output: bool = True
     bf16: bool = False
     params_dtype: torch.dtype = torch.float32
-    qkv_format: str = "sbhd" # "thd". NOTE: if we use context parallelism, we need to use "thd"
+    qkv_format: str = "sbhd"  # "thd". NOTE: if we use context parallelism, we need to use "thd"
     # these attributes are unused for images/videos, we just set because bridge training requires for LLMs
     seq_length: int = 1024
     share_embeddings_and_output_weights: bool = False

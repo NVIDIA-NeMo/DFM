@@ -22,7 +22,6 @@ from dfm.src.megatron.model.wan.utils import patchify, thd_split_inputs_cp
 
 
 class FlowPipeline:
-
     def __init__(
         self,
         model_id="Wan-AI/Wan2.1-T2V-1.3B-Diffusers",
@@ -33,10 +32,9 @@ class FlowPipeline:
         """
         self.pipe = WanPipeline.from_pretrained(model_id, vae=None, torch_dtype=torch.float32, text_encoder=None)
 
-
     def training_step(
-        self, 
-        model, 
+        self,
+        model,
         data_batch: dict[str, torch.Tensor],
         # Flow matching parameters
         use_sigma_noise: bool = True,
@@ -55,13 +53,13 @@ class FlowPipeline:
         3. Compute the loss based on the difference between the predictions and target.
         """
 
-        video_latents = data_batch['video_latents']
-        max_video_seq_len = data_batch['max_video_seq_len']
-        context_embeddings = data_batch['context_embeddings']
-        loss_mask = data_batch['loss_mask']
-        grid_sizes = data_batch['grid_sizes']
-        packed_seq_params = data_batch['packed_seq_params']
-        video_metadata = data_batch['video_metadata']
+        video_latents = data_batch["video_latents"]
+        max_video_seq_len = data_batch["max_video_seq_len"]
+        context_embeddings = data_batch["context_embeddings"]
+        loss_mask = data_batch["loss_mask"]
+        grid_sizes = data_batch["grid_sizes"]
+        packed_seq_params = data_batch["packed_seq_params"]
+        video_metadata = data_batch["video_metadata"]
 
         self.model = model
 
@@ -75,12 +73,12 @@ class FlowPipeline:
         # ========================================================================
         # Flow Matching Timestep Sampling
         # ========================================================================
-        
+
         num_train_timesteps = self.pipe.scheduler.config.num_train_timesteps
-        
+
         if use_sigma_noise:
             use_uniform = torch.rand(1).item() < mix_uniform_ratio
-            
+
             if use_uniform or timestep_sampling == "uniform":
                 # Pure uniform: u ~ U(0, 1)
                 u = torch.rand(size=(batch_size,), device=device)
@@ -94,12 +92,12 @@ class FlowPipeline:
                     logit_std=logit_std,
                 ).to(device)
                 sampling_method = timestep_sampling
-            
+
             # Apply flow shift: σ = shift/(shift + (1/u - 1))
             u_clamped = torch.clamp(u, min=1e-5)  # Avoid division by zero
             sigma = flow_shift / (flow_shift + (1.0 / u_clamped - 1.0))
             sigma = torch.clamp(sigma, 0.0, 1.0)
-            
+
         else:
             # Simple uniform without shift
             u = torch.rand(size=(batch_size,), device=device)
@@ -119,33 +117,33 @@ class FlowPipeline:
             sample_noise = torch.randn(
                 1,
                 in_channels,
-                grid_size[0]*patch_temporal,
-                grid_size[1]*patch_spatial,
-                grid_size[2]*patch_spatial,
+                grid_size[0] * patch_temporal,
+                grid_size[1] * patch_spatial,
+                grid_size[2] * patch_spatial,
                 dtype=torch.float32,
                 device=video_latents.device,
             )
-            sample_noise = patchify(sample_noise, (patch_temporal, patch_spatial, patch_spatial))[0] # shape [noise_seq, c * ( pF * pH * pW)]
+            sample_noise = patchify(sample_noise, (patch_temporal, patch_spatial, patch_spatial))[
+                0
+            ]  # shape [noise_seq, c * ( pF * pH * pW)]
 
             # because video_latents might be padded, we need to make sure noise also be padded to have the same shape
             noise_seq = sample_noise.shape[0]
             video_seq = video_latents.shape[0]
             if noise_seq < video_seq:
                 pad_len = video_seq - noise_seq
-                pad = torch.zeros((pad_len, sample_noise.shape[1]), device=sample_noise.device, dtype=sample_noise.dtype)
+                pad = torch.zeros(
+                    (pad_len, sample_noise.shape[1]), device=sample_noise.device, dtype=sample_noise.dtype
+                )
                 sample_noise = torch.cat([sample_noise, pad], dim=0)
             noise.append(sample_noise)
-        noise = torch.stack(noise, dim=1) # shape [noise_seq, batch_size, c * ( pF * pH * pW)]
-
+        noise = torch.stack(noise, dim=1)  # shape [noise_seq, batch_size, c * ( pF * pH * pW)]
 
         # CRITICAL: Manual flow matching (NOT scheduler.add_noise!)
         # x_t = (1 - σ) * x_0 + σ * ε
         sigma_reshaped = sigma.view(1, batch_size, 1)
-        noisy_latents = (
-            (1.0 - sigma_reshaped) * video_latents.float() 
-            + sigma_reshaped * noise
-        )
-        
+        noisy_latents = (1.0 - sigma_reshaped) * video_latents.float() + sigma_reshaped * noise
+
         # Timesteps for model [0, 1000]
         timesteps = sigma * num_train_timesteps
 
@@ -161,13 +159,31 @@ class FlowPipeline:
         # ========================================================================
         # Split accross context parallelism
         # ========================================================================
-        
+
         if parallel_state.get_context_parallel_world_size() > 1:
-            video_latents = thd_split_inputs_cp(video_latents, packed_seq_params['self_attention'].cu_seqlens_q, parallel_state.get_context_parallel_group())
-            noisy_latents = thd_split_inputs_cp(noisy_latents, packed_seq_params['self_attention'].cu_seqlens_q, parallel_state.get_context_parallel_group())
-            noise = thd_split_inputs_cp(noise, packed_seq_params['self_attention'].cu_seqlens_q, parallel_state.get_context_parallel_group())
-            context_embeddings = thd_split_inputs_cp(context_embeddings, packed_seq_params['cross_attention'].cu_seqlens_kv, parallel_state.get_context_parallel_group())
-            split_loss_mask = thd_split_inputs_cp(loss_mask, packed_seq_params['self_attention'].cu_seqlens_q, parallel_state.get_context_parallel_group())
+            video_latents = thd_split_inputs_cp(
+                video_latents,
+                packed_seq_params["self_attention"].cu_seqlens_q,
+                parallel_state.get_context_parallel_group(),
+            )
+            noisy_latents = thd_split_inputs_cp(
+                noisy_latents,
+                packed_seq_params["self_attention"].cu_seqlens_q,
+                parallel_state.get_context_parallel_group(),
+            )
+            noise = thd_split_inputs_cp(
+                noise, packed_seq_params["self_attention"].cu_seqlens_q, parallel_state.get_context_parallel_group()
+            )
+            context_embeddings = thd_split_inputs_cp(
+                context_embeddings,
+                packed_seq_params["cross_attention"].cu_seqlens_kv,
+                parallel_state.get_context_parallel_group(),
+            )
+            split_loss_mask = thd_split_inputs_cp(
+                loss_mask,
+                packed_seq_params["self_attention"].cu_seqlens_q,
+                parallel_state.get_context_parallel_group(),
+            )
         else:
             video_latents = video_latents
             noisy_latents = noisy_latents
@@ -178,40 +194,35 @@ class FlowPipeline:
         # ========================================================================
         # Forward Pass
         # ========================================================================
-        
+
         if parallel_state.is_pipeline_last_stage():
-        
             model_pred = self.model(
-                x = noisy_latents,
-                grid_sizes = grid_sizes,
-                t = timesteps,
-                context = context_embeddings,
-                max_seq_len = max_video_seq_len,
+                x=noisy_latents,
+                grid_sizes=grid_sizes,
+                t=timesteps,
+                context=context_embeddings,
+                max_seq_len=max_video_seq_len,
                 packed_seq_params=packed_seq_params,
             )
 
             # ========================================================================
             # Target: Flow Matching Velocity
             # ========================================================================
-            
+
             # Flow matching target: v = ε - x_0
             target = noise - video_latents.float()
-            
+
             # ========================================================================
             # Loss with Flow Weighting
             # ========================================================================
-            
-            loss = torch.nn.functional.mse_loss(
-                model_pred.float(),
-                target.float(),
-                reduction="none"
-            )
+
+            loss = torch.nn.functional.mse_loss(model_pred.float(), target.float(), reduction="none")
 
             # Flow weight: w = 1 + shift * σ
-            loss_weight = 1.0 + flow_shift * sigma # shape [batch_size]
-            loss_weight = loss_weight.view(1, batch_size, 1).to(device) # shape [1, batch_size, 1]
+            loss_weight = 1.0 + flow_shift * sigma  # shape [batch_size]
+            loss_weight = loss_weight.view(1, batch_size, 1).to(device)  # shape [1, batch_size, 1]
             unweighted_loss = loss
-            weighted_loss = (loss * loss_weight) # shape [seq_length / cp_size, batch_size, -1]
+            weighted_loss = loss * loss_weight  # shape [seq_length / cp_size, batch_size, -1]
 
             # Safety check
             mean_weighted_loss = weighted_loss.mean()
@@ -224,11 +235,11 @@ class FlowPipeline:
 
         else:
             hidden_states = self.model(
-                x = noisy_latents,
-                grid_sizes = grid_sizes,
-                t = timesteps,
-                context = context_embeddings,
-                max_seq_len = max_video_seq_len,
+                x=noisy_latents,
+                grid_sizes=grid_sizes,
+                t=timesteps,
+                context=context_embeddings,
+                max_seq_len=max_video_seq_len,
                 packed_seq_params=packed_seq_params,
             )
 

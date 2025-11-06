@@ -21,7 +21,7 @@ import warnings
 from datetime import datetime
 
 
-warnings.filterwarnings('ignore')
+warnings.filterwarnings("ignore")
 
 import random
 
@@ -35,12 +35,10 @@ from dfm.src.megatron.model.wan.inference.utils import cache_video, str2bool
 
 EXAMPLE_PROMPT = {
     "t2v-1.3B": {
-        "prompt":
-            "Two anthropomorphic cats in comfy boxing gear and bright gloves fight intensely on a spotlighted stage.",
+        "prompt": "Two anthropomorphic cats in comfy boxing gear and bright gloves fight intensely on a spotlighted stage.",
     },
     "t2v-14B": {
-        "prompt":
-            "Two anthropomorphic cats in comfy boxing gear and bright gloves fight intensely on a spotlighted stage.",
+        "prompt": "Two anthropomorphic cats in comfy boxing gear and bright gloves fight intensely on a spotlighted stage.",
     },
 }
 
@@ -62,75 +60,59 @@ def _validate_args(args):
 
     # Frames default handled later; no single frame arg anymore
 
-    args.base_seed = args.base_seed if args.base_seed >= 0 else random.randint(
-        0, sys.maxsize)
+    args.base_seed = args.base_seed if args.base_seed >= 0 else random.randint(0, sys.maxsize)
     # Size check: only validate provided --sizes; default handled later
     if args.sizes is not None and len(args.sizes) > 0:
         for s in args.sizes:
             assert s in SUPPORTED_SIZES[args.task], (
                 f"Unsupport size {s} for task {args.task}, supported sizes are: "
-                f"{', '.join(SUPPORTED_SIZES[args.task])}")
+                f"{', '.join(SUPPORTED_SIZES[args.task])}"
 
 
 def _parse_args():
-    parser = argparse.ArgumentParser(
-        description="Generate a image or video from a text prompt or image using Wan"
-    )
+    parser = argparse.ArgumentParser(description="Generate a image or video from a text prompt or image using Wan")
     parser.add_argument(
-        "--task",
-        type=str,
-        default="t2v-14B",
-        choices=list(WAN_CONFIGS.keys()),
-        help="The task to run.")
+        "--task", type=str, default="t2v-14B", choices=list(WAN_CONFIGS.keys()), help="The task to run."
+    )
     parser.add_argument(
         "--sizes",
         type=str,
         nargs="+",
         default=None,
         choices=list(SIZE_CONFIGS.keys()),
-        help="A list of sizes to generate multiple images or videos (WIDTH*HEIGHT). Example: --sizes 1280*720 1920*1080"
+        help="A list of sizes to generate multiple images or videos (WIDTH*HEIGHT). Example: --sizes 1280*720 1920*1080",
     )
     parser.add_argument(
         "--frame_nums",
         type=int,
         nargs="+",
         default=None,
-        help="List of frame counts (each should be 4n+1). Broadcasts if single value."
+        help="List of frame counts (each should be 4n+1). Broadcasts if single value.",
     )
     parser.add_argument(
-        "--checkpoint_dir",
-        type=str,
-        default=None,
-        help="The path to the main WAN checkpoint directory.")
+        "--checkpoint_dir", type=str, default=None, help="The path to the main WAN checkpoint directory.",
+    )
     parser.add_argument(
         "--checkpoint_step",
         type=int,
         default=None,
         help=(
             "Optional training step to load, e.g. 1800 -> iter_0001800. "
-            "If not provided, the latest (largest) step in --checkpoint_dir is used.")
+            "If not provided, the latest (largest) step in --checkpoint_dir is used.",
+        ),
     )
     parser.add_argument(
-        "--t5_checkpoint_dir",
-        type=str,
-        default=None,
-        help="Optional directory containing T5 checkpoint/tokenizer")
-    parser.add_argument(
-        "--vae_checkpoint_dir",
-        type=str,
-        default=None,
-        help="Optional directory containing VAE checkpoint")
-    parser.add_argument(
-        "--offload_model",
-        type=str2bool,
-        default=None,
-        help="Whether to offload the model to CPU after each model forward, reducing GPU memory usage."
+        "--t5_checkpoint_dir", type=str, default=None, help="Optional directory containing T5 checkpoint/tokenizer"
     )
     parser.add_argument(
-        "--t5_cpu",
-        action="store_true",
-        default=False,
-        help="Whether to place T5 model on CPU.")
+        "--vae_checkpoint_dir", type=str, default=None, help="Optional directory containing VAE checkpoint"
+    )
+    parser.add_argument(
+        "--offload_model", type=str2bool, default=None, help="Whether to offload the model to CPU after each model forward, reducing GPU memory usage."
+    )
+    parser.add_argument(
+        "--t5_cpu", action="store_true", default=False, help="Whether to place T5 model on CPU.",
+    )
     parser.add_argument(
         "--save_file",
         type=str,
@@ -141,7 +123,7 @@ def _parse_args():
         type=str,
         nargs="+",
         default=None,
-        help="A list of prompts to generate multiple images or videos. Example: --prompts 'a cat' 'a dog'"
+        help="A list of prompts to generate multiple images or videos. Example: --prompts 'a cat' 'a dog'",
     )
     parser.add_argument(
         "--base_seed",

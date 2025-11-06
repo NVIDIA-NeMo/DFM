@@ -136,7 +136,6 @@ def pretrain_config(
     checkpoint_dir = os.path.join(run_output_dir, "checkpoints")
     tensorboard_dir = os.path.join(run_output_dir, "tb_logs")
 
-
     model_cfg = model_config(
         tensor_parallelism=tensor_parallelism,
         pipeline_parallelism=pipeline_parallelism,
@@ -158,7 +157,6 @@ def pretrain_config(
         precision_config = get_mixed_precision_config(precision_config)
 
     precision_config.grad_reduce_in_fp32 = False
-
 
     # Config Container
     cfg = ConfigContainer(
@@ -184,13 +182,13 @@ def pretrain_config(
             use_distributed_optimizer=True,
             use_megatron_fsdp=use_megatron_fsdp,  # need use_distributed_optimizer=True
         ),
-        dataset= WanDataModuleConfig(
+        dataset=WanDataModuleConfig(
             path=None,
-            seq_length=1024, # we don't need to use this value, just add because Bridge training requires for LLMs
+            seq_length=1024,  # we don't need to use this value, just add because Bridge training requires for LLMs
             micro_batch_size=micro_batch_size,
             global_batch_size=global_batch_size,
-            num_workers=10)
-        ,
+            num_workers=10,
+        ),
         logger=LoggerConfig(
             log_interval=10,
             tensorboard_dir=tensorboard_dir,

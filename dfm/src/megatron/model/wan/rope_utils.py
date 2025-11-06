@@ -24,22 +24,26 @@ class Wan3DRopeEmbeddings(torch.nn.Module):
 
     def __init__(self, dim_head, max_position_len):
         super().__init__()
-        self.freqs = torch.cat([
-            self.rope_params(max_position_len, dim_head - 4 * (dim_head // 6)),
-            self.rope_params(max_position_len, 2 * (dim_head // 6)),
-            self.rope_params(max_position_len, 2 * (dim_head // 6))
-        ], dim=1)
+        self.freqs = torch.cat(
+            [
+                self.rope_params(max_position_len, dim_head - 4 * (dim_head // 6)),
+                self.rope_params(max_position_len, 2 * (dim_head // 6)),
+                self.rope_params(max_position_len, 2 * (dim_head // 6)),
+            ],
+            dim=1,
+        )
 
     def rope_params(self, max_position_len, dim_head, theta=10000):
         assert dim_head % 2 == 0
         freqs = torch.outer(
-            torch.arange(max_position_len),
-            1.0 / torch.pow(theta,
-                            torch.arange(0, dim_head, 2).div(dim_head)))
+            torch.arange(max_position_len), 1.0 / torch.pow(theta, torch.arange(0, dim_head, 2).div(dim_head))
+        )
         return freqs
 
     def forward(self, n_head, dim_head, max_seq_len, grid_sizes, device):
-        self.freqs = self.freqs.to(device) # ??? do we need to put this here, or the when we move WanModel to device, it also move freqs to device?
+        self.freqs = self.freqs.to(
+            device,
+        )
 
         n, c = n_head, dim_head // 2
 
@@ -49,11 +53,14 @@ class Wan3DRopeEmbeddings(torch.nn.Module):
         freqs_real = []
         for i, (f, h, w) in enumerate(grid_sizes.tolist()):
             seq_len = f * h * w
-            freqs_real_i = torch.cat([
-                freqs[0][:f].view(f, 1, 1, -1).expand(f, h, w, -1),
-                freqs[1][:h].view(1, h, 1, -1).expand(f, h, w, -1),
-                freqs[2][:w].view(1, 1, w, -1).expand(f, h, w, -1)
-            ], dim=-1).reshape(seq_len, 1, 1, -1)  # <-- add 1,1 for batch/head broadcasting
+            freqs_real_i = torch.cat(
+                [
+                    freqs[0][:f].view(f, 1, 1, -1).expand(f, h, w, -1),
+                    freqs[1][:h].view(1, h, 1, -1).expand(f, h, w, -1),
+                    freqs[2][:w].view(1, 1, w, -1).expand(f, h, w, -1),
+                ],
+                dim=-1,
+            ).reshape(seq_len, 1, 1, -1)  # <-- add 1,1 for batch/head broadcasting
 
             # Double dimension from c -> 2c with rotating angles as (x0, x0, x1, x1, ...), for interleaving RoPE
             freqs_real_i = freqs_real_i.unsqueeze(-1).expand(-1, -1, -1, -1, 2).reshape(seq_len, 1, 1, dim_head)
