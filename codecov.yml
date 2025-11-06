@@ -2,7 +2,18 @@ comment: false
 coverage:
   status:
     project: false
-    patch: false
+    patch:
+      default:
+        target: 0%
+        threshold: 100%
+        base: auto
+        if_ci_failed: success
+        if_no_uploads: success
+        if_not_found: success
+
+codecov:
+  require_ci_to_pass: true
+  slug: NVIDIA-NeMo/DFM
 
 fixes:
   - "/workspace/::"
