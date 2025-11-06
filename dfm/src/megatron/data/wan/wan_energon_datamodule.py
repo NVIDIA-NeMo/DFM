@@ -39,7 +39,8 @@ class WanDataModuleConfig(DatasetProvider):
             task_encoder=WanTaskEncoder(seq_length=self.seq_length),
             micro_batch_size=self.micro_batch_size,
             global_batch_size=self.global_batch_size,
-            num_workers=self.num_workers)
+            num_workers=self.num_workers,
+        )
         self.sequence_length = self.dataset.seq_length
     
     def build_datasets(self, context: DatasetBuildContext):

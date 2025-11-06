@@ -56,7 +56,7 @@ def patchify(x, patch_size):
         c, F_pF, H_pH, W_pW = u.shape
         pF, pH, pW = patch_size
         assert F_pF % pF == 0 and H_pH % pH == 0 and W_pW % pW == 0, (
-             "Spatial dimensions must be divisible by patch size."
+            "Spatial dimensions must be divisible by patch size."
         )
 
         F_patches, H_patches, W_patches = F_pF // pF, H_pH // pH, W_pW // pW

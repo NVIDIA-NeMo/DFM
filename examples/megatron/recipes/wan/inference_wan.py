@@ -90,7 +90,10 @@ def _parse_args():
         help="List of frame counts (each should be 4n+1). Broadcasts if single value.",
     )
     parser.add_argument(
-        "--checkpoint_dir", type=str, default=None, help="The path to the main WAN checkpoint directory.",
+        "--checkpoint_dir",
+        type=str,
+        default=None,
+        help="The path to the main WAN checkpoint directory.",
     )
     parser.add_argument(
         "--checkpoint_step",
@@ -108,16 +111,23 @@ def _parse_args():
         "--vae_checkpoint_dir", type=str, default=None, help="Optional directory containing VAE checkpoint"
     )
     parser.add_argument(
-        "--offload_model", type=str2bool, default=None, help="Whether to offload the model to CPU after each model forward, reducing GPU memory usage."
+        "--offload_model",
+        type=str2bool,
+        default=None,
+        help="Whether to offload the model to CPU after each model forward, reducing GPU memory usage.",
     )
     parser.add_argument(
-        "--t5_cpu", action="store_true", default=False, help="Whether to place T5 model on CPU.",
+        "--t5_cpu",
+        action="store_true",
+        default=False,
+        help="Whether to place T5 model on CPU.",
     )
     parser.add_argument(
         "--save_file",
         type=str,
         default=None,
-        help="The file to save the generated image or video to.")
+        help="The file to save the generated image or video to."
+    )
     parser.add_argument(
         "--prompts",
         type=str,
@@ -177,7 +187,8 @@ def _init_logging(rank):
         logging.basicConfig(
             level=logging.INFO,
             format="[%(asctime)s] %(levelname)s: %(message)s",
-            handlers=[logging.StreamHandler(stream=sys.stdout)])
+            handlers=[logging.StreamHandler(stream=sys.stdout)],
+        )
     else:
         logging.basicConfig(level=logging.ERROR)
 
@@ -195,11 +206,7 @@ def generate(args):
             f"offload_model is not specified, set to {args.offload_model}.")
     if world_size > 1:
         torch.cuda.set_device(local_rank)
-        dist.init_process_group(
-            backend="nccl",
-            init_method="env://",
-            rank=rank,
-            world_size=world_size)
+        dist.init_process_group(backend="nccl", init_method="env://", rank=rank, world_size=world_size)
 
     cfg = WAN_CONFIGS[args.task]
 
@@ -233,7 +240,8 @@ def generate(args):
         # Enforce 1:1 pairing across lists
         assert len(prompts) == len(size_keys) == len(frame_nums), (
             f"prompts ({len(prompts)}), sizes ({len(size_keys)}), and frame_nums ({len(frame_nums)}) "
-            f"must have the same length")
+            f"must have the same length"
+        )
 
         logging.info("Creating flow inference pipeline.")
         pipeline = FlowInferencePipeline(
@@ -262,8 +270,7 @@ def generate(args):
             print("sequence_parallel:", args.sequence_parallel)
             print("\n\n\n")
 
-        logging.info(
-            "Generating videos ...")
+        logging.info("Generating videos ...")
         videos = pipeline.generate(
             prompts=prompts,
             sizes=[SIZE_CONFIGS[size] for size in size_keys],
@@ -278,10 +285,12 @@ def generate(args):
         for i, video in enumerate(videos):
             formatted_experiment_name = (args.save_file) if args.save_file is not None else "DefaultExp"
             formatted_time = datetime.now().strftime("%Y%m%d_%H%M%S")
-            formatted_prompt = prompts[i].replace(" ", "_").replace("/",
-                                                                    "_")[:50]
-            suffix = '.mp4'
-            formatted_save_file = f"{args.task}_{formatted_experiment_name}_videoindex{int(i)}_size{size_keys[i].replace('*','x') if sys.platform=='win32' else size_keys[i]}_{formatted_prompt}_{formatted_time}" + suffix
+            formatted_prompt = prompts[i].replace(" ", "_").replace("/", "_")[:50]
+            suffix = ".mp4"
+            formatted_save_file = (
+                f"{args.task}_{formatted_experiment_name}_videoindex{int(i)}_size{size_keys[i].replace('*', 'x') if sys.platform == 'win32' else size_keys[i]}_{formatted_prompt}_{formatted_time}"
+                + suffix
+            )
 
             if "t2v" in args.task:
                 logging.info(f"Saving generated video to {formatted_save_file}")
@@ -291,7 +300,8 @@ def generate(args):
                     fps=cfg.sample_fps,
                     nrow=1,
                     normalize=True,
-                    value_range=(-1, 1))
+                    value_range=(-1, 1),
+                )
     logging.info("Finished.")
 
 

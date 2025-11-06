@@ -1,7 +1,7 @@
 import os
 
-from .wan_t2v_14B import t2v_14B
 from .wan_t2v_1_3B import t2v_1_3B
+from .wan_t2v_14B import t2v_14B
 
 os.environ["TOKENIZERS_PARALLELISM"] = "false"
 

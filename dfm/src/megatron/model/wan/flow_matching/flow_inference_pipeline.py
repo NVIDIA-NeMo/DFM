@@ -67,6 +67,7 @@ def _encode_text(
     outputs = outputs[0, :true_len, :]
     return outputs
 
+
 class FlowInferencePipeline:
     def __init__(
         self,
@@ -200,14 +201,17 @@ class FlowInferencePipeline:
         pattern = re.compile(r"^iter_(\d+)$")
         try:
             _, latest_path = max(
-                ((int(pattern.match(e.name).group(1)), e.path)
-                 for e in os.scandir(base_dir)
-                 if e.is_dir() and pattern.match(e.name)),
+                (
+                    (int(pattern.match(e.name).group(1)), e.path)
+                    for e in os.scandir(base_dir)
+                    if e.is_dir() and pattern.match(e.name)
+                ),
                 key=lambda x: x[0],
             )
         except ValueError:
             raise FileNotFoundError(
-                f"No checkpoints found under {base_dir}. Expected subdirectories named like 'iter_0001800'.")
+                f"No checkpoints found under {base_dir}. Expected subdirectories named like 'iter_0001800'."
+            )
 
 
         logging.info(f"Auto-selected latest checkpoint: {latest_path}")

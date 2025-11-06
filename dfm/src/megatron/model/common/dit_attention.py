@@ -123,12 +123,10 @@ class DiTSelfAttention(SelfAttention):
         ]
 
         if SplitAlongDim is not None:
-
             # [sq, b, ng, (np/ng + 2) * hn]
             # --> [sq, b, ng, np/ng * hn], [sq, b, ng, hn], [sq, b, ng, hn]
             (query, key, value) = SplitAlongDim(mixed_qkv, 3, split_arg_list)
         else:
-
             # [sq, b, ng, (np/ng + 2) * hn]
             # --> [sq, b, ng, np/ng * hn], [sq, b, ng, hn], [sq, b, ng, hn]
             (query, key, value) = torch.split(mixed_qkv, split_arg_list, dim=3)
@@ -146,10 +144,12 @@ class DiTSelfAttention(SelfAttention):
             key = key.transpose(-2, -1)
 
         if self.q_layernorm is not None:
-            if self.layernorm_across_heads:                
+            if self.layernorm_across_heads:
                 q_flat = query.reshape(query.size(0), query.size(1), -1).contiguous()  # [sq, b, np*hn]
                 q_flat = self.q_layernorm(q_flat)
-                query = q_flat.view(query.size(0), query.size(1), -1, self.hidden_size_per_attention_head)  # [sq, b, np, hn]
+                query = q_flat.view(
+                    query.size(0), query.size(1), -1, self.hidden_size_per_attention_head
+                )  # [sq, b, np, hn]
             else:
                 query = self.q_layernorm(query.contiguous())
 
@@ -169,8 +169,8 @@ class DiTSelfAttention(SelfAttention):
             key = tensor_parallel.scatter_to_tensor_model_parallel_region(key)
             query = query.transpose(-2, -1)
             key = key.transpose(-2, -1)
-            query = query.contiguous() # important becuase TE attention expects contiguous tensors
-            key = key.contiguous() # important becuase TE attention expects contiguous tensors
+            query = query.contiguous()  # important becuase TE attention expects contiguous tensors
+            key = key.contiguous()  # important becuase TE attention expects contiguous tensors
 
         if self.config.test_mode:
             self.run_realtime_tests()
@@ -254,7 +254,9 @@ class DiTCrossAttention(CrossAttention):
             if self.layernorm_across_heads:
                 q_flat = query.reshape(query.size(0), query.size(1), -1).contiguous()  # [sq, b, np*hn]
                 q_flat = self.q_layernorm(q_flat)
-                query = q_flat.view(query.size(0), query.size(1), -1, self.hidden_size_per_attention_head)  # [sq, b, np, hn]
+                query = q_flat.view(
+                    query.size(0), query.size(1), -1, self.hidden_size_per_attention_head
+                )  # [sq, b, np, hn]
             else:
                 query = self.q_layernorm(query.contiguous())
 
@@ -274,8 +276,8 @@ class DiTCrossAttention(CrossAttention):
             key = tensor_parallel.scatter_to_tensor_model_parallel_region(key)
             query = query.transpose(-2, -1)
             key = key.transpose(-2, -1)
-            query = query.contiguous() # important becuase TE attention expects contiguous tensors
-            key = key.contiguous() # important becuase TE attention expects contiguous tensors
+            query = query.contiguous()  # important becuase TE attention expects contiguous tensors
+            key = key.contiguous()  # important becuase TE attention expects contiguous tensors
 
         return query, key, value
         

@@ -65,7 +65,6 @@ class WanForwardStep:
     def __init__(self):
         self.diffusion_pipeline = FlowPipeline()
 
-
     def __call__(
         self, state: GlobalState, data_iterator: Iterable, model: VisionModule
     ) -> tuple[torch.Tensor, partial]:
@@ -108,7 +107,6 @@ class WanForwardStep:
         loss_function = self._create_loss_function(loss_mask, check_for_nan_in_loss, check_for_spiky_loss)
 
         return output_tensor, loss_function
-
 
     def _create_loss_function(
         self, loss_mask: torch.Tensor, check_for_nan_in_loss: bool, check_for_spiky_loss: bool

@@ -14,12 +14,13 @@
 
 # pylint: disable=C0115,C0116,C0301
 
-from dfm.src.megatron.model.wan.utils import grid_sizes_calculation, patchify
-from megatron.core import parallel_state
-from megatron.energon import DefaultTaskEncoder, SkipSample
-from megatron.energon.task_encoder.cooking import basic_sample_keys, Cooker
 import torch
 import torch.nn.functional as F
+from megatron.core import parallel_state
+from megatron.energon import DefaultTaskEncoder, SkipSample
+from megatron.energon.task_encoder.cooking import Cooker, basic_sample_keys
+
+from dfm.src.megatron.model.wan.utils import grid_sizes_calculation, patchify
 
 
 def cook(sample: dict) -> dict:
@@ -74,7 +75,6 @@ class WanTaskEncoder(DefaultTaskEncoder):
 
     ## actual encode_sample() for production
     def encode_sample(self, sample: dict) -> dict:
-
         video_latent = sample["pth"]
         context_embeddings = sample["pickle"]
         video_metadata = sample["json"]
@@ -87,8 +87,8 @@ class WanTaskEncoder(DefaultTaskEncoder):
 
         # calculate grid size
         grid_size = grid_sizes_calculation(
-            input_shape = video_latent.shape[1:], 
-            patch_size = (self.patch_temporal, self.patch_spatial, self.patch_spatial),
+            input_shape=video_latent.shape[1:],
+            patch_size=(self.patch_temporal, self.patch_spatial, self.patch_spatial),
         )
 
         ### Note: shape of sample's values
@@ -124,7 +124,6 @@ class WanTaskEncoder(DefaultTaskEncoder):
 
 
     def batch(self, samples: list[dict]) -> dict:
-
         # process video latents
         # do padding here for video latents
         self.patch_size = (self.patch_temporal, self.patch_spatial, self.patch_spatial)
@@ -146,7 +145,9 @@ class WanTaskEncoder(DefaultTaskEncoder):
         #   because pipeline parallelism requires pre-specified sequence length to create buffer
         if parallel_state.get_pipeline_model_parallel_world_size() > 1:
             if max_video_seq_len > self.seq_length:
-                raise ValueError(f"max_video_seq_len {max_video_seq_len} is greater than DataModule's seq_length {self.seq_length}")
+                raise ValueError(
+                    f"max_video_seq_len {max_video_seq_len} is greater than DataModule's seq_length {self.seq_length}"
+                )
             else:
                 # set max_video_seq_len to DataModule's seq_length
                 max_video_seq_len = self.seq_length
@@ -158,7 +159,9 @@ class WanTaskEncoder(DefaultTaskEncoder):
             assert batch_size == 1, "Error: Batch size must be 1 when using context parallelism"
             sharding_factor = parallel_state.get_context_parallel_world_size() * 2
             max_video_seq_len = ((max_video_seq_len + sharding_factor - 1) // sharding_factor) * sharding_factor
-        video_latents = [F.pad(video_latent, (0, 0, 0, max_video_seq_len - video_latent.shape[0])) for video_latent in video_latents]
+        video_latents = [
+            F.pad(video_latent, (0, 0, 0, max_video_seq_len - video_latent.shape[0])) for video_latent in video_latents
+        ]
         video_latents = torch.stack(video_latents, dim=1)
         # pad and stack loss masks to shape [S_max, B]
         loss_masks = [F.pad(m, (0, max_video_seq_len - m.shape[0])) for m in loss_masks]
@@ -172,7 +175,10 @@ class WanTaskEncoder(DefaultTaskEncoder):
         # pad here for text embeddings
         context_max_len = 512
         context_embeddings = [sample["context_embeddings"] for sample in samples]
-        context_embeddings = [F.pad(context_embedding, (0, 0, 0, context_max_len - context_embedding.shape[0])) for context_embedding in context_embeddings]
+        context_embeddings = [
+            F.pad(context_embedding, (0, 0, 0, context_max_len - context_embedding.shape[0]))
+            for context_embedding in context_embeddings
+        ]
         # calculate all sequence lengths of context embeddings for cross-attention (for videos, we do this after padding to get padded seq len)
         seq_len_kv = [c.shape[0] for c in context_embeddings]
         seq_len_kv = torch.tensor(seq_len_kv, dtype=torch.int32)
@@ -183,12 +189,12 @@ class WanTaskEncoder(DefaultTaskEncoder):
         video_metadata = [sample["video_metadata"] for sample in samples]
 
         return dict(
-            video_latents = video_latents,
-            max_video_seq_len = max_video_seq_len,
-            grid_sizes = grid_sizes,
-            context_embeddings = context_embeddings,
-            loss_mask = loss_masks,
-            seq_len_q = seq_len_q,
-            seq_len_kv = seq_len_kv,
-            video_metadata = video_metadata,
+            video_latents=video_latents,
+            max_video_seq_len=max_video_seq_len,
+            grid_sizes=grid_sizes,
+            context_embeddings=context_embeddings,
+            loss_mask=loss_masks,
+            seq_len_q=seq_len_q,
+            seq_len_kv=seq_len_kv,
+            video_metadata=video_metadata,
         )

@@ -19,6 +19,7 @@ from typing import Dict, Optional, Tuple
 
 import torch
 import torch.nn as nn
+from diffusers.models.embeddings import Timesteps
 from megatron.core import parallel_state, tensor_parallel
 from megatron.core.dist_checkpointing.mapping import ShardedStateDict
 from megatron.core.models.common.vision_module.vision_module import VisionModule
@@ -27,9 +28,8 @@ from megatron.core.transformer.enums import ModelType
 from megatron.core.transformer.transformer_block import TransformerBlock
 from megatron.core.transformer.transformer_config import TransformerConfig
 from megatron.core.utils import make_sharded_tensor_for_checkpoint
-from torch import Tensor
-from diffusers.models.embeddings import Timesteps
 from nemo.collections.diffusion.models.dit.dit_embeddings import ParallelTimestepEmbedding
+from torch import Tensor
 from dfm.src.megatron.model.wan.wan_layer_spec import (
     get_wan_block_with_transformer_engine_spec as WanLayerWithAdaLNspec,
 )
@@ -164,7 +164,6 @@ class WanModel(VisionModule):
         if self.post_process:
             self.head = Head(self.config.hidden_size, self.out_channels, self.patch_size, eps=1e-6)
 
-
     def forward(
         self,
         x: Tensor,
@@ -258,7 +257,6 @@ class WanModel(VisionModule):
         if self.config.sequence_parallel:
             x = tensor_parallel.gather_from_sequence_parallel_region(x)
         return x  # output: x.shape [s, b, c * pF * pH * pW]
-
 
     def set_input_tensor(self, input_tensor: Tensor) -> None:
         """Sets input tensor to the model.

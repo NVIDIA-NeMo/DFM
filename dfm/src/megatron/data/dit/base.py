@@ -106,7 +106,7 @@ class EnergonMultiModalDataModule:
         self.multimodal_sample_config = multimodal_sample_config
         self.shuffle_buffer_size = shuffle_buffer_size
         self.max_samples_per_sequence = max_samples_per_sequence
-        self.task_encoder = task_encoder 
+        self.task_encoder = task_encoder
         self.init_global_step = 0
         self.train_dataloader_object = None
         self.val_dataloader_object = None
@@ -116,7 +116,7 @@ class EnergonMultiModalDataModule:
         self.kwargs = kwargs
 
 
-    def datasets_provider(self, worker_config, split: Literal['train', 'val'] = 'val'):
+    def datasets_provider(self, worker_config, split: Literal["train", "val"] = "val"):
         """
         Provide the dataset for training or validation.
 
@@ -131,7 +131,7 @@ class EnergonMultiModalDataModule:
         Dataset: The dataset configured for the specified split.
         """
 
-        if split not in {'train', 'val'}:
+        if split not in {"train", "val"}:
             raise ValueError("Invalid value for split. Allowed values are 'train' or 'val'.")
 
         if split == "train":
@@ -193,7 +193,7 @@ class EnergonMultiModalDataModule:
                 worker_debug_path=None,
                 worker_log_level=0,
             )
-        train_dataset = self.datasets_provider(worker_config, split='train')
+        train_dataset = self.datasets_provider(worker_config, split="train")
         energon_dataloader = get_savable_loader(train_dataset, worker_config=worker_config)
         self.train_dataloader_object = energon_dataloader
         return self.train_dataloader_object
@@ -231,7 +231,7 @@ class EnergonMultiModalDataModule:
                 worker_debug_path=None,
                 worker_log_level=0,
             )
-        val_dataset = self.datasets_provider(worker_config, split='val')
+        val_dataset = self.datasets_provider(worker_config, split="val")
         energon_loader = get_savable_loader(val_dataset, worker_config=worker_config)
         self.val_dataloader_object = energon_loader
         return self.val_dataloader_object
@@ -284,7 +284,7 @@ class EnergonMultiModalDataModule:
                 state = []  # Megatron core requires all the states on all the ranks to have same python
             # type. Energon sends the state as a list
             logger.info(f"Multimodal data loader saving dataloader state dict consumed samples {consumed_samples}")
-            return {'dataloader_state': state, 'consumed_samples': consumed_samples}
+            return {"dataloader_state": state, "consumed_samples": consumed_samples}
 
         logger.warning("trainer object not connected to data module object returning empty state")
         return {}
@@ -299,14 +299,14 @@ class EnergonMultiModalDataModule:
         Parameters:
         state_dict (Dict[str, Any]): The state dictionary containing the saved state of the data module.
         """
-        if not 'dataloader_state' in state_dict:
+        if not "dataloader_state" in state_dict:
             logger.warning(
                 f"Data loader state cannot be resumed from state_dict, "
                 f"it does not have the required key dataloader_state. It has {state_dict.keys()}"
             )
             return
 
-        state = state_dict['dataloader_state']
+        state = state_dict["dataloader_state"]
         try:
             if self.trainer:
                 self.trainer.datamodule.train_dataloader().restore_state_global(state)
@@ -330,7 +330,7 @@ class EnergonMultiModalDataModule:
             logger.warning("Megatron num_microbatches_calculator not found, using Apex version.")
             from apex.transformer.pipeline_parallel.utils import update_num_microbatches
 
-        consumed_samples = state_dict['consumed_samples']
+        consumed_samples = state_dict["consumed_samples"]
         self.data_sampler.init_consumed_samples = consumed_samples
         self.data_sampler.prev_consumed_samples = consumed_samples
         logger.info(f"Multimodal dataloader load state dict with consumed_samples {consumed_samples}")
