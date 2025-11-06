@@ -19,6 +19,11 @@ import torch.nn.functional as F
 from einops import rearrange
 from megatron.energon import DefaultTaskEncoder, SkipSample
 from megatron.energon.task_encoder.cooking import Cooker, basic_sample_keys
+from megatron.energon.task_encoder.base import stateless
+from dfm.src.megatron.model.dit.data.sequence_packing_utils import first_fit_decreasing, concat_pad
+from dfm.src.megatron.model.dit.data.dit_sample import DiffusionSample
+from typing import List
+import random
 
 
 def cook(sample: dict) -> dict:
@@ -75,6 +80,7 @@ class BasicDiffusionTaskEncoder(DefaultTaskEncoder):
         seq_length: int = None,
         patch_spatial: int = 2,
         patch_temporal: int = 1,
+        packing_buffer_size: int = None,
         **kwargs,
     ):
         super().__init__(*args, **kwargs)
@@ -83,7 +89,9 @@ class BasicDiffusionTaskEncoder(DefaultTaskEncoder):
         self.seq_length = seq_length
         self.patch_spatial = patch_spatial
         self.patch_temporal = patch_temporal
+        self.packing_buffer_size = packing_buffer_size
 
+    @stateless(restore_seeds=True)
     def encode_sample(self, sample: dict) -> dict:
         video_latent = sample["pth"]
 
@@ -169,7 +177,7 @@ class BasicDiffusionTaskEncoder(DefaultTaskEncoder):
             "T H W d -> (T H W) d",
         )
 
-        if self.seq_length is not None:
+        if self.packing_buffer_size is None:
             pos_ids = F.pad(pos_ids, (0, 0, 0, self.seq_length - seq_len))
             loss_mask = torch.zeros(self.seq_length, dtype=torch.bfloat16)
             loss_mask[:seq_len] = 1
@@ -177,22 +185,75 @@ class BasicDiffusionTaskEncoder(DefaultTaskEncoder):
         else:
             loss_mask = torch.ones(seq_len, dtype=torch.bfloat16)
 
-        # print(f"Loss mask shape: {loss_mask.shape}")
-        # print(f"video_latent shape final: {video_latent.shape}")
-        return dict(
+        return DiffusionSample(
+            __key__=sample['__key__'],
+            __restore_key__=sample['__restore_key__'],
+            __subflavor__=None,
+            __subflavors__=sample['__subflavors__'],
             video=video_latent,
             t5_text_embeddings=t5_text_embeddings,
             t5_text_mask=t5_text_mask,
             image_size=image_size,
-            fps=fps,
             num_frames=num_frames,
             loss_mask=loss_mask,
-            seq_len_q=torch.tensor(seq_len, dtype=torch.int32),
-            seq_len_kv=torch.tensor(self.text_embedding_padding_size, dtype=torch.int32),
+            seq_len_q=torch.tensor([seq_len], dtype=torch.int32),
+            seq_len_kv=torch.tensor([self.text_embedding_padding_size], dtype=torch.int32),
             pos_ids=pos_ids,
             latent_shape=torch.tensor([C, T, H, W], dtype=torch.int32),
         )
 
+    def select_samples_to_pack(self, samples: List[DiffusionSample]) -> List[List[DiffusionSample]]:
+        """
+        Selects sequences to pack for mixed image-video training.
+        """
+        results = first_fit_decreasing(samples, self.packing_buffer_size)
+        random.shuffle(results)
+        return results
+
+    @stateless
+    def pack_selected_samples(self, samples):
+        """Construct a new Diffusion sample by concatenating the sequences."""
+
+        def stack(attr):
+            return torch.stack([getattr(sample, attr) for sample in samples], dim=0)
+
+        def cat(attr):
+            return torch.cat([getattr(sample, attr) for sample in samples], dim=0)
+
+        return DiffusionSample(
+            __key__=",".join([s.__key__ for s in samples]),
+            __restore_key__=(),  # Will be set by energon based on `samples`
+            __subflavor__=None,
+            __subflavors__=samples[0].__subflavors__,
+            video=cat('video'),
+            t5_text_embeddings=cat('t5_text_embeddings'),
+            t5_text_mask=cat('t5_text_mask'),
+            loss_mask=cat('loss_mask'),
+            seq_len_q=cat('seq_len_q'),
+            seq_len_kv=cat('seq_len_kv'),
+            pos_ids=cat('pos_ids'),
+            latent_shape=stack('latent_shape'),
+        )
+
+    @stateless
+    def batch(self, samples: List[DiffusionSample]) -> dict:
+        """Return dictionary with data for batch."""
+        if self.packing_buffer_size is None:
+            # no packing
+            return super().batch(samples).to_dict()
+
+        # packing
+        sample = samples[0]
+        return dict(
+            video=sample.video.unsqueeze_(0),
+            t5_text_embeddings=sample.t5_text_embeddings.unsqueeze_(0),
+            t5_text_mask=sample.t5_text_mask.unsqueeze_(0),
+            loss_mask=sample.loss_mask.unsqueeze_(0),
+            seq_len_q=sample.seq_len_q,
+            seq_len_kv=sample.seq_len_kv,
+            pos_ids=sample.pos_ids.unsqueeze_(0),
+            latent_shape=sample.latent_shape,
+        )
 
 class PosID3D:
     def __init__(self, *, max_t=32, max_h=128, max_w=128):

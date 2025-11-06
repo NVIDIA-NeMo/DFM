@@ -3,6 +3,7 @@ from megatron.core.packed_seq_params import PackedSeqParams
 
 
 def dit_data_step(qkv_format, dataloader_iter):
+    # import pdb;pdb.set_trace()
     batch = next(iter(dataloader_iter.iterable))
     batch = get_batch_on_this_cp_rank(batch)
     batch = {k: v.to(device="cuda", non_blocking=True) if torch.is_tensor(v) else v for k, v in batch.items()}
@@ -11,23 +12,27 @@ def dit_data_step(qkv_format, dataloader_iter):
 
 def encode_seq_length(batch, format):
     if ("seq_len_q" in batch) and ("seq_len_kv" in batch):
-
-        cu_seqlens = batch["seq_len_q"].cumsum(dim=0).to(torch.int32)
         zero = torch.zeros([1], dtype=torch.int32, device="cuda")
-        cu_seqlens = torch.cat((zero, cu_seqlens))
+
+        cu_seqlens_q = batch["seq_len_q"].cumsum(dim=0).to(torch.int32)
+        cu_seqlens_q = torch.cat((zero, cu_seqlens_q))
 
         cu_seqlens_kv = batch["seq_len_kv"].cumsum(dim=0).to(torch.int32)
         cu_seqlens_kv = torch.cat((zero, cu_seqlens_kv))
 
         batch["packed_seq_params"] = {
             "self_attention": PackedSeqParams(
-                cu_seqlens_q=cu_seqlens,
-                cu_seqlens_kv=cu_seqlens,
+                cu_seqlens_q=cu_seqlens_q,
+                cu_seqlens_kv=cu_seqlens_q,
+                cu_seqlens_q_padded=None,
+                cu_seqlens_kv_padded=None,
                 qkv_format=format,
             ),
             "cross_attention": PackedSeqParams(
-                cu_seqlens_q=cu_seqlens,
+                cu_seqlens_q=cu_seqlens_q,
                 cu_seqlens_kv=cu_seqlens_kv,
+                cu_seqlens_q_padded=None,
+                cu_seqlens_kv_padded=None,
                 qkv_format=format,
             ),
         }

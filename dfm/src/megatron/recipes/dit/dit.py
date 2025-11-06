@@ -90,7 +90,7 @@ def pretrain_config(
     # Training hyperparameters
     train_iters: int = 10000,
     global_batch_size: int = 8,
-    micro_batch_size: int = 4,
+    micro_batch_size: int = 1,
     lr: float = 0.9e-4,
     lr_warmup_iters: int = 2000,
     # Precision recipe
@@ -188,6 +188,7 @@ def pretrain_config(
             path=dataset_path,
             seq_length=2048,
             task_encoder_seq_length=2048,
+            packing_buffer_size=8000,
             micro_batch_size=micro_batch_size,
             global_batch_size=global_batch_size,
             num_workers=10)

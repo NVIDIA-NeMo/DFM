@@ -203,6 +203,7 @@ class DiTCrossAttentionModel(VisionModule):
                 ]
                 * B,
                 dtype=torch.bfloat16,
+                device=x.device,
             ),
         ).view(-1)
         if self.pre_process:
@@ -234,8 +235,6 @@ class DiTCrossAttentionModel(VisionModule):
 
         crossattn_emb = rearrange(crossattn_emb, "B S D -> S B D")
 
-
-        #import pdb; pdb.set_trace()
         if self.config.sequence_parallel:
             if self.pre_process:
                 x_S_B_D = tensor_parallel.scatter_to_sequence_parallel_region(x_S_B_D)
