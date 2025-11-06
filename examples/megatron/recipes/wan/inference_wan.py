@@ -67,7 +67,7 @@ def _validate_args(args):
             assert s in SUPPORTED_SIZES[args.task], (
                 f"Unsupport size {s} for task {args.task}, supported sizes are: "
                 f"{', '.join(SUPPORTED_SIZES[args.task])}"
-
+            )
 
 def _parse_args():
     parser = argparse.ArgumentParser(description="Generate a image or video from a text prompt or image using Wan")
