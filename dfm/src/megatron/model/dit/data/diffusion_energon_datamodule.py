@@ -31,6 +31,7 @@ class DiffusionDataModuleConfig(DatasetProvider):
     seq_length: int
     micro_batch_size: int
     task_encoder_seq_length: int
+    packing_buffer_size: int
     global_batch_size: int
     num_workers: int_repr
     dataloader_type: str = "external"
@@ -39,13 +40,15 @@ class DiffusionDataModuleConfig(DatasetProvider):
         self.dataset = DiffusionDataModule(
             path=self.path,
             seq_length=self.seq_length,
-            task_encoder=BasicDiffusionTaskEncoder(seq_length=self.task_encoder_seq_length),
+            task_encoder=BasicDiffusionTaskEncoder(seq_length=self.task_encoder_seq_length, packing_buffer_size=self.packing_buffer_size),
             micro_batch_size=self.micro_batch_size,
+            packing_buffer_size=self.packing_buffer_size,
             global_batch_size=self.global_batch_size,
             num_workers=self.num_workers)
         self.sequence_length = self.dataset.seq_length
     
     def build_datasets(self, context: DatasetBuildContext):
+        # TODO: add validation and test datasets
         return self.dataset.train_dataloader(), self.dataset.train_dataloader(), self.dataset.train_dataloader()
     
 
@@ -84,6 +87,7 @@ class DiffusionDataModule(EnergonMultiModalDataModule):
         global_batch_size: int = 8,
         num_workers: int = 1,
         pin_memory: bool = True,
+        packing_buffer_size: int = None,
         task_encoder: DefaultTaskEncoder = None,
         use_train_split_for_val: bool = False,
     ) -> None:
@@ -108,6 +112,7 @@ class DiffusionDataModule(EnergonMultiModalDataModule):
             micro_batch_size=micro_batch_size,
             global_batch_size=global_batch_size,
             num_workers=num_workers,
+            packing_buffer_size=packing_buffer_size,
             pin_memory=pin_memory,
             task_encoder=task_encoder,
         )
@@ -134,6 +139,7 @@ class DiffusionDataModule(EnergonMultiModalDataModule):
         _dataset = get_train_dataset(
             self.path,
             batch_size=self.micro_batch_size,
+            packing_buffer_size=self.packing_buffer_size,
             task_encoder=self.task_encoder,
             worker_config=worker_config,
             max_samples_per_sequence=None,
