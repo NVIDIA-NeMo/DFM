@@ -95,4 +95,3 @@ NVTE_FUSED_ATTN=1 torchrun --nproc_per_node=1 examples/recipes/wan/inference_wan
   --base_seed 42 \
   --sample_steps 50
 ```
-
