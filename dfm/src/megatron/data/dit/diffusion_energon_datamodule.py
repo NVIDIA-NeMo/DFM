@@ -20,10 +20,10 @@ from typing import Any, Dict, Literal
 
 from torch import int_repr
 
-from dfm.src.megatron.model.dit.data.diffusion_taskencoder import BasicDiffusionTaskEncoder
+from dfm.src.megatron.data.dit.diffusion_taskencoder import BasicDiffusionTaskEncoder
 from megatron.bridge.data.utils import DatasetBuildContext, DatasetProvider
 from megatron.energon import DefaultTaskEncoder, get_train_dataset
-from dfm.src.megatron.model.dit.data.base import EnergonMultiModalDataModule
+from dfm.src.megatron.data.dit.base import EnergonMultiModalDataModule
 
 @dataclass(kw_only=True)
 class DiffusionDataModuleConfig(DatasetProvider):
