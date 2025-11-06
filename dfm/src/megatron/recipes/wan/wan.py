@@ -31,6 +31,7 @@ from megatron.bridge.training.mixed_precision import MixedPrecisionConfig, get_m
 from megatron.core.distributed import DistributedDataParallelConfig
 
 from dfm.src.megatron.data.wan.wan_energon_datamodule import WanDataModuleConfig
+from dfm.src.megatron.data.wan.wan_mock_energon_datamodule import WanMockDataModuleConfig
 from dfm.src.megatron.model.wan.wan_provider import WanModelProvider
 
 
@@ -158,6 +159,28 @@ def pretrain_config(
 
     precision_config.grad_reduce_in_fp32 = False
 
+    if mock:
+        dataset = WanMockDataModuleConfig(
+            path=None,
+            seq_length=1024, # we don't need to use this value, just add because Bridge training requires for LLMs
+            F_latents=3,
+            H_latents=104,
+            W_latents=60,
+            context_seq_len=512,
+            context_embeddings_dim=4096,
+            micro_batch_size=micro_batch_size,
+            global_batch_size=global_batch_size,
+            num_workers=10,
+        )
+    else:
+        dataset = WanDataModuleConfig(
+            path=None,
+            seq_length=1024, # we don't need to use this value, just add because Bridge training requires for LLMs
+            micro_batch_size=micro_batch_size,
+            global_batch_size=global_batch_size,
+            num_workers=10,
+        )
+
     # Config Container
     cfg = ConfigContainer(
         model=model_cfg,
@@ -182,13 +205,7 @@ def pretrain_config(
             use_distributed_optimizer=True,
             use_megatron_fsdp=use_megatron_fsdp,  # need use_distributed_optimizer=True
         ),
-        dataset=WanDataModuleConfig(
-            path=None,
-            seq_length=1024,  # we don't need to use this value, just add because Bridge training requires for LLMs
-            micro_batch_size=micro_batch_size,
-            global_batch_size=global_batch_size,
-            num_workers=10,
-        ),
+        dataset=dataset,
         logger=LoggerConfig(
             log_interval=10,
             tensorboard_dir=tensorboard_dir,

@@ -71,7 +71,7 @@ def _encode_text(
 class FlowInferencePipeline:
     def __init__(
         self,
-        config,
+        inference_cfg,
         model_id="Wan-AI/Wan2.1-T2V-14B-Diffusers",
         checkpoint_dir=None,
         checkpoint_step=None,
@@ -90,8 +90,8 @@ class FlowInferencePipeline:
         Initializes the FlowInferencePipeline with the given parameters.
 
         Args:
-            config (EasyDict):
-                Object containing model parameters initialized from config.py
+            inference_cfg (dict):
+                Object containing inference configuration.
             checkpoint_dir (`str`):
                 Path to directory containing model checkpoints
             t5_checkpoint_dir (`str`, *optional*, defaults to None):
@@ -106,7 +106,7 @@ class FlowInferencePipeline:
                 Whether to place T5 model on CPU. Only works without t5_fsdp.
         """
         self.device = torch.device(f"cuda:{device_id}")
-        self.config = config
+        self.inference_cfg = inference_cfg
         self.model_id = model_id
         self.rank = rank
         self.t5_cpu = t5_cpu
@@ -115,25 +115,26 @@ class FlowInferencePipeline:
         self.pipeline_parallel_size = pipeline_parallel_size
         self.sequence_parallel = sequence_parallel
         self.pipeline_dtype = pipeline_dtype
-        self.num_train_timesteps = config.num_train_timesteps
-        self.param_dtype = config.param_dtype
+        self.num_train_timesteps = inference_cfg.num_train_timesteps
+        self.param_dtype = inference_cfg.param_dtype
+        self.text_len = inference_cfg.text_len
 
         self.text_encoder = UMT5EncoderModel.from_pretrained(
             model_id,
             subfolder="text_encoder",
-            torch_dtype=config.t5_dtype,
+            torch_dtype=inference_cfg.t5_dtype,
         )
         self.tokenizer = AutoTokenizer.from_pretrained(
             model_id,
             subfolder="tokenizer",
         )
 
-        self.vae_stride = config.vae_stride
-        self.patch_size = config.patch_size
+        self.vae_stride = inference_cfg.vae_stride
+        self.patch_size = inference_cfg.patch_size
         self.vae = AutoencoderKLWan.from_pretrained(
             model_id,
             subfolder="vae",
-            torch_dtype=config.param_dtype,
+            torch_dtype=inference_cfg.param_dtype,
         )
         self.vae.to(self.device)
 
@@ -150,7 +151,7 @@ class FlowInferencePipeline:
             dist.barrier()
         self.model.to(self.device)
 
-        self.sample_neg_prompt = config.sample_neg_prompt
+        self.sample_neg_prompt = inference_cfg.sample_neg_prompt
 
     def setup_model_from_checkpoint(self, checkpoint_dir):
         provider = WanModelProvider()
@@ -362,7 +363,7 @@ class FlowInferencePipeline:
         # we implement similar to Wan's diffuser setup
         # (https://github.com/huggingface/diffusers/blob/0f252be0ed42006c125ef4429156cb13ae6c1d60/src/diffusers/pipelines/wan/pipeline_wan.py#L157)
         # in which we pad the text to 512, pass through text encoder, and truncate to the actual tokens, then pad with 0s to 512.
-        context_max_len = 512
+        context_max_len = self.text_len
         context_lens = []
         contexts = []
         contexts_null = []

@@ -87,6 +87,11 @@ def parse_cli_args() -> Tuple[argparse.Namespace, list[str]]:
         formatter_class=argparse.RawTextHelpFormatter,
     )
     parser.add_argument(
+        "--mock",
+        action="store_true",
+        help="Whether to use mock data."
+    )
+    parser.add_argument(
         "--config-file",
         type=str,
         default=str(DEFAULT_CONFIG_FILE_PATH),
@@ -131,7 +136,7 @@ def main() -> None:
     logger.info("------------------------------------------------------------------")
 
     # Load base configuration from the recipe as a Python dataclass
-    cfg: ConfigContainer = pretrain_config()
+    cfg: ConfigContainer = pretrain_config(mock=args.mock)
     logger.info("Loaded base configuration")
 
     # Print configuration on rank 0

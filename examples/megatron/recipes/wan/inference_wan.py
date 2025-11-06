@@ -19,6 +19,7 @@ import os
 import sys
 import warnings
 from datetime import datetime
+from easydict import EasyDict
 
 
 warnings.filterwarnings("ignore")
@@ -29,7 +30,7 @@ import torch
 import torch.distributed as dist
 
 from dfm.src.megatron.model.wan.flow_matching.flow_inference_pipeline import FlowInferencePipeline
-from dfm.src.megatron.model.wan.inference.configs import SIZE_CONFIGS, SUPPORTED_SIZES, WAN_CONFIGS
+from dfm.src.megatron.model.wan.inference import SIZE_CONFIGS, SUPPORTED_SIZES
 from dfm.src.megatron.model.wan.inference.utils import cache_video, str2bool
 
 
@@ -45,10 +46,7 @@ EXAMPLE_PROMPT = {
 
 def _validate_args(args):
     # Basic check
-    assert args.checkpoint_dir is not None, "Please specify the checkpoint directory."
-    assert args.t5_checkpoint_dir is not None, "Please specify the T5 checkpoint directory."
-    assert args.vae_checkpoint_dir is not None, "Please specify the VAE checkpoint directory."
-    assert args.task in WAN_CONFIGS, f"Unsupport task: {args.task}"
+    assert args.task in SUPPORTED_SIZES, f"Unsupport task: {args.task}"
     assert args.task in EXAMPLE_PROMPT, f"Unsupport task: {args.task}"
 
     # The default sampling steps are 40 for image-to-video tasks and 50 for text-to-video tasks.
@@ -73,7 +71,7 @@ def _validate_args(args):
 def _parse_args():
     parser = argparse.ArgumentParser(description="Generate a image or video from a text prompt or image using Wan")
     parser.add_argument(
-        "--task", type=str, default="t2v-14B", choices=list(WAN_CONFIGS.keys()), help="The task to run."
+        "--task", type=str, default="t2v-14B", choices=list(SUPPORTED_SIZES.keys()), help="The task to run."
     )
     parser.add_argument(
         "--sizes",
@@ -170,6 +168,7 @@ def generate(args):
     local_rank = int(os.getenv("LOCAL_RANK", 0))
     device = local_rank
     _init_logging(rank)
+    videos = []
 
     if args.offload_model is None:
         logging.info(f"offload_model is not specified, set to {args.offload_model}.")
@@ -177,10 +176,23 @@ def generate(args):
         torch.cuda.set_device(local_rank)
         dist.init_process_group(backend="nccl", init_method="env://", rank=rank, world_size=world_size)
 
-    cfg = WAN_CONFIGS[args.task]
+    inference_cfg = EasyDict({
+        # t5
+        "t5_dtype": torch.bfloat16,
+        "text_len": 512,
+        # vae
+        "vae_stride": (4, 8, 8),
+        # transformer
+        "param_dtype": torch.bfloat16,
+        "patch_size": (1, 2, 2),
+        # others
+        "num_train_timesteps": 1000,
+        "sample_fps": 16,
+        "sample_neg_prompt": "色调艳丽，过曝，静态，细节模糊不清，字幕，风格，作品，画作，画面，静止，整体发灰，最差质量，低质量，JPEG压缩残留，丑陋的，残缺的，多余的手指，画得不好的手部，画得不好的脸部，畸形的，毁容的，形态畸形的肢体，手指融合，静止不动的画面，杂乱的背景，三条腿，背景人很多，倒着走",
+    })
 
     logging.info(f"Generation job args: {args}")
-    logging.info(f"Generation model config: {cfg}")
+    logging.info(f"Generation model config: {inference_cfg}")
 
     if dist.is_initialized():
         base_seed = [args.base_seed] if rank == 0 else [None]
@@ -214,7 +226,7 @@ def generate(args):
 
         logging.info("Creating flow inference pipeline.")
         pipeline = FlowInferencePipeline(
-            config=cfg,
+            inference_cfg=inference_cfg,
             checkpoint_dir=args.checkpoint_dir,
             model_id="Wan-AI/Wan2.1-T2V-14B-Diffusers",
             checkpoint_step=args.checkpoint_step,
@@ -250,23 +262,22 @@ def generate(args):
             offload_model=args.offload_model,
         )
 
-    if rank == 0:
-        for i, video in enumerate(videos):
-            formatted_experiment_name = (args.save_file) if args.save_file is not None else "DefaultExp"
-            formatted_time = datetime.now().strftime("%Y%m%d_%H%M%S")
-            formatted_prompt = prompts[i].replace(" ", "_").replace("/", "_")[:50]
-            suffix = ".mp4"
-            formatted_save_file = (
-                f"{args.task}_{formatted_experiment_name}_videoindex{int(i)}_size{size_keys[i].replace('*', 'x') if sys.platform == 'win32' else size_keys[i]}_{formatted_prompt}_{formatted_time}"
-                + suffix
-            )
+        if rank == 0:
+            for i, video in enumerate(videos):
+                formatted_experiment_name = (args.save_file) if args.save_file is not None else "DefaultExp"
+                formatted_time = datetime.now().strftime("%Y%m%d_%H%M%S")
+                formatted_prompt = prompts[i].replace(" ", "_").replace("/", "_")[:50]
+                suffix = ".mp4"
+                formatted_save_file = (
+                    f"{args.task}_{formatted_experiment_name}_videoindex{int(i)}_size{size_keys[i].replace('*', 'x') if sys.platform == 'win32' else size_keys[i]}_{formatted_prompt}_{formatted_time}"
+                    + suffix
+                )
 
-            if "t2v" in args.task:
                 logging.info(f"Saving generated video to {formatted_save_file}")
                 cache_video(
                     tensor=video[None],
                     save_file=formatted_save_file,
-                    fps=cfg.sample_fps,
+                    fps=inference_cfg.sample_fps,
                     nrow=1,
                     normalize=True,
                     value_range=(-1, 1),
