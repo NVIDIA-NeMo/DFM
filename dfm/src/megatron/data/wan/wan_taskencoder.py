@@ -122,7 +122,6 @@ class WanTaskEncoder(DefaultTaskEncoder):
     #         video_metadata=video_metadata,
     #     )
 
-
     def batch(self, samples: list[dict]) -> dict:
         # process video latents
         # do padding here for video latents
@@ -136,8 +135,6 @@ class WanTaskEncoder(DefaultTaskEncoder):
         # calculate all sequence lengths of video latents for self-attention (for videos, we do this before padding to get original seq len)
         seq_len_q = [v.shape[0] for v in video_latents]
         seq_len_q = torch.tensor(seq_len_q, dtype=torch.int32)
-
-
         # padding and stack video latents
         max_video_seq_len = max([video_latent.shape[0] for video_latent in video_latents])
         # CAVEAT:

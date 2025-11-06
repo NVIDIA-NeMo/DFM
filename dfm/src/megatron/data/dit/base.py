@@ -115,7 +115,6 @@ class EnergonMultiModalDataModule:
         self.num_val_workers = num_val_workers or self.num_workers
         self.kwargs = kwargs
 
-
     def datasets_provider(self, worker_config, split: Literal["train", "val"] = "val"):
         """
         Provide the dataset for training or validation.

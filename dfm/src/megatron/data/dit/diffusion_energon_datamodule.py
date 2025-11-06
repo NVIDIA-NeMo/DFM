@@ -49,7 +49,6 @@ class DiffusionDataModuleConfig(DatasetProvider):
 
     def build_datasets(self, context: DatasetBuildContext):
         return self.dataset.train_dataloader(), self.dataset.train_dataloader(), self.dataset.train_dataloader()
-    
 
 class DiffusionDataModule(EnergonMultiModalDataModule):
     """
