@@ -10,6 +10,7 @@ def dit_data_step(qkv_format, dataloader_iter):
     batch["is_preprocessed"] = True  # assume data is preprocessed
     return encode_seq_length(batch, format=qkv_format)
 
+
 def encode_seq_length(batch, format):
     if ("seq_len_q" in batch) and ("seq_len_kv" in batch):
         zero = torch.zeros([1], dtype=torch.int32, device="cuda")
@@ -38,6 +39,7 @@ def encode_seq_length(batch, format):
         }
 
     return batch
+
 
 def get_batch_on_this_cp_rank(data):
     """Split the data for context parallelism."""

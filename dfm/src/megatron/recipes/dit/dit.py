@@ -15,11 +15,7 @@
 import os
 from typing import List, Optional, Union
 
-from dfm.src.megatron.data.dit.diffusion_energon_datamodule import DiffusionDataModuleConfig
-from dfm.src.megatron.model.dit.dit_model_provider import DiTModelProvider
-from megatron.core.distributed import DistributedDataParallelConfig
 import torch
-
 from megatron.bridge.recipes.utils.optimizer_utils import distributed_fused_adam_with_cosine_annealing
 from megatron.bridge.recipes.utils.tokenizer_utils import DEFAULT_NULL_TOKENIZER_VOCAB_SIZE
 from megatron.bridge.training.comm_overlap import CommOverlapConfig
@@ -28,10 +24,14 @@ from megatron.bridge.training.config import (
     ConfigContainer,
     LoggerConfig,
     RNGConfig,
-    TokenizerConfig, 
+    TokenizerConfig,
     TrainingConfig,
 )
 from megatron.bridge.training.mixed_precision import MixedPrecisionConfig, get_mixed_precision_config
+from megatron.core.distributed import DistributedDataParallelConfig
+
+from dfm.src.megatron.data.dit.diffusion_energon_datamodule import DiffusionDataModuleConfig
+from dfm.src.megatron.model.dit.dit_model_provider import DiTModelProvider
 
 
 def model_config(
@@ -63,7 +63,7 @@ def model_config(
         virtual_pipeline_model_parallel_size=None,
         context_parallel_size=context_parallelism,
         sequence_parallel=sequence_parallelism,
-        seq_length=2048
+        seq_length=2048,
     )
 
 
@@ -137,7 +137,6 @@ def pretrain_config(
     checkpoint_dir = os.path.join(run_output_dir, "checkpoints")
     tensorboard_dir = os.path.join(run_output_dir, "tb_logs")
 
-
     model_cfg = model_config(
         tensor_parallelism=tensor_parallelism,
         pipeline_parallelism=pipeline_parallelism,
@@ -158,7 +157,6 @@ def pretrain_config(
         precision_config = get_mixed_precision_config(precision_config)
 
     precision_config.grad_reduce_in_fp32 = False
-
 
     # Config Container
     cfg = ConfigContainer(
@@ -184,15 +182,15 @@ def pretrain_config(
             use_distributed_optimizer=True,
             use_megatron_fsdp=use_megatron_fsdp,  # need use_distributed_optimizer=True
         ),
-        dataset= DiffusionDataModuleConfig(
+        dataset=DiffusionDataModuleConfig(
             path=dataset_path,
             seq_length=2048,
             task_encoder_seq_length=2048,
             packing_buffer_size=8000,
             micro_batch_size=micro_batch_size,
             global_batch_size=global_batch_size,
-            num_workers=10)
-        ,
+            num_workers=10,
+        ),
         logger=LoggerConfig(
             log_interval=10,
             tensorboard_dir=tensorboard_dir,

@@ -1,4 +1,3 @@
-
 # Copyright (c) 2024, NVIDIA CORPORATION.  All rights reserved.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
@@ -21,6 +20,7 @@ from typing import Union
 
 import torch
 from megatron.core import parallel_state, tensor_parallel
+from megatron.core.extensions.transformer_engine import SplitAlongDim
 from megatron.core.transformer.attention import (
     CrossAttention,
     SelfAttention,
@@ -29,7 +29,6 @@ from megatron.core.transformer.attention import (
 from megatron.core.transformer.enums import AttnMaskType
 from megatron.core.transformer.spec_utils import ModuleSpec, build_module
 from megatron.core.transformer.transformer_config import TransformerConfig
-from megatron.core.extensions.transformer_engine import SplitAlongDim
 
 
 @dataclass
@@ -37,6 +36,7 @@ class DiTCrossAttentionSubmodules:
     """
     Configuration class for specifying the submodules of a cross-attention.
     """
+
     linear_q: Union[ModuleSpec, type] = None
     linear_kv: Union[ModuleSpec, type] = None
     core_attention: Union[ModuleSpec, type] = None
@@ -54,7 +54,7 @@ class DiTSelfAttention(SelfAttention):
         layer_number: int,
         attn_mask_type: AttnMaskType,
         cp_comm_type: str = None,
-        pg_collection = None,
+        pg_collection=None,
     ):
         super().__init__(
             config,
@@ -129,12 +129,10 @@ class DiTSelfAttention(SelfAttention):
         ]
 
         if SplitAlongDim is not None:
-
             # [sq, b, ng, (np/ng + 2) * hn]
             # --> [sq, b, ng, np/ng * hn], [sq, b, ng, hn], [sq, b, ng, hn]
             (query, key, value) = SplitAlongDim(mixed_qkv, 3, split_arg_list)
         else:
-
             # [sq, b, ng, (np/ng + 2) * hn]
             # --> [sq, b, ng, np/ng * hn], [sq, b, ng, hn], [sq, b, ng, hn]
             (query, key, value) = torch.split(mixed_qkv, split_arg_list, dim=3)
@@ -152,10 +150,12 @@ class DiTSelfAttention(SelfAttention):
             key = key.transpose(-2, -1)
 
         if self.q_layernorm is not None:
-            if self.layernorm_across_head:                
+            if self.layernorm_across_head:
                 q_flat = query.reshape(query.size(0), query.size(1), -1).contiguous()  # [sq, b, np*hn]
                 q_flat = self.q_layernorm(q_flat)
-                query = q_flat.view(query.size(0), query.size(1), -1, self.hidden_size_per_attention_head)  # [sq, b, np, hn]
+                query = q_flat.view(
+                    query.size(0), query.size(1), -1, self.hidden_size_per_attention_head
+                )  # [sq, b, np, hn]
             else:
                 query = self.q_layernorm(query.contiguous())
 
@@ -175,8 +175,8 @@ class DiTSelfAttention(SelfAttention):
             key = tensor_parallel.scatter_to_tensor_model_parallel_region(key)
             query = query.transpose(-2, -1)
             key = key.transpose(-2, -1)
-            query = query.contiguous() # important becuase TE attention expects contiguous tensors
-            key = key.contiguous() # important becuase TE attention expects contiguous tensors
+            query = query.contiguous()  # important becuase TE attention expects contiguous tensors
+            key = key.contiguous()  # important becuase TE attention expects contiguous tensors
 
         if self.config.test_mode:
             self.run_realtime_tests()
@@ -192,7 +192,7 @@ class DiTCrossAttention(CrossAttention):
         layer_number: int,
         attn_mask_type: AttnMaskType,
         cp_comm_type: str = None,
-        pg_collection = None,
+        pg_collection=None,
     ):
         super().__init__(
             config,
@@ -211,7 +211,6 @@ class DiTCrossAttention(CrossAttention):
                 q_layernorm_size = self.query_projection_size
             else:
                 q_layernorm_size = self.hidden_size_per_attention_head
-            import transformer_engine as te
             norm_config = copy.deepcopy(self.config)
             norm_config.normalization = "RMSNorm"
             self.q_layernorm = build_module(
@@ -229,7 +228,6 @@ class DiTCrossAttention(CrossAttention):
                 k_layernorm_size = self.kv_projection_size
             else:
                 k_layernorm_size = self.hidden_size_per_attention_head
-            import transformer_engine as te
             norm_config = copy.deepcopy(self.config)
             norm_config.normalization = "RMSNorm"
             self.k_layernorm = build_module(
@@ -240,7 +238,7 @@ class DiTCrossAttention(CrossAttention):
             )
         else:
             self.k_layernorm = None
-        
+
         self.linear_kv = build_module(
             submodules.linear_kv,
             self.config.crossattn_emb_size,
@@ -252,7 +250,6 @@ class DiTCrossAttention(CrossAttention):
             skip_bias_add=False,
             is_expert=False,
         )
-
 
     def get_query_key_value_tensors(self, hidden_states, key_value_states, split_qkv=False):
         """
@@ -295,7 +292,9 @@ class DiTCrossAttention(CrossAttention):
             if self.layernorm_across_head:
                 q_flat = query.reshape(query.size(0), query.size(1), -1).contiguous()  # [sq, b, np*hn]
                 q_flat = self.q_layernorm(q_flat)
-                query = q_flat.view(query.size(0), query.size(1), -1, self.hidden_size_per_attention_head)  # [sq, b, np, hn]
+                query = q_flat.view(
+                    query.size(0), query.size(1), -1, self.hidden_size_per_attention_head
+                )  # [sq, b, np, hn]
             else:
                 query = self.q_layernorm(query.contiguous())
 
@@ -315,8 +314,7 @@ class DiTCrossAttention(CrossAttention):
             key = tensor_parallel.scatter_to_tensor_model_parallel_region(key)
             query = query.transpose(-2, -1)
             key = key.transpose(-2, -1)
-            query = query.contiguous() # important becuase TE attention expects contiguous tensors
-            key = key.contiguous() # important becuase TE attention expects contiguous tensors
+            query = query.contiguous()  # important becuase TE attention expects contiguous tensors
+            key = key.contiguous()  # important becuase TE attention expects contiguous tensors
 
         return query, key, value
-        

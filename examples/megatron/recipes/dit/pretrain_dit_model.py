@@ -1,4 +1,3 @@
-
 #!/usr/bin/env python3
 # Copyright (c) 2025, NVIDIA CORPORATION.  All rights reserved.
 #
@@ -51,21 +50,22 @@ Supported Override Syntax:
 
 import argparse
 import logging
+import os
+import sys
 from pathlib import Path
 from typing import Tuple
 
-from dfm.src.megatron.recipes.dit.dit import pretrain_config
-from dfm.src.megatron.model.dit.dit_step import DITForwardStep
-
 from megatron.bridge.training.config import ConfigContainer
 from megatron.bridge.training.pretrain import pretrain
-from megatron.bridge.utils.common_utils import get_rank_safe
 from megatron.bridge.training.utils.omegaconf_utils import (
-    create_omegaconf_dict_config, parse_hydra_overrides, apply_overrides
+    apply_overrides,
+    create_omegaconf_dict_config,
 )
-import os
-import sys
+from megatron.bridge.utils.common_utils import get_rank_safe
 from omegaconf import OmegaConf
+
+from dfm.src.megatron.model.dit.dit_step import DITForwardStep
+from dfm.src.megatron.recipes.dit.dit import pretrain_config
 
 
 logger: logging.Logger = logging.getLogger(__name__)

@@ -36,7 +36,7 @@ class EDMScaling:
 
 
 class EDMSDE:
-    def __init__(   
+    def __init__(
         self,
         p_mean: float = -1.2,
         p_std: float = 1.2,

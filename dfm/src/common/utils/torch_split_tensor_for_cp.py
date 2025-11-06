@@ -14,7 +14,7 @@
 
 import torch
 from torch import Tensor
-from torch.distributed import ProcessGroup, all_gather, get_process_group_ranks, get_world_size
+from torch.distributed import ProcessGroup, all_gather, get_world_size
 
 
 def cat_outputs_cp(x: Tensor, seq_dim: int, cp_group: ProcessGroup) -> Tensor:

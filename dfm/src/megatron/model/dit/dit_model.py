@@ -13,10 +13,11 @@
 # limitations under the License.
 # pylint: disable=C0115,C0116,C0301
 
+from typing import Dict, Literal, Optional
+
 import torch
 import torch.nn as nn
 from diffusers.models.embeddings import Timesteps
-from typing import Dict, Literal, Optional
 from einops import rearrange
 from megatron.core import parallel_state, tensor_parallel
 from megatron.core.dist_checkpointing.mapping import ShardedStateDict
@@ -26,17 +27,19 @@ from megatron.core.transformer.enums import ModelType
 from megatron.core.transformer.transformer_block import TransformerBlock
 from megatron.core.transformer.transformer_config import TransformerConfig
 from megatron.core.utils import make_sharded_tensor_for_checkpoint
-from dfm.src.common.time_pos_embeddings import (
+from torch import Tensor
+
+from dfm.src.megatron.model.common.time_pos_embeddings import (
+    FactorizedLearnable3DEmbedding,
     ParallelTimestepEmbedding,
     SinCosPosEmb3D,
-    FactorizedLearnable3DEmbedding,
 )
-
 from dfm.src.megatron.model.dit.dit_layer_spec import (
-    get_dit_adaln_block_with_transformer_engine_spec as DiTLayerWithAdaLNspec,
     RMSNorm,
 )
-from torch import Tensor
+from dfm.src.megatron.model.dit.dit_layer_spec import (
+    get_dit_adaln_block_with_transformer_engine_spec as DiTLayerWithAdaLNspec,
+)
 
 
 class DiTCrossAttentionModel(VisionModule):

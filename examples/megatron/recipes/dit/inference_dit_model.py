@@ -13,18 +13,20 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-from megatron.core.tensor_parallel.random import model_parallel_cuda_manual_seed
-from nemo.lightning.megatron_parallel import MegatronParallel
-from transformers import T5EncoderModel, T5TokenizerFast
-from dfm.src.megatron.model.dit.edm.edm_pipeline import EDMPipeline
-from nemo.collections.common.video_tokenizers.cosmos_tokenizer import CausalVideoTokenizer
-from dfm.src.megatron.model.dit.dit_model_provider import DiTModelProvider
-from dfm.src.common.utils.save_video import save_video
-from nemo_vfm.diffusion.utils.mcore_parallel_utils import Utils
-from einops import rearrange
 import argparse
+
 import numpy as np
 import torch
+from einops import rearrange
+from megatron.core.tensor_parallel.random import model_parallel_cuda_manual_seed
+from nemo.collections.common.video_tokenizers.cosmos_tokenizer import CausalVideoTokenizer
+from nemo.lightning.megatron_parallel import MegatronParallel
+from transformers import T5EncoderModel, T5TokenizerFast
+
+from dfm.src.common.utils.save_video import save_video
+from dfm.src.megatron.model.dit.dit_model_provider import DiTModelProvider
+from dfm.src.megatron.model.dit.edm.edm_pipeline import EDMPipeline
+from nemo_vfm.diffusion.utils.mcore_parallel_utils import Utils
 
 
 MegatronParallel.init_ddp = lambda self: None
@@ -65,7 +67,9 @@ def parse_args():
     parser.add_argument("--cp_size", type=int, default=1, help="Number of cp ranks for multi-gpu inference.")
     parser.add_argument("--num_steps", type=float, default=35, help="Number of diffusion sampling steps")
     parser.add_argument("--num_video_frames", type=int, default=121, help="Number of video frames to sample")
-    parser.add_argument("--tokenizer_model", type=str, default="nvidia/Cosmos-1.0-Tokenizer-CV8x8x8", help="Mode of video tokenizer")
+    parser.add_argument(
+        "--tokenizer_model", type=str, default="nvidia/Cosmos-1.0-Tokenizer-CV8x8x8", help="Mode of video tokenizer"
+    )
     parser.add_argument("--tokenizer_dir", type=str, default="", help="Directory for video tokenizer")
     parser.add_argument("--cosmos_assets_dir", type=str, default="", help="Directory containing cosmos assets")
     parser.add_argument("--guardrail_dir", type=str, default="", help="Guardrails weights directory")
@@ -148,9 +152,9 @@ def prepare_data_batch(args, t5_embeding_max_length=512):
     text_encoder.to("cuda")
     text_encoder.eval()
 
-    print('[args.prompt]: ', args.prompt)
+    print("[args.prompt]: ", args.prompt)
     # Encode text to T5 embedding
-    out = encode_for_batch(tokenizer, text_encoder, args.prompt.split(','))
+    out = encode_for_batch(tokenizer, text_encoder, args.prompt.split(","))
     encoded_text = torch.tensor(out, dtype=torch.bfloat16)
     B, L, C = encoded_text.shape
     t5_embed = torch.zeros(B, t5_embeding_max_length, C, dtype=torch.bfloat16)
@@ -159,9 +163,11 @@ def prepare_data_batch(args, t5_embeding_max_length=512):
     t, h, w = args.num_video_frames, args.height, args.width
     pt, ph, pw = 1, 2, 2
     state_shape = [
-        B, # batch dimension
-        ((h // 8) // ph) * ((w // 8) // pw) * 1, # number of tokens: (h //8) * (w // 8) * 1 -> ((h // 8) // ph) * ((w // 8) // pw) * 1
-        16 * (ph*pw*pt) # token hidden size (channel * patch_spatial * patch_spatial * patch_temporal)
+        B,  # batch dimension
+        ((h // 8) // ph)
+        * ((w // 8) // pw)
+        * 1,  # number of tokens: (h //8) * (w // 8) * 1 -> ((h // 8) // ph) * ((w // 8) // pw) * 1
+        16 * (ph * pw * pt),  # token hidden size (channel * patch_spatial * patch_spatial * patch_temporal)
     ]
     # prepare pos_emb
     pos_id_3d = PosID3D()
@@ -182,7 +188,7 @@ def prepare_data_batch(args, t5_embeding_max_length=512):
         "num_frames": torch.tensor([[args.num_video_frames]] * B, dtype=torch.bfloat16).cuda(),
         "padding_mask": torch.zeros((B, 1, args.height, args.width), dtype=torch.bfloat16).cuda(),
         "pos_ids": pos_ids,
-        'latent_shape': [16, t//pt, h//8//ph, w//8//pw],
+        "latent_shape": [16, t // pt, h // 8 // ph, w // 8 // pw],
     }
     return data_batch, state_shape
 
@@ -197,15 +203,16 @@ def setup_diffusion_pipeline(args):
     diffusion_pipeline = EDMPipeline(seed=args.seed)
     diffusion_pipeline.net = model
     return model, diffusion_pipeline, model_config
-    
+
 
 def data_preprocess(data_batch, state_shape):
     from dfm.src.megatron.model.dit.dit_data_process import encode_seq_length
+
     data_batch = {k: v.cuda() if torch.is_tensor(v) else v for k, v in data_batch.items()}
     data_batch["inference_fwd"] = True
 
-    data_batch['seq_len_q'] = torch.tensor([state_shape[1]] * state_shape[0]).cuda()
-    data_batch['seq_len_kv'] = torch.tensor([data_batch['t5_text_embeddings'].shape[1]] * state_shape[0]).cuda()
+    data_batch["seq_len_q"] = torch.tensor([state_shape[1]] * state_shape[0]).cuda()
+    data_batch["seq_len_kv"] = torch.tensor([data_batch["t5_text_embeddings"].shape[1]] * state_shape[0]).cuda()
     data_batch = encode_seq_length(data_batch, format="sbhd")
     return data_batch
 
@@ -220,6 +227,7 @@ def main(args):
     import random
 
     model_parallel_cuda_manual_seed(args.seed)
+
     def set_seed(seed):
         torch.manual_seed(seed)
         torch.cuda.manual_seed(seed)
@@ -229,16 +237,17 @@ def main(args):
         # For deterministic behavior
         torch.backends.cudnn.deterministic = True
         torch.backends.cudnn.benchmark = False
+
     set_seed(42)
     model, diffusion_pipeline, model_config = setup_diffusion_pipeline(args)
 
     new_state = {}
     print("loading model....")
-    state = torch.load('model.pth')
+    state = torch.load("model.pth")
     for key, value in state.items():
-        if 'extra_state' in key:
+        if "extra_state" in key:
             continue
-        new_state[key.replace('0.module.', '')] = value
+        new_state[key.replace("0.module.", "")] = value
     model.load_state_dict(new_state, strict=False)
 
     print_rank_0("preparing data batch...")
@@ -257,13 +266,17 @@ def main(args):
         is_negative_prompt=True if "neg_t5_text_embeddings" in data_batch else False,
     )
     rank = torch.distributed.get_rank()
-    latent = latent[0, None, :state_shape[1]]
+    latent = latent[0, None, : state_shape[1]]
     latent = rearrange(
-            latent,
-            'b (T H W) (ph pw pt c) -> b c (T pt) (H ph) (W pw)',
-            ph=model_config.patch_spatial, pw=model_config.patch_spatial,
-            pt=model_config.patch_temporal,
-            c=C, T=T, H=H, W=W,
+        latent,
+        "b (T H W) (ph pw pt c) -> b c (T pt) (H ph) (W pw)",
+        ph=model_config.patch_spatial,
+        pw=model_config.patch_spatial,
+        pt=model_config.patch_temporal,
+        c=C,
+        T=T,
+        H=H,
+        W=W,
     )
     decoded_video = (1.0 + vae.decode(latent / model_config.sigma_data)).clamp(0, 2) / 2
     decoded_video = (decoded_video * 255).to(torch.uint8).permute(0, 2, 3, 4, 1).cpu().numpy()
@@ -274,11 +287,11 @@ def main(args):
             H=args.height,
             W=args.width,
             video_save_quality=5,
-            video_save_path=f'idx={i}_rank={rank}_' + args.video_save_path,
+            video_save_path=f"idx={i}_rank={rank}_" + args.video_save_path,
         )
         print_rank_0(f"saved video to idx={i}_rank={rank}_{args.video_save_path}")
+
 
 if __name__ == "__main__":
     args = parse_args()
     main(args)
-

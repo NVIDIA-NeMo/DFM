@@ -14,7 +14,6 @@
 
 
 from typing import List
-import torch
 
 
 def find_first_bin_that_fits(bins: List[List[int]], s: int, bin_size: int) -> int:
@@ -56,6 +55,7 @@ def first_fit(seqlens: List[int], pack_size: int) -> List[List[int]]:
             res[first_bin].append(s)
     return res
 
+
 def first_fit_decreasing(seqlens: List[int], pack_size: int) -> List[List[int]]:
     """
     Packs sequences of varying lengths into bins using the First-Fit Decreasing algorithm.
@@ -71,6 +71,7 @@ def first_fit_decreasing(seqlens: List[int], pack_size: int) -> List[List[int]]:
     """
     sorted_seqlens = sorted(seqlens, reverse=True)
     return first_fit(sorted_seqlens, pack_size)
+
 
 def concat_pad(tensor_list, max_seq_length):
     """
@@ -102,4 +103,3 @@ def concat_pad(tensor_list, max_seq_length):
         current_index += length
 
     return result
-

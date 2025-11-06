@@ -13,9 +13,11 @@
 # limitations under the License.
 
 from dataclasses import dataclass
-from typing import Optional, Any
-from megatron.energon import Sample
+from typing import Any, Optional
+
 import torch
+from megatron.energon import Sample
+
 
 @dataclass
 class DiffusionSample(Sample):
@@ -93,4 +95,3 @@ class DiffusionSample(Sample):
         elif isinstance(other, int):
             return self.seq_len_q.item() < other
         raise NotImplementedError
-
