@@ -196,7 +196,7 @@ class SinCosPosEmb3D(MegatronModule):
         self.t = t
         # h w t
         param = get_3d_sincos_pos_embed(
-            config.hidden_size, [h, w], t, spatial_interpolation_scale, temporal_interpolation_scale, output_type='pt'
+            config.hidden_size, [h, w], t, spatial_interpolation_scale, temporal_interpolation_scale, output_type="pt"
         )
         param = rearrange(param, "t hw c -> (t hw) c")
         self.pos_embedding = torch.nn.Embedding(param.shape[0], config.hidden_size)

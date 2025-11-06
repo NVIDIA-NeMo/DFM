@@ -21,7 +21,7 @@ from typing import Literal, Optional, Union
 import torch
 import torch.nn as nn
 # to be imported from common
-from dfm.src.common.attention_wan import WanCrossAttention, WanCrossAttentionSubmodules
+from dfm.src.megatron.model.common.dit_attention import DiTCrossAttention, DiTCrossAttentionSubmodules
 from megatron.core.transformer.attention import (
     SelfAttention,
     SelfAttentionSubmodules,
@@ -251,9 +251,9 @@ def get_dit_adaln_block_with_transformer_engine_spec() -> ModuleSpec:
                 ),
             ),
             cross_attention=ModuleSpec(
-                module=WanCrossAttention,
+                module=DiTCrossAttention,
                 params=params,
-                submodules=WanCrossAttentionSubmodules(
+                submodules=DiTCrossAttentionSubmodules(
                     linear_q=TEColumnParallelLinear,
                     linear_kv=TEColumnParallelLinear,
                     core_attention=TEDotProductAttention,

@@ -12,7 +12,6 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-# pylint: disable=C0115,C0116,C0301
 
 import torch
 import torch.nn.functional as F
@@ -20,9 +19,10 @@ from einops import rearrange
 from megatron.energon import DefaultTaskEncoder, SkipSample
 from megatron.energon.task_encoder.cooking import Cooker, basic_sample_keys
 from megatron.energon.task_encoder.base import stateless
-from dfm.src.megatron.model.dit.data.sequence_packing_utils import first_fit_decreasing, concat_pad
-from dfm.src.megatron.model.dit.data.dit_sample import DiffusionSample
+from dfm.src.megatron.data.dit.sequence_packing_utils import first_fit_decreasing
+from dfm.src.megatron.data.dit.dit_sample import DiffusionSample
 from typing import List
+from megatron.core import parallel_state
 import random
 
 
@@ -101,9 +101,7 @@ class BasicDiffusionTaskEncoder(DefaultTaskEncoder):
             raise SkipSample()
 
         info = sample["json"]
-        # remove batch dimension
         video_latent = video_latent.squeeze(0)
-        # print(f"video_latent shape at start: {video_latent.shape}")
         C, T, H, W = video_latent.shape
         seq_len = (
             video_latent.shape[-1]
@@ -112,10 +110,8 @@ class BasicDiffusionTaskEncoder(DefaultTaskEncoder):
             // self.patch_spatial**2
             // self.patch_temporal
         )
-        # seq_len = 1536
         is_image = T == 1
 
-        # print(f"Skipping sample {sample['__key__']} because seq_len {seq_len} > self.seq_length {self.seq_length}")
         if seq_len > self.seq_length:
             print(f"Skipping sample {sample['__key__']} because seq_len {seq_len} > self.seq_length {self.seq_length}")
             raise SkipSample()
@@ -123,14 +119,13 @@ class BasicDiffusionTaskEncoder(DefaultTaskEncoder):
         if self.max_frames is not None:
             video_latent = video_latent[:, : self.max_frames, :, :]
 
-        # tpcp_size = parallel_state.get_tensor_model_parallel_world_size()
-        # if parallel_state.get_context_parallel_world_size() > 1:
-        #     tpcp_size *= parallel_state.get_context_parallel_world_size() * 2
-        # if (T * H * W) % tpcp_size != 0:
-        #     warnings.warn(f'skipping {video_latent.shape=} not divisible by {tpcp_size=}')
-        #     raise SkipSample()
-        # print(f"video_latent shape before rearrange: {video_latent.shape}")
-        # video_latent shape before rearrange: torch.Size([16, 1, 64, 96])
+        tpcp_size = parallel_state.get_tensor_model_parallel_world_size()
+        if parallel_state.get_context_parallel_world_size() > 1:
+            tpcp_size *= parallel_state.get_context_parallel_world_size() * 2
+        if (T * H * W) % tpcp_size != 0:
+            warnings.warn(f'skipping {video_latent.shape=} not divisible by {tpcp_size=}')
+            raise SkipSample()
+
         video_latent = rearrange(
             video_latent,
             "C (T pt) (H ph) (W pw) -> (T H W) (ph pw pt C)",
@@ -138,9 +133,6 @@ class BasicDiffusionTaskEncoder(DefaultTaskEncoder):
             pw=self.patch_spatial,
             pt=self.patch_temporal,
         )
-        # print(f"video_latent shape after rearrange: {video_latent.shape}")
-        # After reaaranging: video_latent shape after rearrange: torch.Size([1536, 64])
-        # convert sample["pickle"] to numpy, and remove batch dimension
         sample["pickle"] = sample["pickle"].cpu().float().numpy().squeeze(0)
         if is_image:
             t5_text_embeddings = torch.from_numpy(sample["pickle"]).to(torch.bfloat16)
@@ -312,6 +304,5 @@ class RawImageDiffusionTaskEncoder(DefaultTaskEncoder):
     """
 
     cookers = [
-        # Cooker(cook),
         Cooker(cook_raw_iamges),
     ]

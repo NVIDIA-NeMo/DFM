@@ -60,6 +60,13 @@ from dfm.src.megatron.model.dit.dit_step import DITForwardStep
 from megatron.bridge.training.config import ConfigContainer
 from megatron.bridge.training.pretrain import pretrain
 from megatron.bridge.utils.common_utils import get_rank_safe
+from megatron.bridge.training.utils.omegaconf_utils import (
+    create_omegaconf_dict_config, parse_hydra_overrides, apply_overrides
+)
+import os
+import sys
+from omegaconf import OmegaConf
+
 
 logger: logging.Logger = logging.getLogger(__name__)
 
@@ -81,7 +88,7 @@ def parse_cli_args() -> Tuple[argparse.Namespace, list[str]]:
     parser.add_argument(
         "--config-file",
         type=str,
-        default=str(DEFAULT_CONFIG_FILE_PATH),
+        default=None,
         help="Path to the YAML OmegaConf override file. Default: conf/llama3_8b_pretrain_override_example.yaml",
     )
     parser.add_argument("--debug", action="store_true", help="Enable debug logging")
@@ -138,30 +145,32 @@ def main() -> None:
     if get_rank_safe() == 0:
         cfg.print_yaml()
 
-    # # Convert the initial Python dataclass to an OmegaConf DictConfig for merging
-    # merged_omega_conf, excluded_fields = create_omegaconf_dict_config(cfg)
+    # Convert the initial Python dataclass to an OmegaConf DictConfig for merging
+    merged_omega_conf, excluded_fields = create_omegaconf_dict_config(cfg)
 
-    # # Load and merge YAML overrides if a config file is provided
-    # if args.config_file:
-    #     logger.debug(f"Loading YAML overrides from: {args.config_file}")
-    #     if not os.path.exists(args.config_file):
-    #         logger.error(f"Override YAML file not found: {args.config_file}")
-    #         sys.exit(1)
-    #     yaml_overrides_omega = OmegaConf.load(args.config_file)
-    #     merged_omega_conf = OmegaConf.merge(merged_omega_conf, yaml_overrides_omega)
-    #     logger.debug("YAML overrides merged successfully.")
+    # Load and merge YAML overrides if a config file is provided
+    if args.config_file:
+        logger.debug(f"Loading YAML overrides from: {args.config_file}")
+        if not os.path.exists(args.config_file):
+            logger.error(f"Override YAML file not found: {args.config_file}")
+            sys.exit(1)
+        yaml_overrides_omega = OmegaConf.load(args.config_file)
+        merged_omega_conf = OmegaConf.merge(merged_omega_conf, yaml_overrides_omega)
+        logger.debug("YAML overrides merged successfully.")
 
-    # # Apply command-line overrides using Hydra-style parsing
+    # Apply command-line overrides using Hydra-style parsing
+    # TODO: this is not working, need to fix it
     # if cli_overrides:
+    #     print("INSIDE OVERRIDE")
     #     logger.debug(f"Applying Hydra-style command-line overrides: {cli_overrides}")
     #     merged_omega_conf = parse_hydra_overrides(merged_omega_conf, cli_overrides)
     #     logger.debug("Hydra-style command-line overrides applied successfully.")
 
     # # Apply the final merged OmegaConf configuration back to the original ConfigContainer
-    # logger.debug("Applying final merged configuration back to Python ConfigContainer...")
-    # final_overrides_as_dict = OmegaConf.to_container(merged_omega_conf, resolve=True)
-    # # Apply overrides while preserving excluded fields
-    # apply_overrides(cfg, final_overrides_as_dict, excluded_fields)
+    logger.debug("Applying final merged configuration back to Python ConfigContainer...")
+    final_overrides_as_dict = OmegaConf.to_container(merged_omega_conf, resolve=True)
+    # Apply overrides while preserving excluded fields
+    apply_overrides(cfg, final_overrides_as_dict, excluded_fields)
 
     # Display final configuration
     if get_rank_safe() == 0:
