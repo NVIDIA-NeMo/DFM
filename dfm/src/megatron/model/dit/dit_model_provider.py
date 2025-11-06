@@ -111,7 +111,7 @@ class DiT7BModelProvider(DiTModelProvider):
     apply_rope_fusion: bool = True  # TODO: do we support this?
     additional_timestamp_channels = None  # TODO: do we support this?
     bf16: bool = True
-    vae_module: str = "nemo.collections.diffusion.vae.video_vae.video_vae3_512"
+    vae_module: str = None
     vae_path: str = None
 
 
@@ -128,7 +128,7 @@ class DiT14BModelProvider(DiTModelProvider):
     layernorm_zero_centered_gamma: bool = False
     additional_timestamp_channels = None
     bf16: bool = True
-    vae_module: str = "nemo.collections.diffusion.vae.video_vae.video_vae3_512"
+    vae_module: str = None
     vae_path: str = None
     loss_add_logvar: bool = True
 
