@@ -95,7 +95,6 @@ class WanForwardStep:
             else:
                 output_tensor = self.diffusion_pipeline.training_step(model, batch)
 
-        # DEBUGGING
         # TODO: do we need to gather output with sequence or context parallelism here
         #       especially when we have pipeline parallelism
 

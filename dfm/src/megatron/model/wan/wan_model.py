@@ -290,12 +290,6 @@ class WanModel(VisionModule):
         """
         sharded_state_dict = super().sharded_state_dict(prefix, sharded_offsets, metadata)
 
-        # DEBUGGING
-        # for module in ["t_embedder"]:
-        #     for param_name, param in getattr(self, module).named_parameters():
-        #         weight_key = f"{prefix}{module}.{param_name}"
-        #         self._set_embedder_weights_replica_id(param, sharded_state_dict, weight_key)
-        # DEBUGGING
         # Ensure replica ids for non-transformer embedder weights include pipeline dimension
         for module in ["text_embedding", "time_embedding", "time_projection"]:
             if hasattr(self, module):

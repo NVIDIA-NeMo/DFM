@@ -230,13 +230,12 @@ def generate(args):
             pipeline_dtype=torch.float32,
         )
 
-        # DEBUGGING
         rank = dist.get_rank()
         if rank == 0:
-            print("tensor_parallel_size:", args.tensor_parallel_size)
-            print("context_parallel_size:", args.context_parallel_size)
-            print("pipeline_parallel_size:", args.pipeline_parallel_size)
-            print("sequence_parallel:", args.sequence_parallel)
+            print("Running inference with tensor_parallel_size:", args.tensor_parallel_size)
+            print("Running inference with context_parallel_size:", args.context_parallel_size)
+            print("Running inference with pipeline_parallel_size:", args.pipeline_parallel_size)
+            print("Running inference with sequence_parallel:", args.sequence_parallel)
             print("\n\n\n")
 
         logging.info("Generating videos ...")
