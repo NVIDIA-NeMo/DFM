@@ -32,5 +32,5 @@ RUN uv venv ${UV_PROJECT_ENVIRONMENT} --system-site-packages
 # Copy dependency files
 COPY pyproject.toml uv.lock ./
 
-# Install all dependencies using uv sync
-RUN uv sync --link-mode copy --locked --all-groups
+# Install all dependencies using uv sync (without installing the project itself)
+RUN uv sync --link-mode copy --locked --all-groups --no-install-project
