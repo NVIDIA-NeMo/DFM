@@ -18,7 +18,7 @@ import torch
 import torch.nn.functional as F
 from megatron.energon import DefaultTaskEncoder, SkipSample
 from megatron.energon.task_encoder.cooking import Cooker, basic_sample_keys
-from dfm.src.megatron.model.wan.utils.utils import grid_sizes_calculation, patchify
+from dfm.src.megatron.model.wan.utils import grid_sizes_calculation, patchify
 from megatron.core import parallel_state
 
 

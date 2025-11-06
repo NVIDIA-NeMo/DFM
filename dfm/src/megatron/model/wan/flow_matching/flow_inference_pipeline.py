@@ -40,7 +40,7 @@ from torch.nn import functional as F
 from tqdm import tqdm
 from transformers import AutoTokenizer, UMT5EncoderModel
 
-from dfm.src.megatron.model.wan.utils.utils import grid_sizes_calculation, patchify
+from dfm.src.megatron.model.wan.utils import grid_sizes_calculation, patchify, unpatchify
 from dfm.src.megatron.model.wan.wan_provider import WanModelProvider
 
 
@@ -152,31 +152,6 @@ class FlowInferencePipeline:
 
         self.sample_neg_prompt = config.sample_neg_prompt
         
-
-    def unpatchify(self, x: torch.Tensor, grid_sizes: torch.Tensor, out_dim: int) -> list[torch.Tensor]:
-        r"""
-        Reconstruct video tensors from patch embeddings into a list of videotensors.
-
-        Args:
-            x (torch.Tensor):
-                Tensor of patchified features, with shape [seq_len, c * pF * pH * pW]
-            grid_sizes (Tensor):
-                Original spatial-temporal grid dimensions before patching,
-                    shape [B, 3] (3 dimensions correspond to F_patches, H_patches, W_patches)
-
-        Returns:
-            list[torch.Tensor]: list of tensors, each with shape [c, F_latents, H_latents, W_latents]
-        """
-
-        c = out_dim
-        out = []
-        for u, v in zip(x, grid_sizes.tolist()):
-            u = u[:math.prod(v)].view(*v, *self.patch_size, c)
-            u = torch.einsum('fhwpqrc->cfphqwr', u)
-            u = u.reshape(c, *[i * j for i, j in zip(v, self.patch_size)])
-            out.append(u)
-        return out
-
 
     def setup_model_from_checkpoint(self, checkpoint_dir):
         provider = WanModelProvider()
@@ -512,11 +487,11 @@ class FlowInferencePipeline:
                 unpatchified_noise_pred_cond = noise_pred_cond
                 unpatchified_noise_pred_cond = unpatchified_noise_pred_cond.transpose(0, 1) # bring sbhd -> bshd
                 # when unpatchifying, the code will truncate the padded videos into the original video shape, based on the grid_sizes.
-                unpatchified_noise_pred_cond = self.unpatchify(unpatchified_noise_pred_cond, grid_sizes, self.vae.config.z_dim)
+                unpatchified_noise_pred_cond = unpatchify(unpatchified_noise_pred_cond, grid_sizes, self.vae.config.z_dim, self.patch_size)
                 unpatchified_noise_pred_uncond = noise_pred_uncond
                 unpatchified_noise_pred_uncond = unpatchified_noise_pred_uncond.transpose(0, 1) # bring sbhd -> bshd
                 # when unpatchifying, the code will truncate the padded videos into the original video shape, based on the grid_sizes.
-                unpatchified_noise_pred_uncond = self.unpatchify(unpatchified_noise_pred_uncond, grid_sizes, self.vae.config.z_dim)
+                unpatchified_noise_pred_uncond = unpatchify(unpatchified_noise_pred_uncond, grid_sizes, self.vae.config.z_dim, self.patch_size)
 
                 noise_preds = []
                 for i in range(batch_size):

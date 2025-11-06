@@ -15,11 +15,7 @@
 import os
 from typing import List, Optional, Union
 
-from dfm.src.megatron.data.wan.wan_energon_datamodule import WanDataModuleConfig
-from dfm.src.megatron.model.wan.wan_provider import WanModelProvider
 import torch
-from megatron.core.distributed import DistributedDataParallelConfig
-
 from megatron.bridge.recipes.utils.optimizer_utils import distributed_fused_adam_with_cosine_annealing
 from megatron.bridge.recipes.utils.tokenizer_utils import DEFAULT_NULL_TOKENIZER_VOCAB_SIZE
 from megatron.bridge.training.comm_overlap import CommOverlapConfig
@@ -28,10 +24,14 @@ from megatron.bridge.training.config import (
     ConfigContainer,
     LoggerConfig,
     RNGConfig,
-    TokenizerConfig, 
+    TokenizerConfig,
     TrainingConfig,
 )
 from megatron.bridge.training.mixed_precision import MixedPrecisionConfig, get_mixed_precision_config
+from megatron.core.distributed import DistributedDataParallelConfig
+
+from dfm.src.megatron.data.wan.wan_energon_datamodule import WanDataModuleConfig
+from dfm.src.megatron.model.wan.wan_provider import WanModelProvider
 
 
 def model_config(

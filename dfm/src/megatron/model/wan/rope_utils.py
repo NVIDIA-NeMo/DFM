@@ -1,6 +1,5 @@
 import torch
-from torch.cuda import amp
-from megatron.core import parallel_state
+
 
 class Wan3DRopeEmbeddings(torch.nn.Module):
     """

@@ -1,10 +1,10 @@
-import copy
 import os
 
 os.environ['TOKENIZERS_PARALLELISM'] = 'false'
 
 from .wan_t2v_1_3B import t2v_1_3B
 from .wan_t2v_14B import t2v_14B
+
 
 WAN_CONFIGS = {
     't2v-14B': t2v_14B,

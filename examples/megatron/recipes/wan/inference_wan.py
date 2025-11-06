@@ -27,7 +27,6 @@ import random
 
 import torch
 import torch.distributed as dist
-from PIL import Image
 
 from dfm.src.megatron.model.wan.flow_matching.flow_inference_pipeline import FlowInferencePipeline
 from dfm.src.megatron.model.wan.inference.configs import SIZE_CONFIGS, SUPPORTED_SIZES, WAN_CONFIGS
@@ -282,7 +281,7 @@ def generate(args):
             print("\n\n\n")
 
         logging.info(
-            f"Generating videos ...")
+            "Generating videos ...")
         videos = pipeline.generate(
             prompts=prompts,
             sizes=[SIZE_CONFIGS[size] for size in size_keys],

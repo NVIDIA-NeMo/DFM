@@ -12,9 +12,10 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-from typing import Optional
-
 import copy
+from dataclasses import dataclass
+from typing import Optional, Union
+
 import torch
 from megatron.core import parallel_state, tensor_parallel
 from megatron.core.extensions.transformer_engine import SplitAlongDim
@@ -24,12 +25,9 @@ from megatron.core.transformer.attention import (
     SelfAttention,
     SelfAttentionSubmodules,
 )
-from megatron.core.transformer.spec_utils import build_module
-from megatron.core.transformer.transformer_config import TransformerConfig
 from megatron.core.transformer.enums import AttnMaskType
-from dataclasses import dataclass
-from typing import Union
-from megatron.core.transformer.spec_utils import ModuleSpec
+from megatron.core.transformer.spec_utils import ModuleSpec, build_module
+from megatron.core.transformer.transformer_config import TransformerConfig
 
 
 @dataclass

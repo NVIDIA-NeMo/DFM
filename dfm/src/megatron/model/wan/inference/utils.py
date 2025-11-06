@@ -7,6 +7,7 @@ import imageio
 import torch
 import torchvision
 
+
 __all__ = ['cache_video', 'cache_image', 'str2bool']
 
 

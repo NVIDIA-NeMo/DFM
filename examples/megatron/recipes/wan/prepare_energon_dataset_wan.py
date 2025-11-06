@@ -12,7 +12,6 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-import os
 import json
 import pickle
 from pathlib import Path
@@ -22,7 +21,6 @@ import cv2
 import numpy as np
 import torch
 import webdataset as wds
-
 from diffusers import AutoencoderKLWan
 from transformers import AutoTokenizer, UMT5EncoderModel
 

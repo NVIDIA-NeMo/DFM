@@ -15,14 +15,13 @@
 # pylint: disable=C0115,C0116,C0301
 
 from dataclasses import dataclass
-import logging
-from typing import Any, Dict, Literal
 
+from megatron.bridge.data.utils import DatasetBuildContext, DatasetProvider
 from torch import int_repr
 
 from dfm.src.megatron.data.dit.diffusion_energon_datamodule import DiffusionDataModule
 from dfm.src.megatron.data.wan.wan_taskencoder import WanTaskEncoder
-from megatron.bridge.data.utils import DatasetBuildContext, DatasetProvider
+
 
 @dataclass(kw_only=True)
 class WanDataModuleConfig(DatasetProvider):
