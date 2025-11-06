@@ -25,6 +25,7 @@ from torch import int_repr
 from dfm.src.megatron.data.dit.base import EnergonMultiModalDataModule
 from dfm.src.megatron.data.dit.diffusion_taskencoder import BasicDiffusionTaskEncoder
 
+
 @dataclass(kw_only=True)
 class DiffusionDataModuleConfig(DatasetProvider):
     path: str
@@ -45,11 +46,10 @@ class DiffusionDataModuleConfig(DatasetProvider):
             num_workers=self.num_workers,
         )
         self.sequence_length = self.dataset.seq_length
-    
+
     def build_datasets(self, context: DatasetBuildContext):
         return self.dataset.train_dataloader(), self.dataset.train_dataloader(), self.dataset.train_dataloader()
     
-
 
 class DiffusionDataModule(EnergonMultiModalDataModule):
     """

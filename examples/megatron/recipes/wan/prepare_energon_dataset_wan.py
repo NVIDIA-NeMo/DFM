@@ -351,7 +351,7 @@ def main():
         for index, meta in enumerate(metadata_list):
             video_name = meta["file_name"]
             start_frame = int(meta["start_frame"])  # inclusive
-            end_frame = int(meta["end_frame"])      # inclusive
+            end_frame = int(meta["end_frame"])  # inclusive
             caption_text = meta.get("vila_caption", "")
 
             video_path = str(video_folder / video_name)
@@ -412,5 +412,3 @@ def main():
 
 if __name__ == "__main__":
     main()
-
-

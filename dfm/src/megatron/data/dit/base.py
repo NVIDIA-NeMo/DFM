@@ -338,5 +338,3 @@ class EnergonMultiModalDataModule:
             consumed_samples=consumed_samples,
             consistency_check=False,
         )
-
-

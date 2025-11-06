@@ -42,6 +42,6 @@ class WanDataModuleConfig(DatasetProvider):
             num_workers=self.num_workers,
         )
         self.sequence_length = self.dataset.seq_length
-    
+
     def build_datasets(self, context: DatasetBuildContext):
         return self.dataset.train_dataloader(), self.dataset.train_dataloader(), self.dataset.train_dataloader()
