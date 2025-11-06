@@ -86,11 +86,7 @@ def parse_cli_args() -> Tuple[argparse.Namespace, list[str]]:
         description="Pretrain Wan model using Megatron-Bridge with YAML and CLI overrides",
         formatter_class=argparse.RawTextHelpFormatter,
     )
-    parser.add_argument(
-        "--mock",
-        action="store_true",
-        help="Whether to use mock data."
-    )
+    parser.add_argument("--mock", action="store_true", help="Whether to use mock data.")
     parser.add_argument(
         "--config-file",
         type=str,

@@ -162,7 +162,7 @@ def pretrain_config(
     if mock:
         dataset = WanMockDataModuleConfig(
             path=None,
-            seq_length=1024, # we don't need to use this value, just add because Bridge training requires for LLMs
+            seq_length=1024,  # we don't need to use this value, just add because Bridge training requires for LLMs
             F_latents=3,
             H_latents=104,
             W_latents=60,
@@ -175,7 +175,7 @@ def pretrain_config(
     else:
         dataset = WanDataModuleConfig(
             path=None,
-            seq_length=1024, # we don't need to use this value, just add because Bridge training requires for LLMs
+            seq_length=1024,  # we don't need to use this value, just add because Bridge training requires for LLMs
             micro_batch_size=micro_batch_size,
             global_batch_size=global_batch_size,
             num_workers=10,

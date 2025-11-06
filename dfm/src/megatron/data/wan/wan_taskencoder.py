@@ -73,7 +73,6 @@ class WanTaskEncoder(DefaultTaskEncoder):
         self.patch_temporal = patch_temporal
         self.seq_length = seq_length
 
-
     def encode_sample(self, sample: dict) -> dict:
         video_latent = sample["pth"]
         context_embeddings = sample["pickle"]
@@ -102,7 +101,6 @@ class WanTaskEncoder(DefaultTaskEncoder):
             context_embeddings=context_embeddings,
             video_metadata=video_metadata,
         )
-
 
     def batch(self, samples: list[dict]) -> dict:
         # process video latents

@@ -15,8 +15,8 @@
 # pylint: disable=C0115,C0116,C0301
 
 from dataclasses import dataclass
-import torch
 
+import torch
 from megatron.bridge.data.utils import DatasetBuildContext, DatasetProvider
 
 from dfm.src.megatron.data.dit.diffusion_energon_datamodule import DiffusionDataModule
@@ -58,11 +58,21 @@ class WanMockTaskEncoder(WanTaskEncoder):
 
     # mock encode_sample() for debugging
     def encode_sample(self, sample: dict) -> dict:
-
         # mock encode sample
-        video_latent = torch.tensor(torch.randn(16, self.F_latents, self.H_latents, self.W_latents), dtype=torch.float32)
-        grid_size = torch.tensor([video_latent.shape[1] // self.patch_temporal, video_latent.shape[2] // self.patch_spatial, video_latent.shape[3] // self.patch_spatial], dtype=torch.int32)
-        context_embeddings = torch.tensor(torch.randn(self.context_seq_len, self.context_embeddings_dim), dtype=torch.float32)
+        video_latent = torch.tensor(
+            torch.randn(16, self.F_latents, self.H_latents, self.W_latents), dtype=torch.float32
+        )
+        grid_size = torch.tensor(
+            [
+                video_latent.shape[1] // self.patch_temporal,
+                video_latent.shape[2] // self.patch_spatial,
+                video_latent.shape[3] // self.patch_spatial,
+            ],
+            dtype=torch.int32,
+        )
+        context_embeddings = torch.tensor(
+            torch.randn(self.context_seq_len, self.context_embeddings_dim), dtype=torch.float32
+        )
         video_metadata = {}
 
         # DEBUGGING

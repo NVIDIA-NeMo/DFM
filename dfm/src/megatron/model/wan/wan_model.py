@@ -28,9 +28,9 @@ from megatron.core.transformer.enums import ModelType
 from megatron.core.transformer.transformer_block import TransformerBlock
 from megatron.core.transformer.transformer_config import TransformerConfig
 from megatron.core.utils import make_sharded_tensor_for_checkpoint
-from dfm.src.megatron.model.common.dit_embeddings import ParallelTimestepEmbedding
 from torch import Tensor
 
+from dfm.src.megatron.model.common.dit_embeddings import ParallelTimestepEmbedding
 from dfm.src.megatron.model.wan.wan_layer_spec import (
     get_wan_block_with_transformer_engine_spec as WanLayerWithAdaLNspec,
 )
