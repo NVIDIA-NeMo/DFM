@@ -50,7 +50,7 @@ class DiffusionDataModuleConfig(DatasetProvider):
     def build_datasets(self, context: DatasetBuildContext):
         return self.dataset.train_dataloader(), self.dataset.train_dataloader(), self.dataset.train_dataloader()
 
- 
+
 class DiffusionDataModule(EnergonMultiModalDataModule):
     """
     A PyTorch Lightning DataModule for handling multimodal datasets with images and text.
