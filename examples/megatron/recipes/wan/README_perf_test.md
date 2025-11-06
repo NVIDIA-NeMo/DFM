@@ -174,5 +174,3 @@ NVTE_FUSED_ATTN=1 torchrun --nproc_per_node=1 examples/megatron/recipes/wan/infe
 - Replace placeholders (tokens, account, dataset/checkpoint paths) with your own.
 - Keep the specified commit hashes for compatibility.
 - `NVTE_FUSED_ATTN=1` enables fused attention where supported.
-
-

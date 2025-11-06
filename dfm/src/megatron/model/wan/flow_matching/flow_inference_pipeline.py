@@ -152,7 +152,6 @@ class FlowInferencePipeline:
 
         self.sample_neg_prompt = config.sample_neg_prompt
 
-
     def setup_model_from_checkpoint(self, checkpoint_dir):
         provider = WanModelProvider()
         provider.tensor_model_parallel_size = self.tensor_parallel_size
@@ -213,10 +212,8 @@ class FlowInferencePipeline:
                 f"No checkpoints found under {base_dir}. Expected subdirectories named like 'iter_0001800'."
             )
 
-
         logging.info(f"Auto-selected latest checkpoint: {latest_path}")
         return latest_path
-
 
     def forward_pp_step(
         self,
@@ -284,7 +281,6 @@ class FlowInferencePipeline:
 
         noise_pred_pp = broadcast_from_last_pipeline_stage(noise_pred_pp_shape, dtype=torch.float32)
         return noise_pred_pp
-
 
     def generate(
         self,
@@ -392,7 +388,6 @@ class FlowInferencePipeline:
         contexts = torch.stack(contexts, dim=1)
         contexts_null = torch.stack(contexts_null, dim=1)
 
-
         ## setup noise
         noises = []
         for target_shape in target_shapes:
@@ -407,7 +402,6 @@ class FlowInferencePipeline:
                     generator=seed_g,
                 )
             )
-
 
         # calculate grid_sizes
         grid_sizes = [

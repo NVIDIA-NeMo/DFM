@@ -238,7 +238,7 @@ class DiTCrossAttention(CrossAttention):
         Derives `query` tensor from `hidden_states`, and `key`/`value` tensors
         from `key_value_states`.
         """
-        
+
         query, key, value = super().get_query_key_value_tensors(hidden_states, key_value_states)
 
         # gather query and key heads across TP ranks if self.layernorm_across_heads is True
@@ -280,4 +280,3 @@ class DiTCrossAttention(CrossAttention):
             key = key.contiguous()  # important becuase TE attention expects contiguous tensors
 
         return query, key, value
-        

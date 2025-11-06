@@ -69,6 +69,7 @@ def _validate_args(args):
                 f"{', '.join(SUPPORTED_SIZES[args.task])}"
             )
 
+
 def _parse_args():
     parser = argparse.ArgumentParser(description="Generate a image or video from a text prompt or image using Wan")
     parser.add_argument(
@@ -123,10 +124,7 @@ def _parse_args():
         help="Whether to place T5 model on CPU.",
     )
     parser.add_argument(
-        "--save_file",
-        type=str,
-        default=None,
-        help="The file to save the generated image or video to."
+        "--save_file", type=str, default=None, help="The file to save the generated image or video to."
     )
     parser.add_argument(
         "--prompts",
@@ -135,43 +133,16 @@ def _parse_args():
         default=None,
         help="A list of prompts to generate multiple images or videos. Example: --prompts 'a cat' 'a dog'",
     )
+    parser.add_argument("--base_seed", type=int, default=-1, help="The seed to use for generating the image or video.")
+    parser.add_argument("--sample_steps", type=int, default=None, help="The sampling steps.")
     parser.add_argument(
-        "--base_seed",
-        type=int,
-        default=-1,
-        help="The seed to use for generating the image or video.")
-    parser.add_argument(
-        "--sample_steps", type=int, default=None, help="The sampling steps.")
-    parser.add_argument(
-        "--sample_shift",
-        type=float,
-        default=None,
-        help="Sampling shift factor for flow matching schedulers.")
-    parser.add_argument(
-        "--sample_guide_scale",
-        type=float,
-        default=5.0,
-        help="Classifier free guidance scale.")
-    parser.add_argument(
-        "--tensor_parallel_size",
-        type=int,
-        default=1,
-        help="Tensor parallel size.")
-    parser.add_argument(
-        "--context_parallel_size",
-        type=int,
-        default=1,
-        help="Context parallel size.")
-    parser.add_argument(
-        "--pipeline_parallel_size",
-        type=int,
-        default=1,
-        help="Pipeline parallel size.")
-    parser.add_argument(
-        "--sequence_parallel",
-        type=str2bool,
-        default=False,
-        help="Sequence parallel.")
+        "--sample_shift", type=float, default=None, help="Sampling shift factor for flow matching schedulers."
+    )
+    parser.add_argument("--sample_guide_scale", type=float, default=5.0, help="Classifier free guidance scale.")
+    parser.add_argument("--tensor_parallel_size", type=int, default=1, help="Tensor parallel size.")
+    parser.add_argument("--context_parallel_size", type=int, default=1, help="Context parallel size.")
+    parser.add_argument("--pipeline_parallel_size", type=int, default=1, help="Pipeline parallel size.")
+    parser.add_argument("--sequence_parallel", type=str2bool, default=False, help="Sequence parallel.")
 
     args = parser.parse_args()
 
@@ -201,9 +172,7 @@ def generate(args):
     _init_logging(rank)
 
     if args.offload_model is None:
-        args.offload_model = False if world_size > 1 else True
-        logging.info(
-            f"offload_model is not specified, set to {args.offload_model}.")
+        logging.info(f"offload_model is not specified, set to {args.offload_model}.")
     if world_size > 1:
         torch.cuda.set_device(local_rank)
         dist.init_process_group(backend="nccl", init_method="env://", rank=rank, world_size=world_size)
@@ -279,7 +248,8 @@ def generate(args):
             sampling_steps=args.sample_steps,
             guide_scale=args.sample_guide_scale,
             seed=args.base_seed,
-            offload_model=args.offload_model)
+            offload_model=args.offload_model,
+        )
 
     if rank == 0:
         for i, video in enumerate(videos):
