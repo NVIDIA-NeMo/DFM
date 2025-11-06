@@ -69,6 +69,8 @@ def parse_args():
     p.add_argument(
         "--mix_uniform_ratio", type=float, default=None, help="Uniform sampling ratio (default: mode-dependent)"
     )
+    p.add_argument("--sigma_min", type=float, default=None, help="Minimum sigma (default: mode-dependent)")
+    p.add_argument("--sigma_max", type=float, default=None, help="Maximum sigma (default: mode-dependent)")
 
     # Checkpointing
     p.add_argument(
@@ -111,6 +113,8 @@ def apply_mode_defaults(args):
             "logit_std": 1.5,
             "flow_shift": 2.5,
             "mix_uniform_ratio": 0.2,
+            "sigma_min": 0.0,  # PRETRAIN: No clamping, full range
+            "sigma_max": 1.0,  # PRETRAIN: No clamping, full range
             "save_every": 50,
             "consolidate_every": 50,
             "log_every": 1,
@@ -118,22 +122,24 @@ def apply_mode_defaults(args):
         }
     else:  # finetune
         defaults = {
-            "num_epochs": 10,
+            "num_epochs": 10000,  # OLD: Much longer epochs
             "batch_size_per_gpu": 1,
             "grad_accum_steps": 1,
             "learning_rate": 1e-5,
             "weight_decay": 0.01,
             "beta2": 0.999,
             "grad_clip": 1.0,
-            "warmup_steps": 0,  # No warmup for finetuning
-            "lr_min": 1e-6,
+            "warmup_steps": 0,  # OLD: No warmup
+            "lr_min": 1e-6,  # OLD: Higher floor
             "timestep_sampling": "uniform",
-            "logit_std": 1.0,
-            "flow_shift": 3.0,
-            "mix_uniform_ratio": 0.1,
-            "save_every": 500,
-            "consolidate_every": 1000,
-            "log_every": 5,
+            "logit_std": 1.0,  # OLD: Standard spread
+            "flow_shift": 3.0,  # OLD: Aggressive weighting
+            "mix_uniform_ratio": 0.1,  # OLD: Mostly density-based
+            "sigma_min": 0.0,  # OLD: No clamping (full range)
+            "sigma_max": 1.0,  # OLD: No clamping (full range)
+            "save_every": 50,  # OLD: Less frequent
+            "consolidate_every": 50,  # OLD: Less frequent
+            "log_every": 1,
             "output_dir": "./wan_t2v_finetune_outputs",
         }
 
@@ -274,6 +280,8 @@ def main():
         logit_std=args.logit_std,
         flow_shift=args.flow_shift,
         mix_uniform_ratio=args.mix_uniform_ratio,
+        sigma_min=args.sigma_min,
+        sigma_max=args.sigma_max,
     )
 
     # Start training

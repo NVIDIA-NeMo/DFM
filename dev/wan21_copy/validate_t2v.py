@@ -1,9 +1,10 @@
 #!/usr/bin/env python3
-# validate_t2v.py - T2V validation using precomputed text embeddings from .meta files
+# validate_t2v.py - T2V validation supporting both text prompts and precomputed embeddings
 
 import argparse
 import os
 import pickle
+import subprocess
 from pathlib import Path
 
 import numpy as np
@@ -11,50 +12,72 @@ import torch
 from diffusers import WanPipeline
 from diffusers.utils import export_to_video
 from PIL import Image
-import subprocess
-from pathlib import Path
 
 
 try:
     import wandb
+
     WANDB_AVAILABLE = True
 except ImportError:
     WANDB_AVAILABLE = False
     print("[WARNING] wandb not installed. Install with: pip install wandb")
 
+
 def convert_to_gif(video_path):
+    """Convert video to GIF for wandb logging."""
     gif_path = Path(video_path).with_suffix(".gif")
     cmd = [
-        "ffmpeg", "-y",
-        "-i", str(video_path),
-        "-vf", "fps=15,scale=512:-1:flags=lanczos",
-        "-loop", "0",
-        str(gif_path)
+        "ffmpeg",
+        "-y",
+        "-i",
+        str(video_path),
+        "-vf",
+        "fps=15,scale=512:-1:flags=lanczos",
+        "-loop",
+        "0",
+        str(gif_path),
     ]
-    subprocess.run(cmd, check=True)
-    return str(gif_path)
+    try:
+        subprocess.run(cmd, check=True, capture_output=True)
+        return str(gif_path)
+    except subprocess.CalledProcessError as e:
+        print(f"[WARNING] Failed to convert to GIF: {e}")
+        return None
 
 
 def parse_args():
-    p = argparse.ArgumentParser("WAN 2.1 T2V Validation with Precomputed Embeddings")
+    p = argparse.ArgumentParser("WAN 2.1 T2V Validation (Dual Mode: Text or Embeddings)")
 
     # Model configuration
     p.add_argument("--model_id", type=str, default="Wan-AI/Wan2.1-T2V-1.3B-Diffusers")
     p.add_argument("--checkpoint", type=str, default=None, help="Path to checkpoint (optional)")
 
-    # Data - load from .meta files
-    p.add_argument("--meta_folder", type=str, required=True, help="Folder containing .meta files with embeddings")
+    # Data source - load from .meta files
+    p.add_argument("--meta_folder", type=str, required=True, help="Folder containing .meta files")
+
+    # MODE SELECTION - NEW!
+    p.add_argument(
+        "--use_embeddings",
+        action="store_true",
+        help="Use precomputed text embeddings from .meta files (new mode). Default: use text prompts (old mode)",
+    )
 
     # Generation settings
-    p.add_argument("--num_samples", type=int, default=10, help="Number of samples (default: 10)")
+    p.add_argument("--num_samples", type=int, default=10, help="Number of samples")
     p.add_argument("--num_inference_steps", type=int, default=50)
     p.add_argument("--guidance_scale", type=float, default=5.0)
+    p.add_argument("--negative_prompt", type=str, default="", help="Negative prompt (only for text mode)")
     p.add_argument("--seed", type=int, default=42)
     p.add_argument("--fps", type=int, default=16)
 
+    # Video settings (only used in text mode if not auto-inferred)
+    p.add_argument("--height", type=int, default=480, help="Video height (text mode, or fallback)")
+    p.add_argument("--width", type=int, default=832, help="Video width (text mode, or fallback)")
+    p.add_argument("--num_frames", type=int, default=81, help="Number of frames (text mode, or fallback)")
+
     # Output
     p.add_argument("--output_dir", type=str, default="./validation_outputs")
-    
+
     # Wandb settings
     p.add_argument("--use_wandb", action="store_true", help="Upload results to Weights & Biases")
     p.add_argument("--wandb_project", type=str, default="wan_t2v_valid", help="Wandb project name")
@@ -100,13 +123,76 @@ def infer_video_params_from_latents(latents):
     }
 
 
-def load_data_from_meta_files(meta_folder: str, num_samples: int = 10):
+def load_data_text_mode(meta_folder: str, num_samples: int = 10):
     """
-    Load text embeddings and metadata from .meta files.
-    
+    Load prompts from .meta files for text mode (old approach).
+
     Returns list of dicts: [{
         "prompt": "...",
-        "name": "...", 
+        "name": "...",
+        "num_frames": int (optional),
+        "height": int (optional),
+        "width": int (optional)
+    }, ...]
+    """
+    meta_folder = Path(meta_folder)
+    meta_files = sorted(list(meta_folder.glob("*.meta")))[:num_samples]
+
+    if not meta_files:
+        raise FileNotFoundError(f"No .meta files found in {meta_folder}")
+
+    print(f"[INFO] Found {len(meta_files)} .meta files (limited to first {num_samples})")
+
+    data_list = []
+
+    for meta_file in meta_files:
+        try:
+            with open(meta_file, "rb") as f:
+                data = pickle.load(f)
+
+            # Extract prompt from metadata
+            metadata = data.get("metadata", {})
+            prompt = metadata.get("vila_caption", "")
+
+            if not prompt:
+                print(f"[WARNING] No vila_caption in {meta_file.name}, skipping...")
+                continue
+
+            name = meta_file.stem
+
+            item = {
+                "prompt": prompt,
+                "name": name,
+                "meta_file": str(meta_file),
+            }
+
+            # Try to infer dimensions from latents if available
+            if "video_latents" in data:
+                try:
+                    video_params = infer_video_params_from_latents(data["video_latents"])
+                    item.update(video_params)
+                except Exception as e:
+                    print(f"[WARNING] Could not infer dimensions from {meta_file.name}: {e}")
+
+            data_list.append(item)
+
+        except Exception as e:
+            print(f"[WARNING] Failed to load {meta_file.name}: {e}")
+            continue
+
+    if not data_list:
+        raise ValueError(f"No valid data found in {meta_folder}")
+
+    return data_list
+
+
+def load_data_embedding_mode(meta_folder: str, num_samples: int = 10):
+    """
+    Load text embeddings and metadata from .meta files for embedding mode (new approach).
+
+    Returns list of dicts: [{
+        "prompt": "...",
+        "name": "...",
         "text_embeddings": tensor,
         "num_frames": int,
         "height": int,
@@ -136,7 +222,7 @@ def load_data_from_meta_files(meta_folder: str, num_samples: int = 10):
                 print(f"[WARNING] No vila_caption in {meta_file.name}, skipping...")
                 continue
 
-            # Get text embeddings
+            # Get text embeddings (required for embedding mode)
             text_embeddings = data.get("text_embeddings")
             if text_embeddings is None:
                 print(f"[WARNING] No text_embeddings in {meta_file.name}, skipping...")
@@ -145,15 +231,14 @@ def load_data_from_meta_files(meta_folder: str, num_samples: int = 10):
             # Convert to tensor and remove batch dimensions
             if not isinstance(text_embeddings, torch.Tensor):
                 text_embeddings = torch.from_numpy(text_embeddings)
-            
+
             # Squeeze out batch dimensions: (1, 1, seq_len, hidden_dim) -> (seq_len, hidden_dim)
             while text_embeddings.ndim > 2 and text_embeddings.shape[0] == 1:
                 text_embeddings = text_embeddings.squeeze(0)
 
-            # Get filename without extension
             name = meta_file.stem
 
-            # Infer video dimensions from latents
+            # Infer video dimensions from latents (required for embedding mode)
             video_params = None
             if "video_latents" in data:
                 try:
@@ -161,16 +246,17 @@ def load_data_from_meta_files(meta_folder: str, num_samples: int = 10):
                 except Exception as e:
                     print(f"[WARNING] Could not infer dimensions from {meta_file.name}: {e}")
 
+            if video_params is None:
+                print(f"[WARNING] Could not determine dimensions for {meta_file.name}, skipping...")
+                continue
+
             item = {
                 "prompt": prompt,
                 "name": name,
                 "text_embeddings": text_embeddings,
                 "meta_file": str(meta_file),
+                **video_params,
             }
-
-            # Add inferred dimensions if available
-            if video_params:
-                item.update(video_params)
 
             data_list.append(item)
 
@@ -188,7 +274,10 @@ def main():
     args = parse_args()
 
     print("=" * 80)
-    print("WAN 2.1 Text-to-Video Validation (Using Precomputed Embeddings)")
+    if args.use_embeddings:
+        print("WAN 2.1 T2V Validation (EMBEDDING MODE - Using Precomputed Embeddings)")
+    else:
+        print("WAN 2.1 T2V Validation (TEXT MODE - Encoding Prompts On-the-Fly)")
     print("=" * 80)
 
     # Initialize wandb if requested
@@ -198,47 +287,59 @@ def main():
             print("[ERROR] wandb requested but not installed. Install with: pip install wandb")
             print("[INFO] Continuing without wandb...")
         else:
-            print(f"\n[WANDB] Initializing Weights & Biases...")
+            print("\n[WANDB] Initializing Weights & Biases...")
             print(f"[WANDB] Project: {args.wandb_project}")
-            
+
             # Generate run name if not provided
             run_name = args.wandb_run_name
             if run_name is None:
                 checkpoint_name = Path(args.checkpoint).name if args.checkpoint else "base_model"
-                run_name = f"validation_{checkpoint_name}"
-            
+                mode_suffix = "embeddings" if args.use_embeddings else "text"
+                run_name = f"validation_{checkpoint_name}_{mode_suffix}"
+
             wandb_run = wandb.init(
                 project=args.wandb_project,
                 name=run_name,
                 config={
                     "model_id": args.model_id,
                     "checkpoint": args.checkpoint,
+                    "mode": "embeddings" if args.use_embeddings else "text",
                     "num_samples": args.num_samples,
                     "num_inference_steps": args.num_inference_steps,
                     "guidance_scale": args.guidance_scale,
+                    "negative_prompt": args.negative_prompt if not args.use_embeddings else "N/A",
                     "seed": args.seed,
                     "fps": args.fps,
-                }
+                },
             )
             print(f"[WANDB] Run name: {run_name}")
             print(f"[WANDB] Run URL: {wandb_run.get_url()}")
 
     # Load data from .meta files
     print(f"\n[1] Loading data from .meta files in: {args.meta_folder}")
-    data_list = load_data_from_meta_files(args.meta_folder, args.num_samples)
+
+    if args.use_embeddings:
+        print("[INFO] Mode: EMBEDDING MODE (precomputed embeddings)")
+        data_list = load_data_embedding_mode(args.meta_folder, args.num_samples)
+    else:
+        print("[INFO] Mode: TEXT MODE (encode prompts on-the-fly)")
+        data_list = load_data_text_mode(args.meta_folder, args.num_samples)
 
     print(f"[INFO] Loaded {len(data_list)} samples")
 
-    # Show first few samples with dimensions
-    print("\n[INFO] Sample prompts:")
+    # Show first few samples
+    print("\n[INFO] Sample data:")
     for i, item in enumerate(data_list[:3]):
         dims_str = ""
         if "num_frames" in item:
             dims_str = f" [{item['num_frames']} frames, {item['width']}x{item['height']}]"
-        emb_shape = item["text_embeddings"].shape
+
         print(f"  {i + 1}. {item['name']}{dims_str}")
         print(f"     Prompt: {item['prompt'][:60]}...")
-        print(f"     Text embeddings: {emb_shape}")
+
+        if args.use_embeddings:
+            emb_shape = item["text_embeddings"].shape
+            print(f"     Text embeddings: {emb_shape}")
 
     # Check dimension consistency
     items_with_dims = [p for p in data_list if "num_frames" in p]
@@ -275,12 +376,12 @@ def main():
             print("[INFO] Loading consolidated checkpoint...")
             state_dict = torch.load(consolidated_path, map_location="cuda")
             pipe.transformer.load_state_dict(state_dict, strict=True)
-            print("[INFO] Loaded from consolidated checkpoint")
+            print("[INFO] ✅ Loaded from consolidated checkpoint")
         elif os.path.exists(ema_path):
             print("[INFO] Loading EMA checkpoint (best quality)...")
             ema_state = torch.load(ema_path, map_location="cuda")
             pipe.transformer.load_state_dict(ema_state, strict=True)
-            print("[INFO] Loaded from EMA checkpoint")
+            print("[INFO] ✅ Loaded from EMA checkpoint")
         else:
             print("[WARNING] No consolidated or EMA checkpoint found at specified path")
             print("[INFO] Using base WAN 2.1 model weights from pipeline")
@@ -291,7 +392,13 @@ def main():
     os.makedirs(args.output_dir, exist_ok=True)
 
     # Generate videos
-    print("\n[4] Generating videos using precomputed text embeddings...")
+    print("\n[4] Generating videos...")
+    if args.use_embeddings:
+        print("[INFO] Using precomputed text embeddings")
+    else:
+        print("[INFO] Encoding prompts on-the-fly")
+        print(f"[INFO] Negative prompt: '{args.negative_prompt}'")
+
     print(f"[INFO] Settings: {args.num_inference_steps} steps, guidance scale: {args.guidance_scale}")
 
     torch.manual_seed(args.seed)
@@ -304,59 +411,62 @@ def main():
     for i, item in enumerate(data_list):
         prompt = item["prompt"]
         name = item["name"]
-        text_embeddings = item["text_embeddings"]
 
-        # Get dimensions for this sample
-        num_frames = item.get("num_frames")
-        height = item.get("height")
-        width = item.get("width")
-
-        if num_frames is None or height is None or width is None:
-            print(f"\n[{i + 1}/{len(data_list)}] Skipping {name}: missing dimensions")
-            continue
+        # Get dimensions - use inferred if available, otherwise use CLI args
+        num_frames = item.get("num_frames", args.num_frames)
+        height = item.get("height", args.height)
+        width = item.get("width", args.width)
 
         print(f"\n[{i + 1}/{len(data_list)}] Generating: {name}")
         print(f"  Prompt: {prompt[:80]}...")
         print(f"  Dimensions: {num_frames} frames, {width}x{height}")
-        print(f"  Text embeddings: {text_embeddings.shape}")
+
+        if args.use_embeddings:
+            text_embeddings = item["text_embeddings"]
+            print(f"  Text embeddings: {text_embeddings.shape}")
 
         try:
-            # Move embeddings to GPU
-            text_embeddings = text_embeddings.to(device="cuda", dtype=torch.bfloat16)
-            
-            # Add batch dimension if needed: (seq_len, hidden_dim) -> (1, seq_len, hidden_dim)
-            if text_embeddings.ndim == 2:
-                text_embeddings = text_embeddings.unsqueeze(0)
-
-            # Generate using precomputed embeddings
             generator = torch.Generator(device="cuda").manual_seed(args.seed + i)
 
-            # Call pipeline with prompt_embeds instead of prompt
-            output = pipe(
-                prompt_embeds=text_embeddings,
-                negative_prompt="",  # Use empty string for negative prompt
-                height=height,
-                width=width,
-                num_frames=num_frames,
-                guidance_scale=args.guidance_scale,
-                num_inference_steps=args.num_inference_steps,
-                generator=generator,
-            ).frames[0]
+            # MODE SWITCH: Use embeddings or text
+            if args.use_embeddings:
+                # EMBEDDING MODE: Use precomputed embeddings
+                text_embeddings = item["text_embeddings"]
+                text_embeddings = text_embeddings.to(device="cuda", dtype=torch.bfloat16)
+
+                # Add batch dimension if needed: (seq_len, hidden_dim) -> (1, seq_len, hidden_dim)
+                if text_embeddings.ndim == 2:
+                    text_embeddings = text_embeddings.unsqueeze(0)
+
+                output = pipe(
+                    prompt_embeds=text_embeddings,
+                    negative_prompt="",  # Empty string in embedding mode
+                    height=height,
+                    width=width,
+                    num_frames=num_frames,
+                    guidance_scale=args.guidance_scale,
+                    num_inference_steps=args.num_inference_steps,
+                    generator=generator,
+                ).frames[0]
+            else:
+                # TEXT MODE: Use prompt string (old approach)
+                output = pipe(
+                    prompt=prompt,
+                    negative_prompt=args.negative_prompt,
+                    height=height,
+                    width=width,
+                    num_frames=num_frames,
+                    guidance_scale=args.guidance_scale,
+                    num_inference_steps=args.num_inference_steps,
+                    generator=generator,
+                ).frames[0]
 
             # Save as image if single frame, otherwise as video
             if num_frames == 1:
                 output_path = os.path.join(args.output_dir, f"{name}.png")
 
                 # output is a numpy array, squeeze out extra dimensions
-                frame = np.squeeze(output)  # Remove all dimensions of size 1
-
-                # Ensure we have the right shape (H, W, C)
-                if frame.ndim == 2:  # Grayscale
-                    pass
-                elif frame.ndim == 3 and frame.shape[-1] in [1, 3, 4]:  # RGB/RGBA
-                    pass
-                else:
-                    raise ValueError(f"Unexpected frame shape: {frame.shape}")
+                frame = np.squeeze(output)
 
                 # Convert from float [0, 1] to uint8 [0, 255]
                 if frame.dtype in [np.float32, np.float64]:
@@ -365,50 +475,53 @@ def main():
                 image = Image.fromarray(frame)
                 image.save(output_path)
                 print(f"  ✅ Saved image to {output_path}")
-                
-                # Upload to wandb immediately
+
+                # Upload to wandb
                 if wandb_run is not None:
-                    print(f"  📤 Uploading image to wandb...")
-                    wandb_run.log({
-                        f"image/{name}": wandb.Image(image, caption=prompt[:100]),
-                        f"prompt/{name}": prompt,
-                        f"dimensions/{name}": f"{width}x{height}",
-                        "sample_index": i,
-                    })
-                    print(f"  ✅ Uploaded to wandb!")
-                    
+                    wandb_run.log(
+                        {
+                            f"image/{name}": wandb.Image(image, caption=prompt[:100]),
+                            f"prompt/{name}": prompt,
+                            f"dimensions/{name}": f"{width}x{height}",
+                            "sample_index": i,
+                        }
+                    )
+
             else:
                 output_path = os.path.join(args.output_dir, f"{name}.mp4")
                 export_to_video(output, output_path, fps=args.fps)
                 print(f"  ✅ Saved video to {output_path}")
-                gif_path = convert_to_gif(output_path)
-                # Upload to wandb immediately
+
+                # Upload to wandb
                 if wandb_run is not None:
-                    print(f"  📤 Uploading video to wandb...")
-                    wandb_run.log({
-                        f"video/{name}": wandb.Image(gif_path),
-                        f"prompt/{name}": prompt,
-                        f"dimensions/{name}": f"{num_frames} frames, {width}x{height}",
-                        "sample_index": i,
-                    })
-                    print(f"  ✅ Uploaded to wandb!")
+                    gif_path = convert_to_gif(output_path)
+                    if gif_path:
+                        wandb_run.log(
+                            {
+                                f"video/{name}": wandb.Image(gif_path),
+                                f"prompt/{name}": prompt,
+                                f"dimensions/{name}": f"{num_frames} frames, {width}x{height}",
+                                "sample_index": i,
+                            }
+                        )
 
             num_generated += 1
 
         except Exception as e:
             print(f"  ❌ Failed: {e}")
             import traceback
+
             traceback.print_exc()
             continue
 
     print("\n" + "=" * 80)
-    print("Validation complete!")
+    print("✅ Validation complete!")
     print(f"Generated: {num_generated}/{len(data_list)} samples")
     print(f"Outputs saved to: {args.output_dir}")
     if wandb_run is not None:
         print(f"Wandb results: {wandb_run.get_url()}")
     print("=" * 80)
-    
+
     # Finish wandb run
     if wandb_run is not None:
         wandb_run.finish()
@@ -422,34 +535,46 @@ if __name__ == "__main__":
 # USAGE EXAMPLES
 # ============================================================================
 
-# 1. Basic usage (uses precomputed text embeddings from .meta files):
-# python validate_t2v.py \
-#     --meta_folder /linnanw/hdvilla_sample/pika/wan21_codes/1.3B_meta
+# 1. TEXT MODE (old approach - encode prompts on-the-fly):
+# python validate_t2v_dual_mode.py \
+#     --meta_folder ./processed_meta \
+#     --num_samples 10 \
+#     --negative_prompt "blurry, low quality, distorted"
 
-# 2. With wandb logging:
-# python validate_t2v.py \
-#     --meta_folder /linnanw/hdvilla_sample/pika/wan21_codes/1.3B_meta \
-#     --use_wandb \
-#     --wandb_project wan_t2v_valid \
-#     --wandb_run_name "validation_checkpoint_5000"
+# 2. EMBEDDING MODE (new approach - use precomputed embeddings):
+# python validate_t2v_dual_mode.py \
+#     --meta_folder ./processed_meta \
+#     --use_embeddings \
+#     --num_samples 10
 
-# 3. With trained checkpoint and wandb:
-# python validate_t2v.py \
-#     --meta_folder /linnanw/hdvilla_sample/pika/wan21_codes/1.3B_meta \
-#     --checkpoint ./wan_t2v_all_fixes/checkpoint-5000 \
-#     --use_wandb
-
-# 4. Limited samples with custom settings:
-# python validate_t2v.py \
-#     --meta_folder /linnanw/hdvilla_sample/pika/wan21_codes/1.3B_meta \
+# 3. TEXT MODE with checkpoint and wandb:
+# python validate_t2v_dual_mode.py \
+#     --meta_folder ./processed_meta \
 #     --checkpoint ./checkpoint-5000 \
-#     --num_samples 5 \
-#     --num_inference_steps 50 \
-#     --guidance_scale 5.0 \
-#     --use_wandb
+#     --negative_prompt "blurry, low quality" \
+#     --use_wandb \
+#     --wandb_project wan_validation
 
-# 5. If no checkpoint found, uses base WAN 2.1 weights:
-# python validate_t2v.py \
-#     --meta_folder /linnanw/hdvilla_sample/pika/wan21_codes/1.3B_meta \
-#     --checkpoint ./nonexistent_checkpoint \
-#     --use_wandb  # Will fall back to base model and log to wandb
+# 4. EMBEDDING MODE with checkpoint and wandb:
+# python validate_t2v_dual_mode.py \
+#     --meta_folder ./processed_meta \
+#     --checkpoint ./checkpoint-5000 \
+#     --use_embeddings \
+#     --use_wandb \
+#     --wandb_project wan_validation
+
+# 5. TEXT MODE with custom video dimensions:
+# python validate_t2v_dual_mode.py \
+#     --meta_folder ./processed_meta \
+#     --height 480 \
+#     --width 832 \
+#     --num_frames 81 \
+#     --num_inference_steps 50 \
+#     --guidance_scale 5.0
+
+# 6. EMBEDDING MODE (dimensions auto-inferred from latents):
+# python validate_t2v_dual_mode.py \
+#     --meta_folder ./processed_meta \
+#     --use_embeddings \
+#     --num_inference_steps 50 \
+#     --guidance_scale 5.0

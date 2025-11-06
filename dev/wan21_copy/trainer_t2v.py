@@ -6,9 +6,11 @@ from typing import Optional
 import torch
 import torch.distributed as dist
 
+
 # Guard wandb import - make it optional
 try:
     import wandb
+
     WANDB_AVAILABLE = True
 except ImportError:
     wandb = None
@@ -63,6 +65,8 @@ class WanT2VTrainer:
         logit_std: float = 1.0,
         flow_shift: float = 3.0,
         mix_uniform_ratio: float = 0.1,
+        sigma_min: float = 0.0,  # Default: no clamping (pretrain mode)
+        sigma_max: float = 1.0,  # Default: no clamping (pretrain mode)
     ):
         self.model_id = model_id
         self.mode = mode
@@ -87,6 +91,8 @@ class WanT2VTrainer:
         self.logit_std = logit_std
         self.flow_shift = flow_shift
         self.mix_uniform_ratio = mix_uniform_ratio
+        self.sigma_min = sigma_min
+        self.sigma_max = sigma_max
 
         self.local_rank = setup_distributed()
         self.world_size = dist.get_world_size() if dist.is_initialized() else 1
@@ -407,6 +413,8 @@ class WanT2VTrainer:
                         logit_std=self.logit_std,
                         flow_shift=self.flow_shift,
                         mix_uniform_ratio=self.mix_uniform_ratio,
+                        sigma_min=self.sigma_min,
+                        sigma_max=self.sigma_max,
                         global_step=optimizer_step,
                     )
 

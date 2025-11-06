@@ -21,17 +21,19 @@ def step_fsdp_transformer_t2v(
     logit_std: float = 1.0,
     flow_shift: float = 3.0,
     mix_uniform_ratio: float = 0.1,
+    sigma_min: float = 0.0,  # Default: no clamping (pretrain)
+    sigma_max: float = 1.0,  # Default: no clamping (pretrain)
     global_step: int = 0,
 ) -> Tuple[torch.Tensor, Dict]:
     """
     Pure flow matching training - DO NOT use scheduler.add_noise().
-    
+
     FIXED: The scheduler's add_noise() uses alpha_t/sigma_t which explodes at low timesteps.
     We use simple flow matching: x_t = (1-σ)x_0 + σ*ε
     """
     debug_mode = os.environ.get("DEBUG_TRAINING", "0") == "1"
-    detailed_log = (global_step % 100 == 0)
-    summary_log = (global_step % 10 == 0)
+    detailed_log = global_step % 100 == 0
+    summary_log = global_step % 10 == 0
 
     # Extract and prepare batch data
     video_latents = batch["video_latents"].to(device, dtype=bf16)
@@ -54,12 +56,12 @@ def step_fsdp_transformer_t2v(
     # ========================================================================
     # Flow Matching Timestep Sampling
     # ========================================================================
-    
+
     num_train_timesteps = pipe.scheduler.config.num_train_timesteps
-    
+
     if use_sigma_noise:
         use_uniform = torch.rand(1).item() < mix_uniform_ratio
-        
+
         if use_uniform or timestep_sampling == "uniform":
             # Pure uniform: u ~ U(0, 1)
             u = torch.rand(size=(batch_size,), device=device)
@@ -73,48 +75,56 @@ def step_fsdp_transformer_t2v(
                 logit_std=logit_std,
             ).to(device)
             sampling_method = timestep_sampling
-        
+
         # Apply flow shift: σ = shift/(shift + (1/u - 1))
         u_clamped = torch.clamp(u, min=1e-5)  # Avoid division by zero
         sigma = flow_shift / (flow_shift + (1.0 / u_clamped - 1.0))
-        sigma = torch.clamp(sigma, 0.0, 1.0)
-        
+
+        # Clamp sigma (only if not full range [0,1])
+        # Pretrain uses [0, 1], finetune uses [0.02, 0.55]
+        if sigma_min > 0.0 or sigma_max < 1.0:
+            sigma = torch.clamp(sigma, sigma_min, sigma_max)
+        else:
+            sigma = torch.clamp(sigma, 0.0, 1.0)
+
     else:
         # Simple uniform without shift
         u = torch.rand(size=(batch_size,), device=device)
-        sigma = u
+
+        # Clamp sigma (only if not full range [0,1])
+        if sigma_min > 0.0 or sigma_max < 1.0:
+            sigma = torch.clamp(u, sigma_min, sigma_max)
+        else:
+            sigma = u
         sampling_method = "uniform_no_shift"
 
     # ========================================================================
     # Manual Flow Matching Noise Addition (FIXED - NO SCHEDULER!)
     # ========================================================================
-    
+
     # Generate noise
     noise = torch.randn_like(video_latents, dtype=torch.float32)
-    
+
     # CRITICAL FIX: Manual flow matching (NOT scheduler.add_noise!)
     # x_t = (1 - σ) * x_0 + σ * ε
     sigma_reshaped = sigma.view(-1, 1, 1, 1, 1)
-    noisy_latents = (
-        (1.0 - sigma_reshaped) * video_latents.float() 
-        + sigma_reshaped * noise
-    )
-    
+    noisy_latents = (1.0 - sigma_reshaped) * video_latents.float() + sigma_reshaped * noise
+
     # Timesteps for model [0, 1000]
     timesteps = sigma * num_train_timesteps
-    
+
     # CRITICAL: Keep timesteps in fp32 for embedding precision
     timesteps_for_model = timesteps.float()  # NOT bf16!
-    
+
     # ====================================================================
     # DETAILED LOGGING
     # ====================================================================
     if detailed_log or debug_mode:
-        print0("\n" + "="*80)
+        print0("\n" + "=" * 80)
         print0(f"[STEP {global_step}] MANUAL FLOW MATCHING (FIXED)")
-        print0("="*80)
-        print0(f"[FIXED] NOT using scheduler.add_noise() - preventing explosion!")
-        print0(f"[INFO] Using manual: x_t = (1-σ)x_0 + σ*ε")
+        print0("=" * 80)
+        print0("[FIXED] NOT using scheduler.add_noise() - preventing explosion!")
+        print0("[INFO] Using manual: x_t = (1-σ)x_0 + σ*ε")
         print0("")
         print0(f"[SAMPLING] Method: {sampling_method}")
         print0(f"[FLOW] Shift: {flow_shift}")
@@ -134,31 +144,36 @@ def step_fsdp_transformer_t2v(
         print0("")
         print0(f"[TIMESTEPS] Range: [{timesteps.min():.2f}, {timesteps.max():.2f}]")
         print0("")
-        print0(f"[WEIGHTS] Clean: {(1-sigma_reshaped).squeeze().cpu().numpy()}")
+        print0(f"[WEIGHTS] Clean: {(1 - sigma_reshaped).squeeze().cpu().numpy()}")
         print0(f"[WEIGHTS] Noise: {sigma_reshaped.squeeze().cpu().numpy()}")
         print0("")
         print0(f"[RANGES] Clean latents: [{video_latents.min():.4f}, {video_latents.max():.4f}]")
         print0(f"[RANGES] Noise:         [{noise.min():.4f}, {noise.max():.4f}]")
         print0(f"[RANGES] Noisy latents: [{noisy_latents.min():.4f}, {noisy_latents.max():.4f}]")
-        
+
         # Sanity check
-        max_expected = max(
-            abs(video_latents.max().item()), 
-            abs(video_latents.min().item()),
-            abs(noise.max().item()),
-            abs(noise.min().item())
-        ) * 1.5
+        max_expected = (
+            max(
+                abs(video_latents.max().item()),
+                abs(video_latents.min().item()),
+                abs(noise.max().item()),
+                abs(noise.min().item()),
+            )
+            * 1.5
+        )
         if abs(noisy_latents.max()) > max_expected or abs(noisy_latents.min()) > max_expected:
             print0(f"\n⚠️  WARNING: Noisy range seems large! Expected ~{max_expected:.1f}")
         else:
-            print0(f"\n✓ Noisy latents range is reasonable")
-        print0("="*80 + "\n")
-    
+            print0("\n✓ Noisy latents range is reasonable")
+        print0("=" * 80 + "\n")
+
     elif summary_log:
-        print0(f"[STEP {global_step}] σ=[{sigma.min():.3f},{sigma.max():.3f}] | "
-               f"t=[{timesteps.min():.1f},{timesteps.max():.1f}] | "
-               f"noisy=[{noisy_latents.min():.1f},{noisy_latents.max():.1f}] | "
-               f"{sampling_method}")
+        print0(
+            f"[STEP {global_step}] σ=[{sigma.min():.3f},{sigma.max():.3f}] | "
+            f"t=[{timesteps.min():.1f},{timesteps.max():.1f}] | "
+            f"noisy=[{noisy_latents.min():.1f},{noisy_latents.max():.1f}] | "
+            f"{sampling_method}"
+        )
 
     # Convert noisy latents to bf16 for model input
     noisy_latents = noisy_latents.to(bf16)
@@ -167,9 +182,9 @@ def step_fsdp_transformer_t2v(
     # ========================================================================
     # Forward Pass
     # ========================================================================
-    
+
     fsdp_model = model_map["transformer"]["fsdp_transformer"]
-    
+
     try:
         model_pred = fsdp_model(
             hidden_states=noisy_latents,
@@ -184,47 +199,45 @@ def step_fsdp_transformer_t2v(
     except Exception as e:
         print0(f"[ERROR] Forward pass failed: {e}")
         print0(f"[DEBUG] noisy_latents: {noisy_latents.shape}, range: [{noisy_latents.min()}, {noisy_latents.max()}]")
-        print0(f"[DEBUG] timesteps: {timesteps_for_model.shape}, range: [{timesteps_for_model.min()}, {timesteps_for_model.max()}]")
+        print0(
+            f"[DEBUG] timesteps: {timesteps_for_model.shape}, range: [{timesteps_for_model.min()}, {timesteps_for_model.max()}]"
+        )
         raise
 
     # ========================================================================
     # Target: Flow Matching Velocity
     # ========================================================================
-    
+
     # Flow matching target: v = ε - x_0
     target = noise - video_latents.float()
-    
+
     # ========================================================================
     # Loss with Flow Weighting
     # ========================================================================
-    
-    loss = torch.nn.functional.mse_loss(
-        model_pred.float(),
-        target.float(),
-        reduction="none"
-    )
-    
+
+    loss = torch.nn.functional.mse_loss(model_pred.float(), target.float(), reduction="none")
+
     # Flow weight: w = 1 + shift * σ
     loss_weight = 1.0 + flow_shift * sigma
     loss_weight = loss_weight.view(-1, 1, 1, 1, 1).to(device)
-    
+
     unweighted_loss = loss.mean()
     weighted_loss = (loss * loss_weight).mean()
-    
+
     # Safety check
     if torch.isnan(weighted_loss) or weighted_loss > 100:
         print0(f"[ERROR] Loss explosion! Loss={weighted_loss.item():.3f}")
-        print0(f"[DEBUG] Stopping training - check hyperparameters")
+        print0("[DEBUG] Stopping training - check hyperparameters")
         raise ValueError(f"Loss exploded: {weighted_loss.item()}")
-    
+
     # ====================================================================
     # LOSS LOGGING
     # ====================================================================
     if detailed_log or debug_mode:
-        print0("="*80)
+        print0("=" * 80)
         print0(f"[STEP {global_step}] LOSS DEBUG")
-        print0("="*80)
-        print0(f"[TARGET] Flow matching: v = ε - x_0")
+        print0("=" * 80)
+        print0("[TARGET] Flow matching: v = ε - x_0")
         print0(f"[PREDICTION] Scheduler type (inference only): {type(pipe.scheduler).__name__}")
         print0("")
         print0(f"[RANGES] Model pred: [{model_pred.min():.4f}, {model_pred.max():.4f}]")
@@ -239,12 +252,14 @@ def step_fsdp_transformer_t2v(
         print0("")
         print0(f"[LOSS] Unweighted: {unweighted_loss.item():.6f}")
         print0(f"[LOSS] Weighted:   {weighted_loss.item():.6f}")
-        print0(f"[LOSS] Impact:     {(weighted_loss/max(unweighted_loss, 1e-8)):.3f}x")
-        print0("="*80 + "\n")
-    
+        print0(f"[LOSS] Impact:     {(weighted_loss / max(unweighted_loss, 1e-8)):.3f}x")
+        print0("=" * 80 + "\n")
+
     elif summary_log:
-        print0(f"[STEP {global_step}] Loss: {weighted_loss.item():.6f} | "
-               f"w=[{loss_weight.min():.2f},{loss_weight.max():.2f}]")
+        print0(
+            f"[STEP {global_step}] Loss: {weighted_loss.item():.6f} | "
+            f"w=[{loss_weight.min():.2f},{loss_weight.max():.2f}]"
+        )
 
     # Metrics
     metrics = {
@@ -261,5 +276,5 @@ def step_fsdp_transformer_t2v(
         "noisy_max": noisy_latents.max().item(),
         "sampling_method": sampling_method,
     }
-    
+
     return weighted_loss, metrics

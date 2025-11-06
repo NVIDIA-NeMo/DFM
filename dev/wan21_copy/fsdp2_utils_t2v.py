@@ -19,14 +19,14 @@ from torch.distributed.fsdp.wrap import ModuleWrapPolicy
 def create_fsdp_mixed_precision_policy(bf16):
     """
     Create mixed precision policy for FSDP.
-    
+
     CRITICAL: Keep param_dtype as fp32 for optimizer stability.
     - param_dtype=fp32: Master weights in fp32 (prevents gradient update loss)
     - reduce_dtype=bf16: Gradient reductions in bf16 (communication efficiency)
     - buffer_dtype=bf16: Buffers in bf16 (memory efficiency)
     """
     return MixedPrecision(
-        param_dtype=torch.float32,  # FIXED: fp32 for optimizer master weights
+        param_dtype=bf16,  # FIXED: fp32 for optimizer master weights
         reduce_dtype=bf16,
         buffer_dtype=bf16,
     )
@@ -197,7 +197,7 @@ def verify_fsdp_setup(model_map: Dict):
 
     fsdp_model = model_map["transformer"]["fsdp_transformer"]
 
-    print0(f"[FSDP] transformer:")
+    print0("[FSDP] transformer:")
     print0(f"  - FSDP wrapped: {isinstance(fsdp_model, FSDP)}")
 
     trainable_count = sum(1 for p in fsdp_model.parameters() if p.requires_grad)
@@ -239,6 +239,7 @@ def test_fsdp_forward_pass(model_map: Dict, device, bf16):
     except Exception as e:
         print0(f"[WARNING] Transformer test failed: {e}")
         import traceback
+
         traceback.print_exc()
 
 
@@ -247,37 +248,37 @@ def get_fsdp_all_parameters(model_map: Dict):
     fsdp_model = model_map["transformer"]["fsdp_transformer"]
     all_params = [p for p in fsdp_model.parameters() if p.requires_grad]
     print0(f"[FSDP] Collected {len(all_params)} trainable parameters")
-    
+
     if len(all_params) == 0:
         raise RuntimeError("No trainable parameters found!")
-    
+
     return all_params
 
 
 def save_fsdp_checkpoint(
-    model_map: Dict, 
-    optimizer, 
-    scheduler, 
-    output_dir: str, 
+    model_map: Dict,
+    optimizer,
+    scheduler,
+    output_dir: str,
     step: int,
     consolidate: bool = True,  # Changed default to True
 ):
     """
     Save FSDP checkpoint with consolidated model.
-    
+
     Args:
         consolidate: If True, save consolidated model. If False, skip.
                     Default is True to always save inference-ready models.
     """
-    from torch.distributed.checkpoint import save as dist_save
     from torch.distributed.checkpoint import FileSystemWriter
+    from torch.distributed.checkpoint import save as dist_save
     from torch.distributed.fsdp import FullStateDictConfig, StateDictType
 
     ckpt_dir = os.path.join(output_dir, f"checkpoint-{step}")
-    
+
     if is_main_process():
         os.makedirs(ckpt_dir, exist_ok=True)
-    
+
     if dist.is_initialized():
         dist.barrier()
 
@@ -293,13 +294,13 @@ def save_fsdp_checkpoint(
     # 1. Save FSDP sharded checkpoint (ALWAYS)
     # ========================================
     print0("[FSDP] Saving sharded FSDP checkpoint...")
-    
+
     model_state_dict = {"model": fsdp_model.state_dict()}
     model_path = os.path.join(ckpt_dir, "transformer_model")
-    
+
     if is_main_process():
         os.makedirs(model_path, exist_ok=True)
-    
+
     if dist.is_initialized():
         dist.barrier()
 
@@ -307,19 +308,19 @@ def save_fsdp_checkpoint(
         state_dict=model_state_dict,
         storage_writer=FileSystemWriter(model_path),
     )
-    
+
     if dist.is_initialized():
         dist.barrier()
-    
+
     print0("[FSDP] ✓ Saved sharded transformer model")
 
     # Save optimizer
     optimizer_state = FSDP.optim_state_dict(model=fsdp_model, optim=optimizer)
     optim_path = os.path.join(ckpt_dir, "optimizer")
-    
+
     if is_main_process():
         os.makedirs(optim_path, exist_ok=True)
-    
+
     if dist.is_initialized():
         dist.barrier()
 
@@ -327,10 +328,10 @@ def save_fsdp_checkpoint(
         state_dict={"optimizer": optimizer_state},
         storage_writer=FileSystemWriter(optim_path),
     )
-    
+
     if dist.is_initialized():
         dist.barrier()
-    
+
     print0("[FSDP] ✓ Saved sharded optimizer state")
 
     # ========================================
@@ -338,20 +339,21 @@ def save_fsdp_checkpoint(
     # ========================================
     if consolidate:
         print0("[FSDP] Consolidating full model (this may take 1-2 minutes)...")
-        
+
         import time
+
         start_time = time.time()
-        
+
         with FSDP.state_dict_type(
             fsdp_model,
             StateDictType.FULL_STATE_DICT,
             FullStateDictConfig(offload_to_cpu=True, rank0_only=True),
         ):
             consolidated_state_dict = fsdp_model.state_dict()
-        
+
         if is_main_process():
             consolidation_time = time.time() - start_time
-            
+
             if len(consolidated_state_dict) > 0:
                 consolidated_path = os.path.join(ckpt_dir, "consolidated_model.bin")
                 torch.save(consolidated_state_dict, consolidated_path)
@@ -361,7 +363,7 @@ def save_fsdp_checkpoint(
                 print0(f"[FSDP]   Size: {file_size_gb:.2f} GB")
             else:
                 print0("[FSDP] ⚠ Consolidated state dict is empty!")
-        
+
         if dist.is_initialized():
             dist.barrier()
     else:
@@ -381,10 +383,11 @@ def save_fsdp_checkpoint(
 
     print0(f"[FSDP] ✓ Checkpoint saved at step {step}")
 
+
 def load_fsdp_checkpoint(model_map: Dict, optimizer, scheduler, ckpt_path: str) -> int:
     """Load FSDP checkpoint with sharded optimizer states - FULL MODEL."""
-    from torch.distributed.checkpoint import load as dist_load
     from torch.distributed.checkpoint import FileSystemReader
+    from torch.distributed.checkpoint import load as dist_load
 
     if not os.path.exists(ckpt_path):
         print0(f"[WARNING] Checkpoint {ckpt_path} not found")
