@@ -1,3 +1,5 @@
+Test CICD
+
 # NeMo DFM: Diffusion Foundation Models collection
 
 NeMo DFM is a state-of-the-art framework for fast, large-scale training and inference of video world models. It unifies the latest diffusion-based and autoregressive techniques, prioritizing efficiency and performance from research prototyping to production deployment.
