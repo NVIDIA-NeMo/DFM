@@ -23,40 +23,36 @@ on:
 jobs:
   generate-lockfile:
     runs-on: ubuntu-latest
-    container:
-      image: nvcr.io/nvidia/pytorch:25.09-py3
     steps:
-      - name: Install git
+      - name: Free up disk space
         run: |
-          apt-get update
-          apt-get install -y git
+          # Remove unnecessary packages to free up space
+          sudo rm -rf /usr/share/dotnet
+          sudo rm -rf /opt/ghc
+          sudo rm -rf /usr/local/share/boost
+          sudo rm -rf "$AGENT_TOOLSDIRECTORY"
+          sudo apt-get clean
+          df -h
 
       - name: Checkout repository
         uses: actions/checkout@v4
 
-      - name: Set up environment
-        run: |
-          echo "UV_PROJECT_ENVIRONMENT=/opt/venv" >> $GITHUB_ENV
-          echo "VIRTUAL_ENV=/opt/venv" >> $GITHUB_ENV
-          echo "UV_LINK_MODE=copy" >> $GITHUB_ENV
-          echo "CUDA_HOME=/usr/local/cuda" >> $GITHUB_ENV
-          echo "LD_LIBRARY_PATH=/usr/local/cuda/lib64:$LD_LIBRARY_PATH" >> $GITHUB_ENV
-          echo "$HOME/.local/bin:$PATH:$CUDA_HOME/bin" >> $GITHUB_PATH
-          echo "CUDACXX=/usr/local/cuda/bin/nvcc" >> $GITHUB_ENV
-          echo "TORCH_CUDA_ARCH_LIST=6.0;6.1;7.0;7.5;8.0;8.6;9.0" >> $GITHUB_ENV
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
 
       - name: Install uv
         run: |
           curl -LsSf https://astral.sh/uv/0.8.22/install.sh | sh
           echo "$HOME/.local/bin" >> $GITHUB_PATH
 
-      - name: Create virtual environment
-        run: |
-          uv venv ${UV_PROJECT_ENVIRONMENT} --system-site-packages
-
       - name: Install build dependencies
         run: |
-          uv pip install setuptools torch packaging ninja pybind11 Cython "numpy<2.0.0"
+          # Install minimal dependencies needed for lockfile generation
+          # Using CPU-only torch is sufficient - we're only resolving versions, not running CUDA code
+          uv pip install setuptools torch --index-url https://download.pytorch.org/whl/cpu
+          uv pip install packaging ninja pybind11 Cython "numpy<2.0.0"
 
       - name: Generate lockfile
         run: |
@@ -81,11 +77,11 @@ jobs:
       - name: Commit lockfile (if changed)
         if: steps.check_changes.outputs.changed == 'true' && github.event_name == 'workflow_dispatch'
         run: |
-          git config user.name "github-actions[bot]"
-          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git config --global user.name "github-actions[bot]"
+          git config --global user.email "github-actions[bot]@users.noreply.github.com"
           git add uv.lock
           git commit -m "Update uv.lock [skip ci]"
-          git push
+          git push origin HEAD:${{ github.ref_name }}
 
       - name: Comment on PR with lockfile status
         if: github.event_name == 'pull_request'
