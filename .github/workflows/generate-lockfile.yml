@@ -19,6 +19,7 @@ on:
   pull_request:
     paths:
       - 'pyproject.toml'
+      - 'generate-lockfile.yml'
 
 jobs:
   generate-lockfile:
