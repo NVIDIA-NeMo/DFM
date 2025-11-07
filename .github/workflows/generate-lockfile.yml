@@ -16,10 +16,17 @@ name: Generate UV Lockfile
 
 on:
   workflow_dispatch:  # Manual trigger
+  push:
+    branches:
+      - main
+      - 'pull-request/**'
+    paths:
+      - 'pyproject.toml'
+      - '.github/workflows/generate-lockfile.yml'
   pull_request:
     paths:
       - 'pyproject.toml'
-      - 'generate-lockfile.yml'
+      - '.github/workflows/generate-lockfile.yml'
 
 jobs:
   generate-lockfile:
