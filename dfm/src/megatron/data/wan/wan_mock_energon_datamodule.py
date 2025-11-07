@@ -75,16 +75,6 @@ class WanMockTaskEncoder(WanTaskEncoder):
         )
         video_metadata = {}
 
-        # DEBUGGING
-        output = ""
-        output += "----------------------------------------\n"
-        output += f"video_latent.shape: {video_latent.shape}\n"
-        output += f"grid_size.shape: {grid_size.shape}\n"
-        output += f"context_embeddings.shape: {context_embeddings.shape}\n"
-        output += f"video_metadata: {video_metadata}\n"
-        output += "----------------------------------------\n"
-        print(output)
-
         return dict(
             video_latent=video_latent,
             grid_size=grid_size,

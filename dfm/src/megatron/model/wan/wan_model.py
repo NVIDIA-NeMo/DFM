@@ -165,6 +165,19 @@ class WanModel(VisionModule):
         if self.post_process:
             self.head = Head(self.config.hidden_size, self.out_channels, self.patch_size, eps=1e-6)
 
+
+        # set attributes "average_gradients_across_tp_domain" for nn.Parameter objects
+        # this is used for gradient averaging across TP domain with sequence parallelism
+        self._mark_trainable_params_for_tp_grad_avg(
+            [
+                self.patch_embedding,
+                self.text_embedding,
+                self.time_embedder,
+                self.time_proj,
+                self.head,
+            ]
+        )
+
     def forward(
         self,
         x: Tensor,
@@ -299,6 +312,14 @@ class WanModel(VisionModule):
                         self._set_embedder_weights_replica_id(param, sharded_state_dict, weight_key)
 
         return sharded_state_dict
+
+    def _mark_trainable_params_for_tp_grad_avg(self, modules: Optional[list] = None) -> None:
+        """Mark selected modules' trainable parameters to average gradients across TP domain."""
+        target_modules = modules if modules is not None else [self]
+        for module in target_modules:
+            for _name, param in module.named_parameters(recurse=True):
+                if isinstance(param, nn.Parameter) and param.requires_grad:
+                    setattr(param, "average_gradients_across_tp_domain", True)
 
     def _set_embedder_weights_replica_id(
         self, tensor: Tensor, sharded_state_dict: ShardedStateDict, embedder_weight_key: str
