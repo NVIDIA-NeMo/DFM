@@ -99,6 +99,16 @@ readme = {file = "README.md", content-type = "text/markdown"}
 
 [tool.uv]
 prerelease = "allow"
+# These packages require torch during build, so disable build isolation
+no-build-isolation-package = [
+    "transformer-engine",
+    "transformer-engine-torch",
+    "mamba-ssm",
+    "causal-conv1d",
+    "nv-grouped-gemm",
+    "flash_mla",
+    "flash-linear-attention",
+]
 
 [[tool.uv.index]]
 name = "pypi"
