@@ -18,7 +18,7 @@ dynamic = [
     "version",
     "readme",
 ]
-description = "NeMo VFM"
+description = "NeMo DFM - Diffusion Foundation Models"
 license = {file = "LICENSE"}
 requires-python = ">=3.10"
 authors = [{ name = "NVIDIA", email = "nemo-toolkit@nvidia.com" }]
@@ -54,13 +54,25 @@ classifiers = [
     "Topic :: Software Development :: Libraries",
     "Topic :: Utilities",
 ]
-dependencies = []
+dependencies = [
+    "diffusers==0.35.1",
+    "easydict",
+    "imageio",
+    "imageio-ffmpeg",
+]
 
 [build-system]
 requires = ["setuptools>=61"]
 build-backend = "setuptools.build_meta"
 
 [dependency-groups]
+automodel = [
+    "nemo-automodel @ git+https://github.com/NVIDIA-NeMo/Automodel@main",
+    "diffusers",
+    "ftfy",
+    "imageio-ffmpeg",
+    "opencv-python-headless==4.10.0.84",
+]
 docs = [
     "myst-parser>=4.0.1",
     "nvidia-sphinx-theme>=0.0.8",
@@ -90,9 +102,25 @@ packages = ["nemo_vfm"]
 version = {attr = "nemo_vfm.__version__"}
 readme = {file = "README.md", content-type = "text/markdown"}
 
+[[tool.uv.index]]
+name = "pypi"
+url = "https://pypi.org/simple"
+explicit = true
+
+[[tool.uv.index]]
+name = "pytorch"
+url = "https://download.pytorch.org/whl/cu128"
+explicit = true
+
+[tool.uv.sources]
+torch = [
+    { index = "pytorch", marker = "sys_platform != 'darwin'" },
+    { index = "pypi", marker = "sys_platform == 'darwin'" },
+]
+
 [project.urls]
-Download = "https://github.com/NVIDIA-NeMo/NeMo-VFM/releases"
-Homepage = "https://github.com/NVIDIA-NeMo/NeMo-VFM"
+Download = "https://github.com/NVIDIA-NeMo/DFM/releases"
+Homepage = "https://github.com/NVIDIA-NeMo/DFM"
 
 [tool.pytest.ini_options]
 # durations=0 will display all tests execution time, sorted in ascending order starting from from the slowest one.

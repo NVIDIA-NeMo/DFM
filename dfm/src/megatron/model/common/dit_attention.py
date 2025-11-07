@@ -12,15 +12,14 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-# pylint: disable=C0115,C0116,C0301
-
 import copy
 from dataclasses import dataclass
-from typing import Union
+from typing import Optional, Union
 
 import torch
 from megatron.core import parallel_state, tensor_parallel
 from megatron.core.extensions.transformer_engine import SplitAlongDim
+from megatron.core.process_groups_config import ProcessGroupCollection
 from megatron.core.transformer.attention import (
     CrossAttention,
     SelfAttention,
@@ -41,7 +40,6 @@ class DiTCrossAttentionSubmodules:
     linear_kv: Union[ModuleSpec, type] = None
     core_attention: Union[ModuleSpec, type] = None
     linear_proj: Union[ModuleSpec, type] = None
-    layernorm_across_head: bool = False
     q_layernorm: Union[ModuleSpec, type] = None
     k_layernorm: Union[ModuleSpec, type] = None
 
@@ -54,7 +52,7 @@ class DiTSelfAttention(SelfAttention):
         layer_number: int,
         attn_mask_type: AttnMaskType,
         cp_comm_type: str = None,
-        pg_collection=None,
+        pg_collection: Optional[ProcessGroupCollection] = None,
     ):
         super().__init__(
             config,
@@ -65,11 +63,11 @@ class DiTSelfAttention(SelfAttention):
             pg_collection,
         )
 
-        self.layernorm_across_head = submodules.layernorm_across_head
+        self.layernorm_across_heads = getattr(self.config, "layernorm_across_heads", False)
 
         # override q_layernorm
         if submodules.q_layernorm is not None:
-            if self.layernorm_across_head:
+            if self.layernorm_across_heads:
                 q_layernorm_size = self.query_projection_size
             else:
                 q_layernorm_size = self.hidden_size_per_attention_head
@@ -86,7 +84,7 @@ class DiTSelfAttention(SelfAttention):
 
         # override k_layernorm
         if submodules.k_layernorm is not None:
-            if self.layernorm_across_head:
+            if self.layernorm_across_heads:
                 k_layernorm_size = self.kv_projection_size
             else:
                 k_layernorm_size = self.hidden_size_per_attention_head
@@ -101,7 +99,7 @@ class DiTSelfAttention(SelfAttention):
         else:
             self.k_layernorm = None
 
-    def get_query_key_value_tensors(self, hidden_states, key_value_states=None, split_qkv=False):
+    def get_query_key_value_tensors(self, hidden_states, key_value_states=None):
         """
         Derives `query`, `key` and `value` tensors from `hidden_states`.
         """
@@ -140,8 +138,8 @@ class DiTSelfAttention(SelfAttention):
         # [sq, b, ng, np/ng * hn] -> [sq, b, np, hn]
         query = query.reshape(query.size(0), query.size(1), -1, self.hidden_size_per_attention_head)
 
-        # gather query and key heads across TP ranks if self.layernorm_across_head is True
-        if self.layernorm_across_head and parallel_state.get_tensor_model_parallel_world_size() > 1:
+        # gather query and key heads across TP ranks if self.layernorm_across_heads is True
+        if self.layernorm_across_heads and parallel_state.get_tensor_model_parallel_world_size() > 1:
             query = query.transpose(-2, -1)
             key = key.transpose(-2, -1)
             query = tensor_parallel.gather_from_tensor_model_parallel_region(query)
@@ -150,7 +148,7 @@ class DiTSelfAttention(SelfAttention):
             key = key.transpose(-2, -1)
 
         if self.q_layernorm is not None:
-            if self.layernorm_across_head:
+            if self.layernorm_across_heads:
                 q_flat = query.reshape(query.size(0), query.size(1), -1).contiguous()  # [sq, b, np*hn]
                 q_flat = self.q_layernorm(q_flat)
                 query = q_flat.view(
@@ -160,15 +158,15 @@ class DiTSelfAttention(SelfAttention):
                 query = self.q_layernorm(query.contiguous())
 
         if self.k_layernorm is not None:
-            if self.layernorm_across_head:
+            if self.layernorm_across_heads:
                 k_flat = key.reshape(key.size(0), key.size(1), -1).contiguous()
                 k_flat = self.k_layernorm(k_flat)
                 key = k_flat.view(key.size(0), key.size(1), -1, self.hidden_size_per_attention_head)
             else:
                 key = self.k_layernorm(key.contiguous())
 
-        # scatter query and key heads across TP ranks if self.layernorm_across_head is True
-        if self.layernorm_across_head and parallel_state.get_tensor_model_parallel_world_size() > 1:
+        # scatter query and key heads across TP ranks if self.layernorm_across_heads is True
+        if self.layernorm_across_heads and parallel_state.get_tensor_model_parallel_world_size() > 1:
             query = query.transpose(-2, -1)
             key = key.transpose(-2, -1)
             query = tensor_parallel.scatter_to_tensor_model_parallel_region(query)
@@ -192,7 +190,7 @@ class DiTCrossAttention(CrossAttention):
         layer_number: int,
         attn_mask_type: AttnMaskType,
         cp_comm_type: str = None,
-        pg_collection=None,
+        pg_collection: Optional[ProcessGroupCollection] = None,
     ):
         super().__init__(
             config,
@@ -203,11 +201,11 @@ class DiTCrossAttention(CrossAttention):
             pg_collection,
         )
 
-        self.layernorm_across_head = submodules.layernorm_across_head
+        self.layernorm_across_heads = getattr(self.config, "layernorm_across_heads", False)
 
         # override q_layernorm
         if submodules.q_layernorm is not None:
-            if self.layernorm_across_head:
+            if self.layernorm_across_heads:
                 q_layernorm_size = self.query_projection_size
             else:
                 q_layernorm_size = self.hidden_size_per_attention_head
@@ -224,7 +222,7 @@ class DiTCrossAttention(CrossAttention):
 
         # override k_layernorm
         if submodules.k_layernorm is not None:
-            if self.layernorm_across_head:
+            if self.layernorm_across_heads:
                 k_layernorm_size = self.kv_projection_size
             else:
                 k_layernorm_size = self.hidden_size_per_attention_head
@@ -239,6 +237,7 @@ class DiTCrossAttention(CrossAttention):
         else:
             self.k_layernorm = None
 
+        # only in DiT?
         self.linear_kv = build_module(
             submodules.linear_kv,
             self.config.crossattn_emb_size,
@@ -251,36 +250,16 @@ class DiTCrossAttention(CrossAttention):
             is_expert=False,
         )
 
-    def get_query_key_value_tensors(self, hidden_states, key_value_states, split_qkv=False):
+    def get_query_key_value_tensors(self, hidden_states, key_value_states):
         """
         Derives `query` tensor from `hidden_states`, and `key`/`value` tensors
         from `key_value_states`.
         """
-        # Attention heads [sk, b, h] --> [sk, b, (np * 2 * hn)]
-        mixed_kv, _ = self.linear_kv(key_value_states)
 
-        # [sk, b, (np * 2 * hn)] --> [sk, b, np, 2 * hn]
-        new_tensor_shape = mixed_kv.size()[:-1] + (
-            self.num_attention_heads_per_partition,
-            2 * self.hidden_size_per_attention_head,
-        )
-        mixed_kv = mixed_kv.view(*new_tensor_shape)
+        query, key, value = super().get_query_key_value_tensors(hidden_states, key_value_states)
 
-        # [sk, b, np, 2 * hn] --> 2 [sk, b, np, hn]
-        (key, value) = tensor_parallel.split_tensor_along_last_dim(mixed_kv, 2)
-
-        # Attention head [sq, b, h] --> [sq, b, hp]
-        query, _ = self.linear_q(hidden_states)
-
-        # [sq, b, hp] --> [sq, b, np, hn]
-        new_tensor_shape = query.size()[:-1] + (
-            self.num_attention_heads_per_partition,
-            self.hidden_size_per_attention_head,
-        )
-        query = query.view(*new_tensor_shape)
-
-        # gather query and key heads across TP ranks if self.layernorm_across_head is True
-        if self.layernorm_across_head and parallel_state.get_tensor_model_parallel_world_size() > 1:
+        # gather query and key heads across TP ranks if self.layernorm_across_heads is True
+        if self.layernorm_across_heads and parallel_state.get_tensor_model_parallel_world_size() > 1:
             query = query.transpose(-2, -1)
             key = key.transpose(-2, -1)
             query = tensor_parallel.gather_from_tensor_model_parallel_region(query)
@@ -289,7 +268,7 @@ class DiTCrossAttention(CrossAttention):
             key = key.transpose(-2, -1)
 
         if self.q_layernorm is not None:
-            if self.layernorm_across_head:
+            if self.layernorm_across_heads:
                 q_flat = query.reshape(query.size(0), query.size(1), -1).contiguous()  # [sq, b, np*hn]
                 q_flat = self.q_layernorm(q_flat)
                 query = q_flat.view(
@@ -299,15 +278,15 @@ class DiTCrossAttention(CrossAttention):
                 query = self.q_layernorm(query.contiguous())
 
         if self.k_layernorm is not None:
-            if self.layernorm_across_head:
+            if self.layernorm_across_heads:
                 k_flat = key.reshape(key.size(0), key.size(1), -1).contiguous()
                 k_flat = self.k_layernorm(k_flat)
                 key = k_flat.view(key.size(0), key.size(1), -1, self.hidden_size_per_attention_head)
             else:
                 key = self.k_layernorm(key.contiguous())
 
-        # scatter query and key heads across TP ranks if self.layernorm_across_head is True
-        if self.layernorm_across_head and parallel_state.get_tensor_model_parallel_world_size() > 1:
+        # scatter query and key heads across TP ranks if self.layernorm_across_heads is True
+        if self.layernorm_across_heads and parallel_state.get_tensor_model_parallel_world_size() > 1:
             query = query.transpose(-2, -1)
             key = key.transpose(-2, -1)
             query = tensor_parallel.scatter_to_tensor_model_parallel_region(query)

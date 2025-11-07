@@ -19,6 +19,7 @@ on:
     branches:
       - main
       - "pull-request/[0-9]+"
+      - "r[0-9]+.[0-9]+.[0-9]+"
 
 concurrency:
   group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}-${{ github.event.label.name || 'main' }}-${{ github.event_name }}
@@ -42,7 +43,7 @@ jobs:
     uses: ./.github/workflows/_build_container.yml
     needs: cicd-wait-in-queue
     with:
-      image-name: vfm
+      image-name: dfm
       dockerfile: docker/Dockerfile.ci
     secrets:
       AZURE_CLIENT_ID: ${{ secrets.AZURE_CLIENT_ID }}
@@ -74,7 +75,7 @@ jobs:
           script: ${{ matrix.script }}
           timeout: ${{ matrix.timeout || 10 }}
           is_unit_test: "true"
-          image: vfm
+          image: dfm
           cpu-only: ${{ matrix.cpu-only || false }}
           has-azure-credentials: "true"
           azure-client-id: ${{ secrets.AZURE_CLIENT_ID }}
@@ -102,7 +103,7 @@ jobs:
           runner: ${{ runner.name }}
           script: ${{ matrix.script }}
           timeout: ${{ matrix.timeout || 10 }}
-          image: vfm
+          image: dfm
           cpu-only: ${{ matrix.cpu-only || false }}
           has-azure-credentials: "true"
           azure-client-id: ${{ secrets.AZURE_CLIENT_ID }}
@@ -226,7 +227,7 @@ jobs:
         shell: bash -x -e -u -o pipefail {0}
         if: always()
         run: |
-          pip install coverage
+          pip install coverage[toml]
 
           ls -al .
           ls -al coverage-*/
@@ -241,6 +242,8 @@ jobs:
           token: ${{ secrets.CODECOV_TOKEN }}
           verbose: true
           flags: ${{ matrix.flag }}
+          slug: NVIDIA-NeMo/DFM
+          name: DFM-Coverage-${{ matrix.flag }}
 
       - name: Upload artifacts
         uses: actions/upload-artifact@v4
