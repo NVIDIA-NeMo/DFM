@@ -165,7 +165,6 @@ class WanModel(VisionModule):
         if self.post_process:
             self.head = Head(self.config.hidden_size, self.out_channels, self.patch_size, eps=1e-6)
 
-
         # set attributes "average_gradients_across_tp_domain" for nn.Parameter objects
         # this is used for gradient averaging across TP domain with sequence parallelism
         self._mark_trainable_params_for_tp_grad_avg(
