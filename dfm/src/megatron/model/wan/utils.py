@@ -39,6 +39,36 @@ def grid_sizes_calculation(
     return [F_patches, H_patches, W_patches]
 
 
+def patchify_single_sample(x, patch_size):
+    """
+    Convert a list of reconstructed video tensor into patch embeddings.
+    This method is the inverse of `unpatchify`.
+
+    Args:
+        x (list[torch.Tensor]): list of tensors, each with shape [c, F_patches * pF, H_patches * pH, W_patches * pW]
+        patch_size (tuple): (pF, pH, pW)
+
+    Returns:
+        torch.Tensor: shape [ (F_patches * H_patches * W_patches), (c * pF * pH * pW)],
+    """
+    c, F_pF, H_pH, W_pW = x.shape
+    pF, pH, pW = patch_size
+    assert F_pF % pF == 0 and H_pH % pH == 0 and W_pW % pW == 0, "Spatial dimensions must be divisible by patch size."
+
+    F_patches, H_patches, W_patches = F_pF // pF, H_pH // pH, W_pW // pW
+
+    # split spatial dims into (grid, patch) and reorder to match original patch layout:
+    # start: (c, F_patches * pF, H_patches * pH, W_patches * pW)
+    # reshape -> (c, F_patches, pF, H_patches, pH, W_patches, pW)
+    # permute -> (F_patches, H_patches, W_patches, pF, pH, pW, c)
+    t = x.reshape(c, F_patches, pF, H_patches, pH, W_patches, pW)
+    t = t.permute(1, 3, 5, 2, 4, 6, 0)
+
+    num_patches = F_patches * H_patches * W_patches
+    out = t.reshape(num_patches, c * (pF * pH * pW))
+    return out
+
+
 def patchify(x, patch_size):
     """
     Convert a list of reconstructed video tensor into patch embeddings.

@@ -101,7 +101,8 @@ class WanForwardStep:
         loss = output_tensor
         if "loss_mask" not in batch or batch["loss_mask"] is None:
             loss_mask = torch.ones_like(loss)
-        loss_mask = batch["loss_mask"]
+        else:
+            loss_mask = batch["loss_mask"]
 
         loss_function = self._create_loss_function(loss_mask, check_for_nan_in_loss, check_for_spiky_loss)
 

@@ -184,7 +184,9 @@ def pretrain_config(
         ),
         dataset=WanDataModuleConfig(
             path=None,
-            seq_length=1024,  # we don't need to use this value, just add because Bridge training requires for LLMs
+            seq_length=2048,  # we don't need to use this value, just add because Bridge training requires for LLMs
+            task_encoder_seq_length=2048,
+            packing_buffer_size=4000,
             micro_batch_size=micro_batch_size,
             global_batch_size=global_batch_size,
             num_workers=10,

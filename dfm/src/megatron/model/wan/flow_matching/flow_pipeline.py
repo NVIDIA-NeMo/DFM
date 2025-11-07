@@ -53,13 +53,13 @@ class FlowPipeline:
         3. Compute the loss based on the difference between the predictions and target.
         """
 
-        video_latents = data_batch["video_latents"]
-        max_video_seq_len = data_batch["max_video_seq_len"]
+        video_latents = data_batch["video"]
+        max_video_seq_len = data_batch["max_seq_len"]
         context_embeddings = data_batch["context_embeddings"]
         loss_mask = data_batch["loss_mask"]
-        grid_sizes = data_batch["grid_sizes"]
+        grid_sizes = data_batch["latent_shape"]
         packed_seq_params = data_batch["packed_seq_params"]
-        video_metadata = data_batch["video_metadata"]
+        # video_metadata = data_batch["video_metadata"]
 
         self.model = model
 
@@ -123,10 +123,7 @@ class FlowPipeline:
                 dtype=torch.float32,
                 device=video_latents.device,
             )
-            sample_noise = patchify(sample_noise, (patch_temporal, patch_spatial, patch_spatial))[
-                0
-            ]  # shape [noise_seq, c * ( pF * pH * pW)]
-
+            sample_noise = patchify(sample_noise, (patch_temporal, patch_spatial, patch_spatial))[0]
             # because video_latents might be padded, we need to make sure noise also be padded to have the same shape
             noise_seq = sample_noise.shape[0]
             video_seq = video_latents.shape[0]
