@@ -46,7 +46,6 @@ from dfm.src.megatron.model.common.dit_attention import DiTCrossAttention, DiTCr
 
 @dataclass
 class DiTWithAdaLNSubmodules(TransformerLayerSubmodules):
-    temporal_self_attention: Union[ModuleSpec, type] = IdentityOp
     full_self_attention: Union[ModuleSpec, type] = IdentityOp
 
 
