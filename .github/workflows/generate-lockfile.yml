@@ -50,17 +50,6 @@ jobs:
         with:
           python-version: '3.12'
 
-      - name: Install CUDA toolkit (for causal-conv1d metadata extraction)
-        run: |
-          # Install minimal CUDA toolkit for building package metadata
-          wget https://developer.download.nvidia.com/compute/cuda/repos/ubuntu2404/x86_64/cuda-keyring_1.1-1_all.deb
-          sudo dpkg -i cuda-keyring_1.1-1_all.deb
-          sudo apt-get update
-          sudo apt-get install -y cuda-nvcc-12-6 cuda-cudart-dev-12-6
-          echo "CUDA_HOME=/usr/local/cuda-12.6" >> $GITHUB_ENV
-          echo "/usr/local/cuda-12.6/bin" >> $GITHUB_PATH
-          echo "LD_LIBRARY_PATH=/usr/local/cuda-12.6/lib64:${LD_LIBRARY_PATH}" >> $GITHUB_ENV
-
       - name: Install uv
         run: |
           curl -LsSf https://astral.sh/uv/0.8.22/install.sh | sh
@@ -79,19 +68,22 @@ jobs:
           python3 -c "import torch; print(f'Torch version: {torch.__version__}')"
           python3 -c "import sys; print(f'Python path: {sys.path}')"
 
-      - name: Temporarily remove override-dependencies for lockfile generation
+      - name: Temporarily remove override-dependencies and no-build-isolation packages
         run: |
           # Backup original pyproject.toml
           cp pyproject.toml pyproject.toml.backup
           # Comment out override-dependencies section
           sed -i '/^override-dependencies = \[/,/^\]/s/^/# /' pyproject.toml
+          # Comment out no-build-isolation-package section (let packages build normally with wheels)
+          sed -i '/^no-build-isolation-package = \[/,/^\]/s/^/# /' pyproject.toml
           echo "Modified pyproject.toml:"
           grep -A 5 "override-dependencies" pyproject.toml || echo "override-dependencies removed"
+          grep -A 10 "no-build-isolation" pyproject.toml || echo "no-build-isolation removed"
 
       - name: Generate lockfile
         run: |
-          # Use --no-build-isolation so packages can see the torch we installed
-          uv lock --no-build-isolation
+          # Let uv use pre-built wheels - no need for CUDA compiler
+          uv lock
 
       - name: Restore original pyproject.toml
         run: |
