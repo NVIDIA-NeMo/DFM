@@ -31,63 +31,63 @@ on:
 jobs:
   generate-lockfile:
     runs-on: ubuntu-latest
+    container:
+      image: nvcr.io/nvidia/pytorch:25.09-py3
+      options: --shm-size=2g
     steps:
-      - name: Free up disk space
+      - name: Aggressive disk cleanup inside container
         run: |
-          # Remove unnecessary packages to free up space
-          sudo rm -rf /usr/share/dotnet
-          sudo rm -rf /opt/ghc
-          sudo rm -rf /usr/local/share/boost
-          sudo rm -rf "$AGENT_TOOLSDIRECTORY"
-          sudo apt-get clean
+          # Clean up unnecessary files from the container
+          rm -rf /workspace/* || true
+          rm -rf /tmp/* || true
+          apt-get clean
+          rm -rf /var/lib/apt/lists/*
+          # Remove unnecessary PyTorch extras to save space
+          pip uninstall -y torchvision torchaudio || true
           df -h
-
+          
       - name: Checkout repository
         uses: actions/checkout@v4
-
-      - name: Set up Python
-        uses: actions/setup-python@v5
-        with:
-          python-version: '3.12'
 
       - name: Install uv
         run: |
           curl -LsSf https://astral.sh/uv/0.8.22/install.sh | sh
+          export PATH="$HOME/.local/bin:$PATH"
           echo "$HOME/.local/bin" >> $GITHUB_PATH
 
-      - name: Install build dependencies
+      - name: Set environment
         run: |
-          # Install minimal dependencies needed for lockfile generation
-          # Use regular pip to ensure packages are installed correctly
-          pip install setuptools wheel packaging ninja pybind11 Cython "numpy<2.0.0"
-          # Install CPU-only torch (sufficient for lockfile generation - we're only resolving versions, not running CUDA code)
-          pip install torch --index-url https://download.pytorch.org/whl/cpu
+          echo "UV_PROJECT_ENVIRONMENT=/opt/venv" >> $GITHUB_ENV
+          echo "UV_CACHE_DIR=/tmp/uv-cache" >> $GITHUB_ENV
+          echo "CUDA_HOME=/usr/local/cuda" >> $GITHUB_ENV
+          echo "PATH=$HOME/.local/bin:/usr/local/cuda/bin:$PATH" >> $GITHUB_PATH
 
-      - name: Verify torch installation
+      - name: Create venv and install minimal build deps
         run: |
-          python3 -c "import torch; print(f'Torch version: {torch.__version__}')"
-          python3 -c "import sys; print(f'Python path: {sys.path}')"
+          uv venv /opt/venv --system-site-packages
+          # Only install what's absolutely necessary
+          uv pip install --system setuptools wheel packaging ninja pybind11 Cython "numpy<2.0.0"
+          # Clean cache after install to save space
+          uv cache clean
 
-      - name: Temporarily remove override-dependencies and no-build-isolation packages
+      - name: Temporarily remove override-dependencies
         run: |
-          # Backup original pyproject.toml
           cp pyproject.toml pyproject.toml.backup
-          # Comment out override-dependencies section
           sed -i '/^override-dependencies = \[/,/^\]/s/^/# /' pyproject.toml
-          # Comment out no-build-isolation-package section (let packages build normally with wheels)
-          sed -i '/^no-build-isolation-package = \[/,/^\]/s/^/# /' pyproject.toml
-          echo "Modified pyproject.toml:"
-          grep -A 5 "override-dependencies" pyproject.toml || echo "override-dependencies removed"
-          grep -A 10 "no-build-isolation" pyproject.toml || echo "no-build-isolation removed"
 
       - name: Generate lockfile
         run: |
-          # Let uv use pre-built wheels - no need for CUDA compiler
-          uv lock
+          # Use system torch from container, no-build-isolation for CUDA packages
+          uv lock --no-build-isolation
+          # Clean cache immediately after to free up space
+          uv cache clean
 
       - name: Restore original pyproject.toml
         run: |
           mv pyproject.toml.backup pyproject.toml
+          
+      - name: Show final disk usage
+        run: df -h
 
       - name: Upload lockfile artifact
         uses: actions/upload-artifact@v4
