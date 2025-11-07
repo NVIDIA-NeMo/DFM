@@ -93,10 +93,10 @@ jobs:
         with:
           script: |
             const changed = '${{ steps.check_changes.outputs.changed }}';
-            const message = changed === 'true' 
+            const message = changed === 'true'
               ? '⚠️ **uv.lock needs to be regenerated**\n\nThe lockfile is out of sync with pyproject.toml. Please run the "Generate UV Lockfile" workflow manually or regenerate locally on Linux.'
               : '✅ **uv.lock is up to date**\n\nThe lockfile is in sync with pyproject.toml.';
-            
+
             github.rest.issues.createComment({
               issue_number: context.issue.number,
               owner: context.repo.owner,
