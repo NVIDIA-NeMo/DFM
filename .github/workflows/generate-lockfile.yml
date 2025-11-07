@@ -59,8 +59,8 @@ jobs:
         run: |
           # Install minimal dependencies needed for lockfile generation
           # Using CPU-only torch is sufficient - we're only resolving versions, not running CUDA code
-          uv pip install setuptools torch --index-url https://download.pytorch.org/whl/cpu
-          uv pip install packaging ninja pybind11 Cython "numpy<2.0.0"
+          uv pip install --system setuptools torch --index-url https://download.pytorch.org/whl/cpu
+          uv pip install --system packaging ninja pybind11 Cython "numpy<2.0.0"
 
       - name: Generate lockfile
         run: |
