@@ -89,7 +89,7 @@ dev = [
     "ruff>=0.9.9",
     "mypy>=1.8.0",
 ]
-build = ["setuptools", "torch", "pybind11", "Cython>=3.0.0", "numpy<2.0.0", "ninja", "packaging"]
+build = ["setuptools", "wheel", "torch", "pybind11", "Cython>=3.0.0", "numpy<2.0.0", "ninja", "packaging"]
 
 [tool.setuptools]
 packages = ["nemo_vfm"]
