@@ -60,6 +60,7 @@ dependencies = [
     "ftfy",
     "imageio-ffmpeg",
     "opencv-python-headless==4.10.0.84",
+    "megatron-bridge",
 ]
 
 [build-system]
@@ -95,6 +96,9 @@ packages = ["nemo_vfm"]
 [tool.setuptools.dynamic]
 version = {attr = "nemo_vfm.__version__"}
 readme = {file = "README.md", content-type = "text/markdown"}
+
+[tool.uv]
+prerelease = "allow"
 
 [[tool.uv.index]]
 name = "pypi"
