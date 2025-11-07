@@ -63,9 +63,28 @@ jobs:
           # Install CPU-only torch (sufficient for lockfile generation - we're only resolving versions, not running CUDA code)
           uv pip install --system torch --index-url https://download.pytorch.org/whl/cpu
 
+      - name: Verify torch installation
+        run: |
+          python3 -c "import torch; print(f'Torch version: {torch.__version__}')"
+          python3 -c "import sys; print(f'Python path: {sys.path}')"
+
+      - name: Temporarily remove override-dependencies for lockfile generation
+        run: |
+          # Backup original pyproject.toml
+          cp pyproject.toml pyproject.toml.backup
+          # Comment out override-dependencies section
+          sed -i '/^override-dependencies = \[/,/^\]/s/^/# /' pyproject.toml
+          echo "Modified pyproject.toml:"
+          grep -A 5 "override-dependencies" pyproject.toml || echo "override-dependencies removed"
+
       - name: Generate lockfile
         run: |
-          uv lock
+          # Use --no-build-isolation so packages can see the torch we installed
+          uv lock --no-build-isolation
+
+      - name: Restore original pyproject.toml
+        run: |
+          mv pyproject.toml.backup pyproject.toml
 
       - name: Upload lockfile artifact
         uses: actions/upload-artifact@v4
