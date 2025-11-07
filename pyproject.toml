@@ -55,21 +55,11 @@ classifiers = [
     "Topic :: Utilities",
 ]
 dependencies = [
+    "nemo-automodel @ git+https://github.com/NVIDIA-NeMo/Automodel@main",
     "diffusers==0.35.1",
     "easydict",
-    "imageio",
-    "imageio-ffmpeg",
-]
-
-[build-system]
-requires = ["setuptools>=61"]
-build-backend = "setuptools.build_meta"
-
-[dependency-groups]
-automodel = [
-    "nemo-automodel @ git+https://github.com/NVIDIA-NeMo/Automodel@main",
-    "diffusers",
     "ftfy",
+    "imageio",
     "imageio-ffmpeg",
     "opencv-python-headless==4.10.0.84",
 ]

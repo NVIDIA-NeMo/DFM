@@ -151,7 +151,7 @@ class FlowInferencePipeline:
             dist.barrier()
         self.model.to(self.device)
 
-        self.sample_neg_prompt = inference_cfg.sample_neg_prompt
+        self.sample_neg_prompt = inference_cfg.english_sample_neg_prompt
 
     def setup_model_from_checkpoint(self, checkpoint_dir):
         provider = WanModelProvider()
