@@ -250,7 +250,7 @@ class DiTCrossAttention(CrossAttention):
             is_expert=False,
         )
 
-    def get_query_key_value_tensors(self, hidden_states, key_value_states):
+    def get_query_key_value_tensors(self, hidden_states, key_value_states, split_qkv=False):
         """
         Derives `query` tensor from `hidden_states`, and `key`/`value` tensors
         from `key_value_states`.

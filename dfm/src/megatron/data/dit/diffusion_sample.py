@@ -40,15 +40,14 @@ class DiffusionSample(Sample):
     """
 
     video: torch.Tensor  # video latents (C T H W)
-    t5_text_embeddings: torch.Tensor  # (S D)
-    t5_text_mask: torch.Tensor  # 1
-    loss_mask: torch.Tensor
+    context_embeddings: torch.Tensor  # (S D)
+    context_mask: torch.Tensor = None  # 1
     image_size: Optional[torch.Tensor] = None
+    loss_mask: torch.Tensor = None
     fps: Optional[torch.Tensor] = None
     num_frames: Optional[torch.Tensor] = None
     padding_mask: Optional[torch.Tensor] = None
     seq_len_q: Optional[torch.Tensor] = None
-    padding_mask: Optional[torch.Tensor] = None
     seq_len_kv: Optional[torch.Tensor] = None
     pos_ids: Optional[torch.Tensor] = None
     latent_shape: Optional[torch.Tensor] = None
@@ -57,8 +56,8 @@ class DiffusionSample(Sample):
         """Converts the sample to a dictionary."""
         return dict(
             video=self.video,
-            t5_text_embeddings=self.t5_text_embeddings,
-            t5_text_mask=self.t5_text_mask,
+            context_embeddings=self.context_embeddings,
+            context_mask=self.context_mask,
             loss_mask=self.loss_mask,
             image_size=self.image_size,
             fps=self.fps,

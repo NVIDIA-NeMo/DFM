@@ -296,9 +296,9 @@ class EDMPipeline:
         """Returns conditioning and unconditioning for classifier-free guidance."""
         _, _, condition = self.get_data_and_condition(data_batch, dropout_rate=0.0)
 
-        if "neg_t5_text_embeddings" in data_batch:
-            data_batch["t5_text_embeddings"] = data_batch["neg_t5_text_embeddings"]
-            data_batch["t5_text_mask"] = data_batch["neg_t5_text_mask"]
+        if "neg_context_embeddings" in data_batch:
+            data_batch["context_embeddings"] = data_batch["neg_context_embeddings"]
+            data_batch["context_mask"] = data_batch["context_mask"]
             _, _, uncondition = self.get_data_and_condition(data_batch, dropout_rate=1.0)
         else:
             _, _, uncondition = self.get_data_and_condition(data_batch, dropout_rate=1.0)
@@ -428,7 +428,7 @@ class EDMPipeline:
 
         # Condition
         data_batch["crossattn_emb"] = self.random_dropout_input(
-            data_batch["t5_text_embeddings"], dropout_rate=dropout_rate
+            data_batch["context_embeddings"], dropout_rate=dropout_rate
         )
 
         return raw_state, latent_state, data_batch
