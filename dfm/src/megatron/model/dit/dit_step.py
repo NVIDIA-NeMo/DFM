@@ -49,7 +49,7 @@ class DITForwardStep:
             guidance=7,
             state_shape=batch["video"].shape,
             num_steps=35,
-            is_negative_prompt=True if "neg_t5_text_embeddings" in batch else False,
+            is_negative_prompt=True if "neg_context_embeddings" in batch else False,
         )
         latent = latent[0, None, : batch["seq_len_q"][0]]
         latent = rearrange(
@@ -140,7 +140,8 @@ class DITForwardStep:
         loss = output_tensor
         if "loss_mask" not in batch or batch["loss_mask"] is None:
             loss_mask = torch.ones_like(loss)
-        loss_mask = batch["loss_mask"]
+        else:
+            loss_mask = batch["loss_mask"]
         loss_function = self._create_loss_function(loss_mask, check_for_nan_in_loss, check_for_spiky_loss)
         return output_tensor, loss_function
 

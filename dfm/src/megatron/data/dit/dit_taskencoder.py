@@ -12,45 +12,20 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-
-import random
+import warnings
 from typing import List
 
 import torch
 import torch.nn.functional as F
 from einops import rearrange
 from megatron.core import parallel_state
-from megatron.energon import DefaultTaskEncoder, SkipSample
-from megatron.energon.task_encoder.base import stateless
-from megatron.energon.task_encoder.cooking import Cooker, basic_sample_keys
+from megatron.energon import SkipSample, stateless
 
-from dfm.src.megatron.data.dit.dit_sample import DiffusionSample
-from dfm.src.megatron.data.dit.sequence_packing_utils import first_fit_decreasing
+from dfm.src.megatron.data.dit.diffusion_sample import DiffusionSample
+from dfm.src.megatron.data.dit.diffusion_task_encoder_with_sp import DiffusionTaskEncoderWithSequencePacking
 
 
-def cook(sample: dict) -> dict:
-    """
-    Processes a raw sample dictionary from energon dataset and returns a new dictionary with specific keys.
-
-    Args:
-        sample (dict): The input dictionary containing the raw sample data.
-
-    Returns:
-        dict: A new dictionary containing the processed sample data with the following keys:
-            - All keys from the result of `basic_sample_keys(sample)`
-            - 'json': The contains meta data like resolution, aspect ratio, fps, etc.
-            - 'pth': contains video latent tensor
-            - 'pickle': contains text embeddings
-    """
-    return dict(
-        **basic_sample_keys(sample),
-        json=sample[".json"],
-        pth=sample[".pth"],
-        pickle=sample[".pickle"],
-    )
-
-
-class BasicDiffusionTaskEncoder(DefaultTaskEncoder):
+class DiTTaskEncoder(DiffusionTaskEncoderWithSequencePacking):
     """
     BasicDiffusionTaskEncoder is a class that encodes image/video samples for diffusion tasks.
     Attributes:
@@ -70,31 +45,15 @@ class BasicDiffusionTaskEncoder(DefaultTaskEncoder):
                 SkipSample: If the video latent contains NaNs, Infs, or is not divisible by the tensor parallel size.
     """
 
-    cookers = [
-        Cooker(cook),
-    ]
-
     def __init__(
         self,
         *args,
-        max_frames: int = None,
-        text_embedding_padding_size: int = 512,
-        seq_length: int = None,
-        patch_spatial: int = 2,
-        patch_temporal: int = 1,
-        packing_buffer_size: int = None,
         **kwargs,
     ):
         super().__init__(*args, **kwargs)
-        self.max_frames = max_frames
-        self.text_embedding_padding_size = text_embedding_padding_size
-        self.seq_length = seq_length
-        self.patch_spatial = patch_spatial
-        self.patch_temporal = patch_temporal
-        self.packing_buffer_size = packing_buffer_size
 
     @stateless(restore_seeds=True)
-    def encode_sample(self, sample: dict) -> dict:
+    def encode_sample(self, sample: dict) -> DiffusionSample:
         video_latent = sample["pth"]
 
         if torch.isnan(video_latent).any() or torch.isinf(video_latent).any():
@@ -185,48 +144,13 @@ class BasicDiffusionTaskEncoder(DefaultTaskEncoder):
             __subflavor__=None,
             __subflavors__=sample["__subflavors__"],
             video=video_latent,
-            t5_text_embeddings=t5_text_embeddings,
-            t5_text_mask=t5_text_mask,
-            image_size=image_size,
-            num_frames=num_frames,
+            context_embeddings=t5_text_embeddings,
+            context_mask=t5_text_mask,
             loss_mask=loss_mask,
             seq_len_q=torch.tensor([seq_len], dtype=torch.int32),
             seq_len_kv=torch.tensor([self.text_embedding_padding_size], dtype=torch.int32),
             pos_ids=pos_ids,
             latent_shape=torch.tensor([C, T, H, W], dtype=torch.int32),
-        )
-
-    def select_samples_to_pack(self, samples: List[DiffusionSample]) -> List[List[DiffusionSample]]:
-        """
-        Selects sequences to pack for mixed image-video training.
-        """
-        results = first_fit_decreasing(samples, self.packing_buffer_size)
-        random.shuffle(results)
-        return results
-
-    @stateless
-    def pack_selected_samples(self, samples):
-        """Construct a new Diffusion sample by concatenating the sequences."""
-
-        def stack(attr):
-            return torch.stack([getattr(sample, attr) for sample in samples], dim=0)
-
-        def cat(attr):
-            return torch.cat([getattr(sample, attr) for sample in samples], dim=0)
-
-        return DiffusionSample(
-            __key__=",".join([s.__key__ for s in samples]),
-            __restore_key__=(),  # Will be set by energon based on `samples`
-            __subflavor__=None,
-            __subflavors__=samples[0].__subflavors__,
-            video=cat("video"),
-            t5_text_embeddings=cat("t5_text_embeddings"),
-            t5_text_mask=cat("t5_text_mask"),
-            loss_mask=cat("loss_mask"),
-            seq_len_q=cat("seq_len_q"),
-            seq_len_kv=cat("seq_len_kv"),
-            pos_ids=cat("pos_ids"),
-            latent_shape=stack("latent_shape"),
         )
 
     @stateless
@@ -240,12 +164,12 @@ class BasicDiffusionTaskEncoder(DefaultTaskEncoder):
         sample = samples[0]
         return dict(
             video=sample.video.unsqueeze_(0),
-            t5_text_embeddings=sample.t5_text_embeddings.unsqueeze_(0),
-            t5_text_mask=sample.t5_text_mask.unsqueeze_(0),
-            loss_mask=sample.loss_mask.unsqueeze_(0),
+            context_embeddings=sample.context_embeddings.unsqueeze_(0),
+            context_mask=sample.context_mask.unsqueeze_(0) if sample.context_mask is not None else None,
+            loss_mask=sample.loss_mask.unsqueeze_(0) if sample.loss_mask is not None else None,
             seq_len_q=sample.seq_len_q,
             seq_len_kv=sample.seq_len_kv,
-            pos_ids=sample.pos_ids.unsqueeze_(0),
+            pos_ids=sample.pos_ids.unsqueeze_(0) if sample.pos_ids is not None else None,
             latent_shape=sample.latent_shape,
         )
 
@@ -279,33 +203,33 @@ class PosID3D:
 pos_id_3d = PosID3D()
 
 
-def cook_raw_iamges(sample: dict) -> dict:
-    """
-    Processes a raw sample dictionary from energon dataset and returns a new dictionary with specific keys.
+# def cook_raw_iamges(sample: dict) -> dict:
+#     """
+#     Processes a raw sample dictionary from energon dataset and returns a new dictionary with specific keys.
 
-    Args:
-        sample (dict): The input dictionary containing the raw sample data.
+#     Args:
+#         sample (dict): The input dictionary containing the raw sample data.
 
-    Returns:
-        dict: A new dictionary containing the processed sample data with the following keys:
-            - All keys from the result of `basic_sample_keys(sample)`
-            - 'jpg': original images
-            - 'png': contains control images
-            - 'txt': contains raw text
-    """
-    return dict(
-        **basic_sample_keys(sample),
-        images=sample["jpg"],
-        hint=sample["png"],
-        txt=sample["txt"],
-    )
+#     Returns:
+#         dict: A new dictionary containing the processed sample data with the following keys:
+#             - All keys from the result of `basic_sample_keys(sample)`
+#             - 'jpg': original images
+#             - 'png': contains control images
+#             - 'txt': contains raw text
+#     """
+#     return dict(
+#         **basic_sample_keys(sample),
+#         images=sample["jpg"],
+#         hint=sample["png"],
+#         txt=sample["txt"],
+#     )
 
 
-class RawImageDiffusionTaskEncoder(DefaultTaskEncoder):
-    """
-    Dummy task encoder takes raw image input on CrudeDataset.
-    """
+# class RawImageDiffusionTaskEncoder(DefaultTaskEncoder):
+#     """
+#     Dummy task encoder takes raw image input on CrudeDataset.
+#     """
 
-    cookers = [
-        Cooker(cook_raw_iamges),
-    ]
+#     cookers = [
+#         Cooker(cook_raw_iamges),
+#     ]

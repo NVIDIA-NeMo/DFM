@@ -14,6 +14,7 @@
 
 # pylint: disable=C0115,C0116,C0301
 
+
 import logging
 from dataclasses import dataclass
 from typing import Any, Dict, Literal
@@ -22,8 +23,8 @@ from megatron.bridge.data.utils import DatasetBuildContext, DatasetProvider
 from megatron.energon import DefaultTaskEncoder, get_train_dataset
 from torch import int_repr
 
-from dfm.src.megatron.data.dit.base import EnergonMultiModalDataModule
-from dfm.src.megatron.data.dit.diffusion_taskencoder import BasicDiffusionTaskEncoder
+from dfm.src.megatron.data.dit.base_energon_datamodule import EnergonMultiModalDataModule
+from dfm.src.megatron.data.dit.dit_taskencoder import DiTTaskEncoder
 
 
 @dataclass(kw_only=True)
@@ -41,7 +42,7 @@ class DiffusionDataModuleConfig(DatasetProvider):
         self.dataset = DiffusionDataModule(
             path=self.path,
             seq_length=self.seq_length,
-            task_encoder=BasicDiffusionTaskEncoder(
+            task_encoder=DiTTaskEncoder(
                 seq_length=self.task_encoder_seq_length, packing_buffer_size=self.packing_buffer_size
             ),
             micro_batch_size=self.micro_batch_size,

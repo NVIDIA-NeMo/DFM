@@ -67,6 +67,7 @@ class DiTModelProvider(TransformerConfig, ModelProviderMixin[VisionModule]):
     vae_path: str = None
     sigma_data: float = 0.5
     in_channels: int = 16
+    layernorm_across_heads: bool = False
 
     replicated_t_embedder = True
     qkv_format: str = "thd"
