@@ -1368,7 +1368,7 @@ dependencies = [
 ]
 
 [[package]]
-name = "nemo-vfm"
+name = "nemo-dfm"
 source = { editable = "." }
 dependencies = [
     { name = "diffusers" },
