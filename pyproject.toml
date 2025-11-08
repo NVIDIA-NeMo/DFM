@@ -13,7 +13,7 @@
 # limitations under the License.
 
 [project]
-name = "nemo-vfm"
+name = "nemo-dfm"
 dynamic = [
     "version",
     "readme",
@@ -90,10 +90,10 @@ dev = [
 ]
 
 [tool.setuptools]
-packages = ["nemo_vfm"]
+packages = ["nemo_dfm"]
 
 [tool.setuptools.dynamic]
-version = {attr = "nemo_vfm.__version__"}
+version = {attr = "dfm.__version__"}
 readme = {file = "README.md", content-type = "text/markdown"}
 
 [[tool.uv.index]]
@@ -123,7 +123,7 @@ addopts = "--verbose --pyargs --durations=0 --strict-markers"  # always add thes
 testpaths = ["tests"]
 # directories to ignore when discovering tests
 norecursedirs = [
-    "nemo_vfm",
+    "dfm",
     "external",
     "examples",
     "docs",
@@ -194,7 +194,7 @@ ignore = [
     "D103",  # Missing docstring in public function
 ]
 [tool.ruff.lint.isort]
-known-first-party = ["nemo_vfm"]
+known-first-party = ["dfm"]
 known-third-party = ["examples", "scripts"]
 section-order = ["future", "standard-library", "third-party", "first-party", "local-folder"]
 lines-after-imports = 2
@@ -218,4 +218,4 @@ concurrency = ["thread", "multiprocessing"]
 omit = ["/tmp/*"]
 
 [tool.coverage.paths]
-source = ["nemo_vfm/", "/workspace/nemo_vfm"]
+source = ["dfm/", "/workspace/dfm"]

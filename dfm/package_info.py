@@ -24,12 +24,12 @@ VERSION = (MAJOR, MINOR, PATCH, PRE_RELEASE)
 __shortversion__ = ".".join(map(str, VERSION[:3]))
 __version__ = ".".join(map(str, VERSION[:3])) + "".join(VERSION[3:])
 
-__package_name__ = "nemo_vfm"
+__package_name__ = "nemo_dfm"
 __contact_names__ = "NVIDIA"
 __contact_emails__ = "nemo-toolkit@nvidia.com"
-__homepage__ = "https://github.com/NVIDIA-NeMo/NeMo-VFM"
-__repository_url__ = "https://github.com/NVIDIA-NeMo/NeMo-VFM"
-__download_url__ = "https://github.com/NVIDIA-NeMo/NeMo-VFM/releases"
-__description__ = "NeMo VFM"
+__homepage__ = "https://github.com/NVIDIA-NeMo/NeMo-DFM"
+__repository_url__ = "https://github.com/NVIDIA-NeMo/NeMo-DFM"
+__download_url__ = "https://github.com/NVIDIA-NeMo/NeMo-DFM/releases"
+__description__ = "NeMo DFM"
 __license__ = "Apache2"
 __keywords__ = "deep learning, machine learning, gpu, NLP, pytorch, torch"
