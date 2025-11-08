@@ -90,7 +90,7 @@ dev = [
 ]
 
 [tool.setuptools]
-packages = ["nemo_dfm"]
+packages = ["dfm"]
 
 [tool.setuptools.dynamic]
 version = {attr = "dfm.__version__"}
