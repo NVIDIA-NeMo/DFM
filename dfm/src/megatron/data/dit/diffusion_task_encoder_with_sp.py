@@ -65,7 +65,7 @@ class DiffusionTaskEncoderWithSequencePacking(DefaultTaskEncoder, ABC):
         """
         Selects sequences to pack for mixed image-video training.
         """
-        results = first_fit_decreasing(samples, self.packing_buffer_size)
+        results = first_fit_decreasing(samples, self.seq_length)
         random.shuffle(results)
         return results
 

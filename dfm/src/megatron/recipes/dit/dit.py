@@ -185,8 +185,8 @@ def pretrain_config(
         dataset=DiffusionDataModuleConfig(
             path=dataset_path,
             seq_length=2048,
-            task_encoder_seq_length=2048,
-            packing_buffer_size=8000,
+            task_encoder_seq_length=8000,
+            packing_buffer_size=32,
             micro_batch_size=micro_batch_size,
             global_batch_size=global_batch_size,
             num_workers=10,
