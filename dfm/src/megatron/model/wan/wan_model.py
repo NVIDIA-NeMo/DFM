@@ -183,7 +183,6 @@ class WanModel(VisionModule):
         grid_sizes: list[Tuple[int, int, int]],
         t: Tensor,
         context: Tensor,
-        max_seq_len: int,
         packed_seq_params: PackedSeqParams = None,
         **kwargs,
     ) -> Tensor:
@@ -194,7 +193,6 @@ class WanModel(VisionModule):
             grid_sizes List[Tuple[int, int, int]]: list of grid sizes (f, h, w)
             t Tensor: timesteps
             context List[Tensor]: list of context (text_len, hidden_size)
-            max_seq_len int: maximum sequence length
             packed_seq_params PackedSeqParams: packed sequence parameters
 
         Returns:
@@ -238,8 +236,9 @@ class WanModel(VisionModule):
         # ============= decoder =============
         # calculate rotary pos emb
         n_head, dim_head = self.num_heads, self.config.hidden_size // self.num_heads
+        cu_seqlens_q_padded = packed_seq_params["self_attention"].cu_seqlens_q_padded
         rotary_pos_emb = self.rope_embeddings(
-            n_head, dim_head, max_seq_len, grid_sizes, t.device
+            n_head, dim_head, cu_seqlens_q_padded, grid_sizes, t.device
         )  # output: rotary_pos_emb.shape [s, b, 1, dim_head]
 
         # run decoder

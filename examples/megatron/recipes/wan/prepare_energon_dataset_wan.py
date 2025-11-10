@@ -21,6 +21,7 @@ import cv2
 import numpy as np
 import torch
 import webdataset as wds
+
 from diffusers import AutoencoderKLWan
 from transformers import AutoTokenizer, UMT5EncoderModel
 
@@ -204,6 +205,54 @@ def _load_frames_cv2(
     return video_tensor
 
 
+def _extract_evenly_spaced_frames(
+    video_path: str,
+    start_frame: int,
+    end_frame: int,
+    num_frames: int,
+    target_size: Optional[Tuple[int, int]],
+    resize_mode: str,
+    maintain_aspect_ratio: bool,
+    center_crop: bool,
+) -> List[np.ndarray]:
+    cap = cv2.VideoCapture(video_path)
+    total_frames = max(0, end_frame - start_frame + 1)
+    if total_frames <= 0:
+        cap.release()
+        raise ValueError(f"Invalid frame range [{start_frame}, {end_frame}] for {video_path}")
+
+    if num_frames <= 1:
+        frame_indices = [start_frame]
+    else:
+        frame_indices = np.linspace(start_frame, end_frame, num_frames, dtype=int).tolist()
+
+    extracted_frames: List[np.ndarray] = []
+    for frame_idx in frame_indices:
+        cap.set(cv2.CAP_PROP_POS_FRAMES, frame_idx)
+        ret, frame = cap.read()
+        if not ret:
+            continue
+        frame = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
+        frame = _resize_frame(frame, target_size, resize_mode, maintain_aspect_ratio, center_crop)
+        extracted_frames.append(frame)
+
+    cap.release()
+    if not extracted_frames:
+        raise ValueError(f"Could not extract any frames from {video_path}")
+    return extracted_frames
+
+
+def _frame_to_video_tensor(frame: np.ndarray, target_dtype: torch.dtype) -> torch.Tensor:
+    # frame: RGB numpy array (H, W, C), uint8 or float
+    if frame.dtype != np.float32:
+        frame = frame.astype(np.float32)
+    frame = frame / 255.0 if frame.max() > 1.0 else frame
+    tensor = torch.from_numpy(frame)  # H, W, C
+    tensor = tensor.permute(2, 0, 1).unsqueeze(0).unsqueeze(2)  # 1, C, 1, H, W
+    tensor = tensor.to(dtype=target_dtype)
+    return tensor
+
+
 @torch.no_grad()
 def _init_hf_models(
     model_id: str,
@@ -309,6 +358,18 @@ def main():
     )
     parser.add_argument("--no-memory-optimization", action="store_true", help="Disable VAE slicing/tiling")
     parser.add_argument("--shard_maxcount", type=int, default=10000, help="Max samples per shard")
+    parser.add_argument(
+        "--mode",
+        default="video",
+        choices=["video", "frames"],
+        help="Processing mode: 'video' for full videos, 'frames' to extract frames and treat each as a 1-frame video",
+    )
+    parser.add_argument(
+        "--num-frames",
+        type=int,
+        default=10,
+        help="Number of evenly-spaced frames to extract per video when using --mode frames",
+    )
 
     # Resize arguments (match automodel)
     parser.add_argument("--height", type=int, default=None, help="Target height for video frames")
@@ -351,61 +412,118 @@ def main():
         for index, meta in enumerate(metadata_list):
             video_name = meta["file_name"]
             start_frame = int(meta["start_frame"])  # inclusive
-            end_frame = int(meta["end_frame"])  # inclusive
+            end_frame = int(meta["end_frame"])      # inclusive
             caption_text = meta.get("vila_caption", "")
 
             video_path = str(video_folder / video_name)
-            # Load frames using the same OpenCV + resize path as automodel
-            video_tensor = _load_frames_cv2(
-                video_path=video_path,
-                start_frame=start_frame,
-                end_frame=end_frame,
-                target_size=target_size,
-                resize_mode=args.resize_mode,
-                maintain_aspect_ratio=not args.no_aspect_ratio,
-                center_crop=args.center_crop,
-                target_dtype=model_dtype,
-            )
+            if args.mode == "video":
+                # Load frames using the same OpenCV + resize path as automodel
+                video_tensor = _load_frames_cv2(
+                    video_path=video_path,
+                    start_frame=start_frame,
+                    end_frame=end_frame,
+                    target_size=target_size,
+                    resize_mode=args.resize_mode,
+                    maintain_aspect_ratio=not args.no_aspect_ratio,
+                    center_crop=args.center_crop,
+                    target_dtype=model_dtype,
+                )
 
-            # Encode text and video with HF models exactly like automodel
-            text_embed = _encode_text(tokenizer, text_encoder, args.device, caption_text)
-            latents = _encode_video_latents(vae, args.device, video_tensor, deterministic_latents=not args.stochastic)
+                # Encode text and video with HF models exactly like automodel
+                text_embed = _encode_text(tokenizer, text_encoder, args.device, caption_text)
+                latents = _encode_video_latents(vae, args.device, video_tensor, deterministic_latents=not args.stochastic)
 
-            # Move to CPU without changing dtype; keep exact values to match automodel outputs
-            text_embed_cpu = text_embed.detach().to(device="cpu")
-            latents_cpu = latents.detach().to(device="cpu")
+                # Move to CPU without changing dtype; keep exact values to match automodel outputs
+                text_embed_cpu = text_embed.detach().to(device="cpu")
+                latents_cpu = latents.detach().to(device="cpu")
 
-            # Reshape to match Mcore's Wan input format
-            text_embed_cpu = text_embed_cpu[0]
-            latents_cpu = latents_cpu[0]
+                # Reshape to match Mcore's Wan input format
+                text_embed_cpu = text_embed_cpu[0]
+                latents_cpu = latents_cpu[0]
 
-            # Build JSON side-info similar to prepare_energon script
-            C, T, H, W = video_tensor.shape[1:]  # 1,C,T,H,W
-            json_data = {
-                "video_path": video_path,
-                "processed_frames": int(T),
-                "processed_height": int(H),
-                "processed_width": int(W),
-                "caption": caption_text,
-                "deterministic_latents": bool(not args.stochastic),
-                "memory_optimization": bool(not args.no_memory_optimization),
-                "model_version": "wan2.1",
-                "resize_settings": {
-                    "target_size": target_size,
-                    "resize_mode": args.resize_mode,
-                    "maintain_aspect_ratio": bool(not args.no_aspect_ratio),
-                    "center_crop": bool(args.center_crop),
-                },
-            }
+                # Build JSON side-info similar to prepare_energon script
+                C, T, H, W = video_tensor.shape[1:]  # 1,C,T,H,W
+                json_data = {
+                    "video_path": video_path,
+                    "processed_frames": int(T),
+                    "processed_height": int(H),
+                    "processed_width": int(W),
+                    "caption": caption_text,
+                    "deterministic_latents": bool(not args.stochastic),
+                    "memory_optimization": bool(not args.no_memory_optimization),
+                    "model_version": "wan2.1",
+                    "processing_mode": "video",
+                    "resize_settings": {
+                        "target_size": target_size,
+                        "resize_mode": args.resize_mode,
+                        "maintain_aspect_ratio": bool(not args.no_aspect_ratio),
+                        "center_crop": bool(args.center_crop),
+                    },
+                }
 
-            sample = {
-                "__key__": f"{index:06}",
-                "pth": latents_cpu,
-                "pickle": pickle.dumps(text_embed_cpu),
-                "json": json_data,
-            }
-            sink.write(sample)
-            written += 1
+                sample = {
+                    "__key__": f"{index:06}",
+                    "pth": latents_cpu,
+                    "pickle": pickle.dumps(text_embed_cpu),
+                    "json": json_data,
+                }
+                sink.write(sample)
+                written += 1
+            else:
+                # Frames mode: extract evenly-spaced frames, treat each as a 1-frame video
+                frames = _extract_evenly_spaced_frames(
+                    video_path=video_path,
+                    start_frame=start_frame,
+                    end_frame=end_frame,
+                    num_frames=max(1, int(args.num_frames)),
+                    target_size=target_size,
+                    resize_mode=args.resize_mode,
+                    maintain_aspect_ratio=not args.no_aspect_ratio,
+                    center_crop=args.center_crop,
+                )
+
+                # Encode text once and reuse for all frames of this video
+                text_embed = _encode_text(tokenizer, text_encoder, args.device, caption_text)
+                text_embed_cpu = text_embed.detach().to(device="cpu")[0]
+
+                total_extracted = len(frames)
+                for frame_idx, frame in enumerate(frames, start=1):
+                    video_tensor = _frame_to_video_tensor(frame, target_dtype=model_dtype)
+                    latents = _encode_video_latents(
+                        vae, args.device, video_tensor, deterministic_latents=not args.stochastic
+                    )
+                    latents_cpu = latents.detach().to(device="cpu")[0]
+
+                    # Frame shape after resize
+                    H, W = frame.shape[:2]
+                    json_data = {
+                        "video_path": video_path,
+                        "processed_frames": 1,
+                        "processed_height": int(H),
+                        "processed_width": int(W),
+                        "caption": caption_text,
+                        "deterministic_latents": bool(not args.stochastic),
+                        "memory_optimization": bool(not args.no_memory_optimization),
+                        "model_version": "wan2.1",
+                        "processing_mode": "frames",
+                        "frame_index": int(frame_idx),
+                        "total_frames_in_video": int(total_extracted),
+                        "resize_settings": {
+                            "target_size": target_size,
+                            "resize_mode": args.resize_mode,
+                            "maintain_aspect_ratio": bool(not args.no_aspect_ratio),
+                            "center_crop": bool(args.center_crop),
+                        },
+                    }
+
+                    sample = {
+                        "__key__": f"{index:06}_{frame_idx:02}",
+                        "pth": latents_cpu,
+                        "pickle": pickle.dumps(text_embed_cpu),
+                        "json": json_data,
+                    }
+                    sink.write(sample)
+                    written += 1
 
     print("Done writing shards using HF automodel encoders.")
 

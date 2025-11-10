@@ -179,6 +179,8 @@ def pretrain_config(
             micro_batch_size=micro_batch_size,
             global_batch_size=global_batch_size,
             num_workers=10,
+            task_encoder_seq_length=None,
+            packing_buffer_size=131072, # 131,072 = 2^17 tokens, each 5 secs of 832*480 is about 45k tokens
         )
 
     # Config Container

@@ -42,17 +42,24 @@ def wan_data_step(qkv_format, dataloader_iter):
         zero = torch.zeros(1, dtype=torch.int32, device="cuda")
         cu_seqlens = torch.cat((zero, cu_seqlens))
 
+        cu_seqlens_padded = batch["seq_len_q_padded"].cumsum(dim=0).to(torch.int32)
+        zero = torch.zeros(1, dtype=torch.int32, device="cuda")
+        cu_seqlens_padded = torch.cat((zero, cu_seqlens_padded))
+
         cu_seqlens_kv = batch["seq_len_kv"].cumsum(dim=0).to(torch.int32)
         cu_seqlens_kv = torch.cat((zero, cu_seqlens_kv))
 
         batch["packed_seq_params"] = {
             "self_attention": PackedSeqParams(
                 cu_seqlens_q=cu_seqlens,
+                cu_seqlens_q_padded=cu_seqlens_padded,
                 cu_seqlens_kv=cu_seqlens,
+                cu_seqlens_kv_padded=cu_seqlens_padded,
                 qkv_format=qkv_format,
             ),
             "cross_attention": PackedSeqParams(
                 cu_seqlens_q=cu_seqlens,
+                cu_seqlens_q_padded=cu_seqlens_padded,
                 cu_seqlens_kv=cu_seqlens_kv,
                 qkv_format=qkv_format,
             ),

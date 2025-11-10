@@ -14,12 +14,16 @@
 
 # pylint: disable=C0115,C0116,C0301
 
+from torch._tensor import Tensor
 import torch
 import torch.nn.functional as F
+from megatron.energon.task_encoder.base import stateless
 from megatron.core import parallel_state
-from megatron.energon import DefaultTaskEncoder, SkipSample
+from typing import List
+from megatron.energon import SkipSample
+from dfm.src.megatron.data.dit.diffusion_task_encoder_with_sp import DiffusionTaskEncoderWithSequencePacking
 from megatron.energon.task_encoder.cooking import Cooker, basic_sample_keys
-
+from dfm.src.megatron.data.wan.wan_sample import WanSample
 from dfm.src.megatron.model.wan.utils import grid_sizes_calculation, patchify
 
 
@@ -45,7 +49,7 @@ def cook(sample: dict) -> dict:
     )
 
 
-class WanTaskEncoder(DefaultTaskEncoder):
+class WanTaskEncoder(DiffusionTaskEncoderWithSequencePacking):
     """
     Task encoder for Wan dataset.
     Attributes:
@@ -73,6 +77,7 @@ class WanTaskEncoder(DefaultTaskEncoder):
         self.patch_temporal = patch_temporal
         self.seq_length = seq_length
 
+    @stateless(restore_seeds=True)
     def encode_sample(self, sample: dict) -> dict:
         video_latent = sample["pth"]
         context_embeddings = sample["pickle"]
@@ -90,88 +95,125 @@ class WanTaskEncoder(DefaultTaskEncoder):
             patch_size=(self.patch_temporal, self.patch_spatial, self.patch_spatial),
         )
 
-        ### Note: shape of sample's values
-        # video_latent: [latents_channels, F_latents, W_latents, H_latents]
-        # grid_size: [F_patches, W_patches, H_patches]
-        # context_embeddings: [context_seq_len, text_embedding_dim]
-
-        return dict(
-            video_latent=video_latent,
-            grid_size=grid_size,
-            context_embeddings=context_embeddings,
-            video_metadata=video_metadata,
-        )
-
-    def batch(self, samples: list[dict]) -> dict:
-        # process video latents
-        # do padding here for video latents
-        self.patch_size = (self.patch_temporal, self.patch_spatial, self.patch_spatial)
-
-        # running patchify
-        video_latents = patchify([sample["video_latent"] for sample in samples], self.patch_size)
-
-        # build per-sample loss masks (1 for valid tokens pre-padding)
-        loss_masks = [torch.ones(v.shape[0]) for v in video_latents]
-        # calculate all sequence lengths of video latents for self-attention (for videos, we do this before padding to get original seq len)
-        seq_len_q = [v.shape[0] for v in video_latents]
-        seq_len_q = torch.tensor(seq_len_q, dtype=torch.int32)
-        # padding and stack video latents
-        max_video_seq_len = max([video_latent.shape[0] for video_latent in video_latents])
-        # CAVEAT:
-        #   when using pipeline parallelism, we need to set batch sequence length to DataModule's seq_length because
-        #   because pipeline parallelism requires pre-specified sequence length to create buffer
-        if parallel_state.get_pipeline_model_parallel_world_size() > 1:
-            if max_video_seq_len > self.seq_length:
-                raise ValueError(
-                    f"max_video_seq_len {max_video_seq_len} is greater than DataModule's seq_length {self.seq_length}"
-                )
-            else:
-                # set max_video_seq_len to DataModule's seq_length
-                max_video_seq_len = self.seq_length
-        # CAVEAT:
-        #   when using context parallelism, we need to pad batch sequence length to be divisible by [cp_rank*2]
-        #   (because TransformerEngine's context parallelism requires "AssertionError: Sequence length per GPU needs to be divisible by 2!")
-        if parallel_state.get_context_parallel_world_size() > 1:
-            batch_size = len(video_latents)
-            assert batch_size == 1, "Error: Batch size must be 1 when using context parallelism"
-            sharding_factor = parallel_state.get_context_parallel_world_size() * 2
-            max_video_seq_len = ((max_video_seq_len + sharding_factor - 1) // sharding_factor) * sharding_factor
-        video_latents = [
-            F.pad(video_latent, (0, 0, 0, max_video_seq_len - video_latent.shape[0])) for video_latent in video_latents
-        ]
-        video_latents = torch.stack(video_latents, dim=1)
-        # pad and stack loss masks to shape [S_max, B]
-        loss_masks = [F.pad(m, (0, max_video_seq_len - m.shape[0])) for m in loss_masks]
-        loss_masks = torch.stack(loss_masks, dim=1)
-
-        # process grid sizes
-        grid_sizes = [torch.tensor(sample["grid_size"], dtype=torch.int32) for sample in samples]
-        grid_sizes = torch.stack(grid_sizes, dim=0)
+        # patchify video_latent
+        video_latent = patchify([video_latent], (self.patch_temporal, self.patch_spatial, self.patch_spatial))[0]
 
         # process text embeddings
         # pad here for text embeddings
         context_max_len = 512
-        context_embeddings = [sample["context_embeddings"] for sample in samples]
-        context_embeddings = [
-            F.pad(context_embedding, (0, 0, 0, context_max_len - context_embedding.shape[0]))
-            for context_embedding in context_embeddings
-        ]
-        # calculate all sequence lengths of context embeddings for cross-attention (for videos, we do this after padding to get padded seq len)
-        seq_len_kv = [c.shape[0] for c in context_embeddings]
-        seq_len_kv = torch.tensor(seq_len_kv, dtype=torch.int32)
-        # stack context embeddings
-        context_embeddings = torch.stack(context_embeddings, dim=1)
+        context_embeddings = F.pad(context_embeddings, (0, 0, 0, context_max_len - context_embeddings.shape[0]))
 
-        # process video metadata
-        video_metadata = [sample["video_metadata"] for sample in samples]
+        # calculate sequence length
+        seq_len_q = video_latent.shape[0]
+        seq_len_kv = context_embeddings.shape[0]
 
-        return dict(
-            video_latents=video_latents,
-            max_video_seq_len=max_video_seq_len,
-            grid_sizes=grid_sizes,
+        # loss mask
+        loss_mask = torch.ones(seq_len_q, dtype=torch.bfloat16)
+
+        # CAVEAT:
+        #   when using context parallelism, we need to pad batch sequence length to be divisible by [cp_rank*2]
+        #   (because TransformerEngine's context parallelism requires "AssertionError: Sequence length per GPU needs to be divisible by 2!")
+        if parallel_state.get_context_parallel_world_size() > 1:
+            sharding_factor = parallel_state.get_context_parallel_world_size() * 2
+            seq_len_q_padded = ((seq_len_q + sharding_factor - 1) // sharding_factor) * sharding_factor
+        else:
+            seq_len_q_padded = seq_len_q
+
+        # padding
+        if seq_len_q < seq_len_q_padded:
+            video_latent = F.pad(video_latent, (0, 0, 0, seq_len_q_padded - seq_len_q))
+            loss_mask = F.pad(loss_mask, (0, seq_len_q_padded - seq_len_q))
+
+        ### Note: shape of sample's values
+        # video_latent: [num_patches, latents_channels * pF * pH * pW]
+        # grid_size: [F_patches, W_patches, H_patches]
+        # context_embeddings: [context_seq_len, text_embedding_dim]
+
+        return WanSample(
+            __key__=sample["__key__"],
+            __restore_key__=sample["__restore_key__"],
+            __subflavor__=None,
+            __subflavors__=sample["__subflavors__"],
+            video=video_latent,
             context_embeddings=context_embeddings,
-            loss_mask=loss_masks,
-            seq_len_q=seq_len_q,
-            seq_len_kv=seq_len_kv,
+            latent_shape=torch.tensor(grid_size, dtype=torch.int32),
+            loss_mask=loss_mask,
+            seq_len_q=torch.tensor([seq_len_q], dtype=torch.int32),
+            seq_len_q_padded=torch.tensor([seq_len_q_padded], dtype=torch.int32),
+            seq_len_kv=torch.tensor([seq_len_kv], dtype=torch.int32),
             video_metadata=video_metadata,
         )
+
+    # NOTE:
+    # the method select_samples_to_pack() is inherited from the parent 
+    #   class DiffusionTaskEncoderWithSequencePacking
+
+    @stateless
+    def pack_selected_samples(self, samples: List[WanSample]) -> WanSample:
+        """Construct a new Wan sample by concatenating the sequences."""
+
+        def stack(attr):
+            return torch.stack([getattr(sample, attr) for sample in samples], dim=0)
+
+        def cat(attr):
+            return torch.cat([getattr(sample, attr) for sample in samples], dim=0)
+
+        return WanSample(
+            __key__=",".join([s.__key__ for s in samples]),
+            __restore_key__=(),  # Will be set by energon based on `samples`
+            __subflavor__=None,
+            __subflavors__=samples[0].__subflavors__,
+            video=cat("video"),
+            context_embeddings=cat("context_embeddings"),
+            loss_mask=cat("loss_mask"),
+            seq_len_q=cat("seq_len_q"),
+            seq_len_q_padded=cat("seq_len_q_padded"),
+            seq_len_kv=cat("seq_len_kv"),
+            latent_shape=stack("latent_shape"),
+            video_metadata=[sample.video_metadata for sample in samples],
+        )
+
+    @stateless
+    def batch(self, samples: List[WanSample]) -> dict:
+        """Return dictionary with data for batch."""
+        if self.packing_buffer_size is None:
+            # no packing
+            return super().batch(samples).to_dict()
+
+        # packing
+        sample = samples[0]
+
+        # # CAVEAT:
+        # #   when using pipeline parallelism, we need to set batch sequence length to DataModule's seq_length because
+        # #   because pipeline parallelism requires pre-specified sequence length to create buffer
+        # if parallel_state.get_pipeline_model_parallel_world_size() > 1:
+        #     if sample.video.shape[0] > self.seq_length:
+        #         raise ValueError(
+        #             f"video sequence length {sample.video.shape[0]} is greater than DataModule's seq_length {self.seq_length}"
+        #         )
+        #     else:
+        #         # set max_video_seq_len to DataModule's seq_length
+        #         padded_seq_len = self.seq_length
+
+        batch = dict(
+            video_latents=sample.video.unsqueeze(1),
+            context_embeddings=sample.context_embeddings.unsqueeze(1),
+            loss_mask=sample.loss_mask.unsqueeze(1) if sample.loss_mask is not None else None,
+            seq_len_q=sample.seq_len_q,
+            seq_len_q_padded=sample.seq_len_q_padded,
+            seq_len_kv=sample.seq_len_kv,
+            grid_sizes=sample.latent_shape,
+            video_metadata=sample.video_metadata,
+        )
+
+        ### Note: shape of batch's values
+        # video_latents: [seq_len, 1, latents_channels * pF * pH * pW]
+        # context_embeddings: [seq_len, 1, text_embedding_dim]
+        # loss_mask: [seq_len, 1]
+        # seq_len_q: [num_samples]
+        # seq_len_q_padded: [num_samples]
+        # seq_len_kv: [num_samples]
+        # grid_sizes: [num_samples, 3]
+        # video_metadata: [num_samples]
+
+        return batch

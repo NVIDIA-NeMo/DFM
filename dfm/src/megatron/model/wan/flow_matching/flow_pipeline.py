@@ -54,7 +54,6 @@ class FlowPipeline:
         """
 
         video_latents = data_batch["video_latents"]
-        max_video_seq_len = data_batch["max_video_seq_len"]
         context_embeddings = data_batch["context_embeddings"]
         loss_mask = data_batch["loss_mask"]
         grid_sizes = data_batch["grid_sizes"]
@@ -113,7 +112,7 @@ class FlowPipeline:
         in_channels = model.config.in_channels
         patch_spatial = model.config.patch_spatial
         patch_temporal = model.config.patch_temporal
-        for grid_size in grid_sizes:
+        for i, grid_size in enumerate(grid_sizes):
             sample_noise = torch.randn(
                 1,
                 in_channels,
@@ -127,22 +126,27 @@ class FlowPipeline:
                 0
             ]  # shape [noise_seq, c * ( pF * pH * pW)]
 
+
             # because video_latents might be padded, we need to make sure noise also be padded to have the same shape
-            noise_seq = sample_noise.shape[0]
-            video_seq = video_latents.shape[0]
-            if noise_seq < video_seq:
-                pad_len = video_seq - noise_seq
+            sample_noise_seq_len = sample_noise.shape[0]
+            cu_seqlens_q_padded = packed_seq_params["self_attention"].cu_seqlens_q_padded
+            seq_len_q_padded = cu_seqlens_q_padded[i+1] - cu_seqlens_q_padded[i]
+            if sample_noise_seq_len < seq_len_q_padded:
+                pad_len = seq_len_q_padded - sample_noise_seq_len
                 pad = torch.zeros(
                     (pad_len, sample_noise.shape[1]), device=sample_noise.device, dtype=sample_noise.dtype
                 )
-                sample_noise = torch.cat([sample_noise, pad], dim=0)
+                sample_noise = torch.cat([sample_noise, pad], dim=0)  # shape [padded_noise_seq, c * ( pF * pH * pW)]
+
             noise.append(sample_noise)
-        noise = torch.stack(noise, dim=1)  # shape [noise_seq, batch_size, c * ( pF * pH * pW)]
+        noise = torch.cat(noise, dim=0)  # shape [concatenated_noise_seq, c * ( pF * pH * pW)]
+        noise = noise.unsqueeze(1)  # shape [concatenated_noise_seq, 1, c * ( pF * pH * pW)]
+
 
         # CRITICAL: Manual flow matching (NOT scheduler.add_noise!)
         # x_t = (1 - σ) * x_0 + σ * ε
-        sigma_reshaped = sigma.view(1, batch_size, 1)
-        noisy_latents = (1.0 - sigma_reshaped) * video_latents.float() + sigma_reshaped * noise
+        # since we use sequence packing, the batch_size is 1)
+        noisy_latents = (1.0 - sigma) * video_latents.float() + sigma * noise
 
         # Timesteps for model [0, 1000]
         timesteps = sigma * num_train_timesteps
@@ -201,7 +205,6 @@ class FlowPipeline:
                 grid_sizes=grid_sizes,
                 t=timesteps,
                 context=context_embeddings,
-                max_seq_len=max_video_seq_len,
                 packed_seq_params=packed_seq_params,
             )
 
@@ -219,10 +222,10 @@ class FlowPipeline:
             loss = torch.nn.functional.mse_loss(model_pred.float(), target.float(), reduction="none")
 
             # Flow weight: w = 1 + shift * σ
-            loss_weight = 1.0 + flow_shift * sigma  # shape [batch_size]
-            loss_weight = loss_weight.view(1, batch_size, 1).to(device)  # shape [1, batch_size, 1]
+            loss_weight = 1.0 + flow_shift * sigma
             unweighted_loss = loss
-            weighted_loss = loss * loss_weight  # shape [seq_length / cp_size, batch_size, -1]
+            # since we use sequence packing, the batch_size is 1
+            weighted_loss = loss * loss_weight  # shape [seq_length / cp_size, 1, -1]
 
             # Safety check
             mean_weighted_loss = weighted_loss.mean()
@@ -239,7 +242,6 @@ class FlowPipeline:
                 grid_sizes=grid_sizes,
                 t=timesteps,
                 context=context_embeddings,
-                max_seq_len=max_video_seq_len,
                 packed_seq_params=packed_seq_params,
             )
 

@@ -444,11 +444,14 @@ class FlowInferencePipeline:
             packed_seq_params = {
                 "self_attention": PackedSeqParams(
                     cu_seqlens_q=cu_q,
+                    cu_seqlens_q_padded=cu_q,
                     cu_seqlens_kv=cu_kv_self,
+                    cu_seqlens_kv_padded=cu_kv_self,
                     qkv_format=self.model.config.qkv_format,
                 ),
                 "cross_attention": PackedSeqParams(
                     cu_seqlens_q=cu_q,
+                    cu_seqlens_q_padded=cu_q,
                     cu_seqlens_kv=cu_kv_cross,
                     qkv_format=self.model.config.qkv_format,
                 ),

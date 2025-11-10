@@ -40,7 +40,7 @@ class Wan3DRopeEmbeddings(torch.nn.Module):
         )
         return freqs
 
-    def forward(self, n_head, dim_head, max_seq_len, grid_sizes, device):
+    def forward(self, n_head, dim_head, cu_seqlens_q_padded, grid_sizes, device):
         self.freqs = self.freqs.to(
             device,
         )
@@ -65,17 +65,21 @@ class Wan3DRopeEmbeddings(torch.nn.Module):
             # Double dimension from c -> 2c with rotating angles as (x0, x0, x1, x1, ...), for interleaving RoPE
             freqs_real_i = freqs_real_i.unsqueeze(-1).expand(-1, -1, -1, -1, 2).reshape(seq_len, 1, 1, dim_head)
 
-            # Pad freqs_real_i to (max_seq_len, 1, 1, dim_head) with 0s
-            if freqs_real_i.shape[0] < max_seq_len:
-                pad_shape = (max_seq_len - freqs_real_i.shape[0], 1, 1, dim_head)
-                freqs_real_i = torch.cat(
-                    [freqs_real_i, torch.zeros(pad_shape, dtype=freqs_real_i.dtype, device=freqs_real_i.device)]
-                )
             freqs_real.append(freqs_real_i)
 
-        # Each freqs_real[i] is (max_seq_len, 1, 1, dim_head)
-        # We concatenate them along dim=1 to get (max_seq_len, batch_size, 1, dim_head)
-        freqs_real = torch.cat(freqs_real, dim=1)
+        # Pad freqs_real_i to (padded_seq_len, 1, 1, dim_head) with 0s
+        for i, freqs_real_i in enumerate(freqs_real):
+            seq_len_q_padded = cu_seqlens_q_padded[i+1] - cu_seqlens_q_padded[i]
+            if freqs_real_i.shape[0] < seq_len_q_padded:
+                pad_shape = (seq_len_q_padded - freqs_real_i.shape[0], 1, 1, dim_head)
+                freqs_real_i = torch.cat(
+                    [freqs_real_i, torch.zeros(pad_shape, dtype=freqs_real_i.dtype, device=freqs_real_i.device)], dim=0
+                )
+            freqs_real[i] = freqs_real_i
+
+        # Each freqs_real[i] is (seq_len, 1, 1, dim_head)
+        # We concatenate them along dim=0 to get (concatenated_seq_len, 1, 1, dim_head)
+        freqs_real = torch.cat(freqs_real, dim=0)
 
         # Note:
         # when running context_parallel, which must use "thd" for qkv_format,

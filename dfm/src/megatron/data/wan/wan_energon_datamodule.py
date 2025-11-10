@@ -19,24 +19,28 @@ from dataclasses import dataclass
 from megatron.bridge.data.utils import DatasetBuildContext, DatasetProvider
 from torch import int_repr
 
-from dfm.src.megatron.data.dit.diffusion_energon_datamodule import DiffusionDataModule
+from dfm.src.megatron.data.dit.diffusion_energon_datamodule import DiffusionDataModuleConfig, DiffusionDataModule
 from dfm.src.megatron.data.wan.wan_taskencoder import WanTaskEncoder
 
 
 @dataclass(kw_only=True)
-class WanDataModuleConfig(DatasetProvider):
+class WanDataModuleConfig(DiffusionDataModuleConfig):
     path: str
     seq_length: int
+    packing_buffer_size: int
     micro_batch_size: int
     global_batch_size: int
     num_workers: int_repr
     dataloader_type: str = "external"
-
+    
     def __post_init__(self):
         self.dataset = DiffusionDataModule(
             path=self.path,
             seq_length=self.seq_length,
-            task_encoder=WanTaskEncoder(seq_length=self.seq_length),
+            packing_buffer_size=self.packing_buffer_size,
+            task_encoder=WanTaskEncoder(
+                seq_length=self.seq_length, packing_buffer_size=self.packing_buffer_size
+            ),
             micro_batch_size=self.micro_batch_size,
             global_batch_size=self.global_batch_size,
             num_workers=self.num_workers,
