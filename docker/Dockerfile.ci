@@ -13,7 +13,7 @@
 # limitations under the License.
 FROM nvcr.io/nvidia/pytorch:25.09-py3
 
-WORKDIR /workspace
+WORKDIR /opt/DFM
 
 # Install uv
 ENV UV_VERSION="0.8.22"

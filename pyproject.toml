@@ -229,4 +229,4 @@ concurrency = ["thread", "multiprocessing"]
 omit = ["/tmp/*"]
 
 [tool.coverage.paths]
-source = ["nemo_vfm/", "/workspace/nemo_vfm"]
+source = ["nemo_vfm/", "/opt/DFM/nemo_vfm"]
