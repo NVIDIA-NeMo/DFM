@@ -31,7 +31,7 @@ RUN uv venv ${UV_PROJECT_ENVIRONMENT} --system-site-packages
 
 # Copy dependency files and source code (needed for dynamic version resolution)
 COPY pyproject.toml uv.lock ./
-COPY nemo_vfm ./nemo_vfm
+COPY dfm ./dfm
 
 # Install all dependencies using uv sync (without installing the project itself)
 RUN uv sync --link-mode copy --locked --all-groups --no-install-project
