@@ -32,6 +32,7 @@ RUN uv venv ${UV_PROJECT_ENVIRONMENT} --system-site-packages
 # Copy dependency files and source code (needed for dynamic version resolution)
 COPY pyproject.toml uv.lock ./
 COPY dfm ./dfm
+COPY 3rdparty ./3rdparty
 
 # Install dependencies in two steps:
 # 1. Install build dependencies first (required for packages with no-build-isolation)
