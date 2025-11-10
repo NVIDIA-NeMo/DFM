@@ -89,7 +89,7 @@ def pretrain_config(
     use_megatron_fsdp: bool = False,
     # Training hyperparameters
     train_iters: int = 10000,
-    global_batch_size: int = 8,
+    global_batch_size: int = 2,  # TODO: set it to num devices
     micro_batch_size: int = 1,
     lr: float = 0.9e-4,
     lr_warmup_iters: int = 2000,
@@ -163,7 +163,7 @@ def pretrain_config(
         model=model_cfg,
         train=TrainingConfig(
             train_iters=train_iters,
-            eval_interval=2000,
+            eval_interval=1000,
             eval_iters=32,
             global_batch_size=global_batch_size,
             micro_batch_size=micro_batch_size,
@@ -186,7 +186,7 @@ def pretrain_config(
             path=dataset_path,
             seq_length=2048,
             task_encoder_seq_length=8000,
-            packing_buffer_size=32,
+            packing_buffer_size=40,
             micro_batch_size=micro_batch_size,
             global_batch_size=global_batch_size,
             num_workers=10,
