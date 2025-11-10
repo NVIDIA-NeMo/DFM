@@ -29,7 +29,7 @@ from megatron.core.transformer.transformer_config import TransformerConfig
 from megatron.core.utils import make_sharded_tensor_for_checkpoint
 from torch import Tensor
 
-from dfm.src.megatron.model.common.time_pos_embeddings import (
+from dfm.src.megatron.model.common.dit_embeddings import (
     FactorizedLearnable3DEmbedding,
     ParallelTimestepEmbedding,
     SinCosPosEmb3D,

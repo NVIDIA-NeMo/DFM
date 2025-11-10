@@ -23,7 +23,7 @@ from megatron.bridge.data.utils import DatasetBuildContext, DatasetProvider
 from megatron.energon import DefaultTaskEncoder, get_train_dataset
 from torch import int_repr
 
-from dfm.src.megatron.data.dit.base_energon_datamodule import EnergonMultiModalDataModule
+from dfm.src.megatron.data.common.base_energon_datamodule import EnergonMultiModalDataModule
 from dfm.src.megatron.data.dit.dit_taskencoder import DiTTaskEncoder
 
 

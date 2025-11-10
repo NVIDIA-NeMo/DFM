@@ -14,7 +14,6 @@
 
 import imageio
 import numpy as np
-import torch
 
 
 def save_video(
@@ -35,12 +34,3 @@ def save_video(
 
     print("video_save_path", video_save_path)
     imageio.mimsave(video_save_path, grid, "mp4", **kwargs)
-
-
-def print_dict(dict):
-    for key, value in dict.items():
-        if isinstance(value, torch.Tensor):
-            print(key, value.shape)
-        else:
-            print(key, value)
-    print("-" * 40)

@@ -30,7 +30,7 @@ from megatron.bridge.training.config import (
 from megatron.bridge.training.mixed_precision import MixedPrecisionConfig, get_mixed_precision_config
 from megatron.core.distributed import DistributedDataParallelConfig
 
-from dfm.src.megatron.data.dit.diffusion_energon_datamodule import DiffusionDataModuleConfig
+from dfm.src.megatron.data.common.diffusion_energon_datamodule import DiffusionDataModuleConfig
 from dfm.src.megatron.model.dit.dit_model_provider import DiTModelProvider
 
 

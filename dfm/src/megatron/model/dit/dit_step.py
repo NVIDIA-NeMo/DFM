@@ -25,7 +25,7 @@ from megatron.core import parallel_state
 from megatron.core.models.gpt import GPTModel
 from megatron.core.utils import get_model_config
 
-from dfm.src.common.models.cosmos.cosmos1.causal_video_tokenizer import CausalVideoTokenizer
+from dfm.src.common.tokenizers.cosmos.cosmos1.causal_video_tokenizer import CausalVideoTokenizer
 from dfm.src.common.utils.save_video import save_video
 from dfm.src.megatron.model.dit.dit_data_process import dit_data_step
 from dfm.src.megatron.model.dit.edm.edm_pipeline import EDMPipeline

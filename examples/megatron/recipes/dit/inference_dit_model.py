@@ -22,7 +22,7 @@ from megatron.core.tensor_parallel.random import model_parallel_cuda_manual_seed
 from nemo.lightning.megatron_parallel import MegatronParallel
 from transformers import T5EncoderModel, T5TokenizerFast
 
-from dfm.src.common.models.cosmos.cosmos1.causal_video_tokenizer import CausalVideoTokenizer
+from dfm.src.common.tokenizers.cosmos.cosmos1.causal_video_tokenizer import CausalVideoTokenizer
 from dfm.src.common.utils.save_video import save_video
 from dfm.src.megatron.model.dit.dit_model_provider import DiTModelProvider
 from dfm.src.megatron.model.dit.edm.edm_pipeline import EDMPipeline
@@ -179,8 +179,8 @@ def prepare_data_batch(args, t5_embeding_max_length=512):
     )
     data_batch = {
         "video": torch.zeros((B, 3, t, h, w), dtype=torch.uint8).cuda(),
-        "t5_text_embeddings": t5_embed,
-        "t5_text_mask": torch.ones(B, t5_embeding_max_length, dtype=torch.bfloat16).cuda(),
+        "context_embeddings": t5_embed,
+        "context_mask": torch.ones(B, t5_embeding_max_length, dtype=torch.bfloat16).cuda(),
         "image_size": torch.tensor(
             [[args.height, args.width, args.height, args.width]] * B, dtype=torch.bfloat16
         ).cuda(),
@@ -212,7 +212,7 @@ def data_preprocess(data_batch, state_shape):
     data_batch["inference_fwd"] = True
 
     data_batch["seq_len_q"] = torch.tensor([state_shape[1]] * state_shape[0]).cuda()
-    data_batch["seq_len_kv"] = torch.tensor([data_batch["t5_text_embeddings"].shape[1]] * state_shape[0]).cuda()
+    data_batch["seq_len_kv"] = torch.tensor([data_batch["context_embeddings"].shape[1]] * state_shape[0]).cuda()
     data_batch = encode_seq_length(data_batch, format="sbhd")
     return data_batch
 
@@ -241,6 +241,7 @@ def main(args):
     set_seed(42)
     model, diffusion_pipeline, model_config = setup_diffusion_pipeline(args)
 
+    # TODO: load model from checkpoint path argument
     new_state = {}
     print("loading model....")
     state = torch.load("model.pth")
@@ -259,7 +260,8 @@ def main(args):
     data_batch = data_preprocess(data_batch, state_shape)
     C, T, H, W = data_batch["latent_shape"]
     latent = diffusion_pipeline.generate_samples_from_batch(
-        data_batch,
+        data_batch=data_batch,
+        model=model,
         guidance=args.guidance,
         state_shape=state_shape,
         num_steps=args.num_steps,

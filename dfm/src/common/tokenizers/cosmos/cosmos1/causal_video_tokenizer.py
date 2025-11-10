@@ -25,7 +25,7 @@ from huggingface_hub import get_token as get_hf_token
 from huggingface_hub import hf_hub_download
 from tqdm import tqdm
 
-from dfm.src.common.models.cosmos.cosmos1.tokenizer_utils import (
+from dfm.src.common.tokenizers.cosmos.cosmos1.video_tokenizer_utils import (
     load_jit_model,
     numpy2tensor,
     pad_video_batch,
