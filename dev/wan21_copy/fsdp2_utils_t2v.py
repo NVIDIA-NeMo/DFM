@@ -10,10 +10,66 @@ from torch.distributed.algorithms._checkpoint.checkpoint_wrapper import (
     apply_activation_checkpointing,
     checkpoint_wrapper,
 )
-from torch.distributed.fsdp import CPUOffload, MixedPrecision, ShardingStrategy, StateDictType
-from torch.distributed.fsdp import FullyShardedDataParallel as FSDP
-from torch.distributed.fsdp.api import ShardedOptimStateDictConfig, ShardedStateDictConfig
+from torch.distributed.checkpoint import (
+    FileSystemWriter,
+    FileSystemReader,
+    save as dist_save,
+    load as dist_load,
+)
+from torch.distributed.fsdp import (
+    CPUOffload,
+    MixedPrecision,
+    ShardingStrategy,
+    StateDictType,
+    FullyShardedDataParallel as FSDP,
+)
+from torch.distributed.fsdp.api import (
+    ShardedOptimStateDictConfig,
+    ShardedStateDictConfig,
+    FullStateDictConfig,
+    FullOptimStateDictConfig,
+)
 from torch.distributed.fsdp.wrap import ModuleWrapPolicy
+
+
+def is_main_process():
+    return (not dist.is_initialized()) or dist.get_rank() == 0
+
+def print0(*args, **kwargs):
+    if is_main_process():
+        print(*args, **kwargs)
+
+def _summarize_optimizer_state(tag: str, state_dict: dict):
+    if state_dict is None or not isinstance(state_dict, dict):
+        print0(f"[FSDP][OPT-DEBUG] {tag}: state_dict is None/invalid")
+        return
+
+    param_state = state_dict.get("state", {})
+    param_groups = state_dict.get("param_groups", [])
+
+    num_params_total = len(param_state)
+    num_params_non_empty = sum(
+        1 for v in param_state.values()
+        if isinstance(v, dict) and len(v) > 0
+    )
+    has_momentum_like = any(
+        isinstance(v, dict) and (
+            "momentum" in v
+            or "exp_avg" in v
+            or "exp_avg_sq" in v
+            or "exp_avg_sq_row" in v
+            or "exp_avg_sq_col" in v
+        )
+        for v in param_state.values()
+    )
+
+    print0(
+        f"[FSDP][OPT-DEBUG] {tag}: "
+        f"param_groups={len(param_groups)}, "
+        f"state_entries={num_params_total}, "
+        f"non_empty_state={num_params_non_empty}, "
+        f"has_momentum_like={has_momentum_like}"
+    )
 
 
 def create_fsdp_mixed_precision_policy(bf16):
@@ -255,196 +311,213 @@ def get_fsdp_all_parameters(model_map: Dict):
     return all_params
 
 
-def save_fsdp_checkpoint(
-    model_map: Dict,
-    optimizer,
-    scheduler,
-    output_dir: str,
-    step: int,
-    consolidate: bool = True,  # Changed default to True
-):
-    """
-    Save FSDP checkpoint with consolidated model.
-
-    Args:
-        consolidate: If True, save consolidated model. If False, skip.
-                    Default is True to always save inference-ready models.
-    """
-    from torch.distributed.checkpoint import FileSystemWriter
-    from torch.distributed.checkpoint import save as dist_save
-    from torch.distributed.fsdp import FullStateDictConfig, StateDictType
-
-    ckpt_dir = os.path.join(output_dir, f"checkpoint-{step}")
-
-    if is_main_process():
-        os.makedirs(ckpt_dir, exist_ok=True)
-
-    if dist.is_initialized():
-        dist.barrier()
-
-    print0(f"[FSDP] Saving checkpoint to {ckpt_dir}")
-    if consolidate:
-        print0("[FSDP] Will save consolidated model (inference-ready)")
-    else:
-        print0("[FSDP] Skipping consolidation (sharded only, faster)")
+def save_fsdp_checkpoint(model_map, optimizer, scheduler, output_dir: str, step: int, consolidate = True):
+    if not dist.is_initialized():
+        raise RuntimeError("FSDP checkpointing requires torch.distributed to be initialized")
 
     fsdp_model = model_map["transformer"]["fsdp_transformer"]
 
-    # ========================================
-    # 1. Save FSDP sharded checkpoint (ALWAYS)
-    # ========================================
-    print0("[FSDP] Saving sharded FSDP checkpoint...")
+    ckpt_dir = os.path.join(output_dir, f"checkpoint-{step}")
+    if is_main_process():
+        os.makedirs(ckpt_dir, exist_ok=True)
+    dist.barrier()
 
-    model_state_dict = {"model": fsdp_model.state_dict()}
+    print0(f"[FSDP] Saving checkpoint to {ckpt_dir}")
+
+    # ==========================
+    # 1) Save sharded model via DCP
+    # ==========================
     model_path = os.path.join(ckpt_dir, "transformer_model")
-
     if is_main_process():
         os.makedirs(model_path, exist_ok=True)
+    dist.barrier()
 
-    if dist.is_initialized():
-        dist.barrier()
-
-    dist_save(
-        state_dict=model_state_dict,
-        storage_writer=FileSystemWriter(model_path),
-    )
-
-    if dist.is_initialized():
-        dist.barrier()
-
+    model_state = {"model": fsdp_model.state_dict()}
+    dist_save(model_state, FileSystemWriter(model_path))
+    dist.barrier()
     print0("[FSDP] ✓ Saved sharded transformer model")
 
-    # Save optimizer
-    optimizer_state = FSDP.optim_state_dict(model=fsdp_model, optim=optimizer)
-    optim_path = os.path.join(ckpt_dir, "optimizer")
+    # ==========================
+    # 2) Save FULL optimizer state (rank0-only write, all-rank compute)
+    # ==========================
+    optim_file = os.path.join(ckpt_dir, "optimizer.pt")
 
+    # All ranks must participate in FSDP.optim_state_dict, even with rank0_only=True.
+    with FSDP.state_dict_type(
+        fsdp_model,
+        StateDictType.FULL_STATE_DICT,
+        FullStateDictConfig(rank0_only=True, offload_to_cpu=True),
+        FullOptimStateDictConfig(rank0_only=True, offload_to_cpu=True),
+    ):
+        global_optim_state = FSDP.optim_state_dict(fsdp_model, optimizer)
+
+    # At this point:
+    # - rank 0 has the full CPU optimizer dict
+    # - other ranks have an empty dict (by contract)
     if is_main_process():
-        os.makedirs(optim_path, exist_ok=True)
+        _summarize_optimizer_state("Global FSDP.optim_state_dict (save)", global_optim_state)
+        torch.save(global_optim_state, optim_file)
+        print0(f"[FSDP] ✓ Saved global optimizer state to {optim_file}")
+        if len(global_optim_state.get("state", {})) == 0:
+            print0(
+                "[FSDP][OPT-DEBUG][WARNING] Saved optimizer state has 0 entries. "
+                "Resume will use a fresh optimizer (expect loss spike)."
+            )
 
-    if dist.is_initialized():
-        dist.barrier()
+    dist.barrier()
 
-    dist_save(
-        state_dict={"optimizer": optimizer_state},
-        storage_writer=FileSystemWriter(optim_path),
-    )
-
-    if dist.is_initialized():
-        dist.barrier()
-
-    print0("[FSDP] ✓ Saved sharded optimizer state")
-
-    # ========================================
-    # 2. Save consolidated model if requested
-    # ========================================
-    if consolidate:
-        print0("[FSDP] Consolidating full model (this may take 1-2 minutes)...")
-
-        import time
-
-        start_time = time.time()
-
-        with FSDP.state_dict_type(
-            fsdp_model,
-            StateDictType.FULL_STATE_DICT,
-            FullStateDictConfig(offload_to_cpu=True, rank0_only=True),
-        ):
-            consolidated_state_dict = fsdp_model.state_dict()
-
-        if is_main_process():
-            consolidation_time = time.time() - start_time
-
-            if len(consolidated_state_dict) > 0:
-                consolidated_path = os.path.join(ckpt_dir, "consolidated_model.bin")
-                torch.save(consolidated_state_dict, consolidated_path)
-                file_size_gb = os.path.getsize(consolidated_path) / 1024**3
-                print0(f"[FSDP] ✓ Saved consolidated model ({consolidation_time:.1f}s)")
-                print0(f"[FSDP]   Path: {consolidated_path}")
-                print0(f"[FSDP]   Size: {file_size_gb:.2f} GB")
-            else:
-                print0("[FSDP] ⚠ Consolidated state dict is empty!")
-
-        if dist.is_initialized():
-            dist.barrier()
-    else:
-        print0("[FSDP] ⏭ Skipped consolidation (faster save)")
-
-    # Save training state
+    # ==========================
+    # 3) Save training state
+    # ==========================
     if is_main_process():
         training_state = {
-            "step": step,
+            "step": int(step),
             "scheduler": scheduler.state_dict(),
         }
         torch.save(training_state, os.path.join(ckpt_dir, "training_state.pt"))
-        print0("[FSDP] ✓ Saved training state")
+        print0("[FSDP] ✓ Saved training_state.pt")
 
-    if dist.is_initialized():
-        dist.barrier()
-
-    print0(f"[FSDP] ✓ Checkpoint saved at step {step}")
+    dist.barrier()
 
 
-def load_fsdp_checkpoint(model_map: Dict, optimizer, scheduler, ckpt_path: str) -> int:
-    """Load FSDP checkpoint with sharded optimizer states - FULL MODEL."""
-    from torch.distributed.checkpoint import FileSystemReader
-    from torch.distributed.checkpoint import load as dist_load
 
+def load_fsdp_checkpoint(model_map, optimizer, scheduler, ckpt_path: str) -> int:
     if not os.path.exists(ckpt_path):
-        print0(f"[WARNING] Checkpoint {ckpt_path} not found")
+        print0(f"[FSDP] Checkpoint {ckpt_path} not found")
         return 0
 
-    print0(f"[FSDP] Loading sharded checkpoint from {ckpt_path}")
-
-    # Load model state dict
-    model_path = os.path.join(ckpt_path, "transformer_model")
-    if not os.path.exists(model_path):
-        print0("[WARNING] Model checkpoint not found")
-        return 0
-
+    print0(f"[FSDP] Loading checkpoint from {ckpt_path}")
     fsdp_model = model_map["transformer"]["fsdp_transformer"]
-    model_state_dict = {"model": fsdp_model.state_dict()}
 
-    dist_load(
-        state_dict=model_state_dict,
-        storage_reader=FileSystemReader(model_path),
+    # ============================================================
+    # 1) Load sharded transformer model via DCP
+    # ============================================================
+    model_path = os.path.join(ckpt_path, "transformer_model")
+
+    # Make sure all ranks agree whether model_path exists
+    if dist.is_initialized():
+        if is_main_process():
+            model_dir_exists = os.path.exists(model_path)
+        else:
+            model_dir_exists = False
+        flag = [model_dir_exists]
+        dist.broadcast_object_list(flag, src=0)
+        model_dir_exists = flag[0]
+    else:
+        model_dir_exists = os.path.exists(model_path)
+
+    if not model_dir_exists:
+        print0("[FSDP][WARNING] Model checkpoint directory not found")
+        return 0
+
+    model_state = {"model": fsdp_model.state_dict()}
+    dist_load(model_state, FileSystemReader(model_path))
+    missing, unexpected = fsdp_model.load_state_dict(model_state["model"], strict=False)
+    print0(
+        f"[FSDP] Loaded transformer model state "
+        f"(missing={len(missing)}, unexpected={len(unexpected)})"
     )
 
-    fsdp_model.load_state_dict(model_state_dict["model"])
-    print0("[FSDP] Loaded transformer model state")
+    # ============================================================
+    # 2) Load optimizer from FULL optimizer.pt (global, synced)
+    # ============================================================
+    optim_file = os.path.join(ckpt_path, "optimizer.pt")
 
-    # Load optimizer state dict
-    optim_path = os.path.join(ckpt_path, "optimizer")
-    if os.path.exists(optim_path):
-        optimizer_state = {
-            "optimizer": FSDP.optim_state_dict(
+    # Global check for optimizer.pt existence (avoid branchy collectives)
+    if dist.is_initialized():
+        if is_main_process():
+            has_optim = os.path.exists(optim_file)
+        else:
+            has_optim = False
+        flag = [has_optim]
+        dist.broadcast_object_list(flag, src=0)
+        has_optim = flag[0]
+    else:
+        has_optim = os.path.exists(optim_file)
+
+    base_optim_state = None
+    if has_optim:
+        if is_main_process():
+            try:
+                # PyTorch 2.6+: weights_only=True by default is too strict for optimizer dicts.
+                base_optim_state = torch.load(
+                    optim_file,
+                    map_location="cpu",
+                    weights_only=False,
+                )
+            except TypeError:
+                # Older PyTorch: no weights_only arg
+                base_optim_state = torch.load(optim_file, map_location="cpu")
+            except Exception as e:
+                print0(
+                    f"[FSDP][OPT-DEBUG][WARNING] Failed to load optimizer.pt: {e}. "
+                    "Treating as missing optimizer state."
+                )
+                base_optim_state = None
+
+        # All ranks participate in the same broadcast
+        if dist.is_initialized():
+            obj_list = [base_optim_state]
+            dist.broadcast_object_list(obj_list, src=0)
+            base_optim_state = obj_list[0]
+
+        _summarize_optimizer_state("Loaded optimizer.pt (global)", base_optim_state)
+
+        if (
+            base_optim_state is None
+            or not isinstance(base_optim_state, dict)
+            or len(base_optim_state.get("state", {})) == 0
+        ):
+            print0(
+                "[FSDP][OPT-DEBUG][WARNING] optimizer.pt is empty/invalid; "
+                "using fresh optimizer (expect possible loss bump)."
+            )
+        else:
+            mapped_osd = FSDP.optim_state_dict_to_load(
+                optim_state_dict=base_optim_state,
                 model=fsdp_model,
                 optim=optimizer,
             )
-        }
+            _summarize_optimizer_state("Mapped optimizer state", mapped_osd)
 
-        dist_load(
-            state_dict=optimizer_state,
-            storage_reader=FileSystemReader(optim_path),
+            optimizer.load_state_dict(mapped_osd)
+            _summarize_optimizer_state(
+                "After optimizer.load_state_dict",
+                optimizer.state_dict(),
+            )
+            print0("[FSDP] ✓ Optimizer state loaded from optimizer.pt")
+    else:
+        print0(
+            "[FSDP][WARNING] optimizer.pt not found in checkpoint; "
+            "using fresh optimizer."
         )
 
-        FSDP.optim_state_dict_to_load(
-            model=fsdp_model,
-            optim=optimizer,
-            optim_state_dict=optimizer_state["optimizer"],
-        )
-
-        print0("[FSDP] Loaded sharded optimizer state")
-
-    # Load scheduler and step
+    # ============================================================
+    # 3) Load scheduler + global step (no collectives inside branches)
+    # ============================================================
+    step = 0
     training_state_path = os.path.join(ckpt_path, "training_state.pt")
+
+    # For scheduler/step it's okay if only rank0 reads the file; no collectives needed.
     if os.path.exists(training_state_path):
         training_state = torch.load(training_state_path, map_location="cpu")
-        scheduler.load_state_dict(training_state["scheduler"])
+        if "scheduler" in training_state:
+            try:
+                scheduler.load_state_dict(training_state["scheduler"])
+                print0("[FSDP] Scheduler state loaded.")
+            except Exception as e:
+                print0(f"[FSDP][WARNING] Failed to load scheduler state: {e}")
         step = int(training_state.get("step", 0))
-        print0(f"[FSDP] Loaded training state from step {step}")
+        print0(f"[FSDP] Resumed from global step={step}")
     else:
-        step = 0
+        print0(
+            "[FSDP][WARNING] training_state.pt not found; "
+            "starting scheduler and step from 0."
+        )
 
+    # ============================================================
+    # 4) Final sync
+    # ============================================================
     if dist.is_initialized():
         dist.barrier()
 

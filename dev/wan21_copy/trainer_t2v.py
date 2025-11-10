@@ -29,6 +29,12 @@ from fsdp2_utils_t2v import (
 )
 from training_step_t2v import step_fsdp_transformer_t2v
 
+# Import FSDP types needed for diagnostic code
+from torch.distributed.fsdp import FullyShardedDataParallel as FSDP
+from torch.distributed.fsdp import StateDictType
+from torch.distributed.fsdp.api import ShardedOptimStateDictConfig
+
+
 
 class WanT2VTrainer:
     """
@@ -477,6 +483,113 @@ class WanT2VTrainer:
                         # Determine if we should consolidate
                         should_consolidate = optimizer_step % consolidate_every == 0
 
+                        print0("\n" + "="*80)
+                        print0("[SAVE DIAGNOSTIC] Checking optimizer state BEFORE saving")
+                        print0("="*80)
+
+                        # Check if optimizer has state
+                        optimizer_has_state = False
+                        num_params_with_state = 0
+                        total_params = 0
+
+                        for param_group in self.optimizer.param_groups:
+                            for param in param_group['params']:
+                                total_params += 1
+                                if param in self.optimizer.state:
+                                    optimizer_has_state = True
+                                    num_params_with_state += 1
+
+                        print0(f"[SAVE DIAGNOSTIC] Total parameters: {total_params}")
+                        print0(f"[SAVE DIAGNOSTIC] Parameters with state: {num_params_with_state}")
+                        print0(f"[SAVE DIAGNOSTIC] Optimizer has state: {optimizer_has_state}")
+
+                        if not optimizer_has_state:
+                            print0("\n❌ CRITICAL BUG: Optimizer has NO STATE!")
+                            print0("   This means optimizer.step() was never called or state was cleared.")
+                            print0("   Saving this checkpoint will result in empty optimizer state!")
+                            print0("   Check your training loop!")
+                        else:
+                            print0(f"\n✓ Optimizer has state for {num_params_with_state}/{total_params} parameters")
+                            
+                            # Check a sample parameter's state
+                            sample_param = None
+                            for param_group in self.optimizer.param_groups:
+                                if param_group['params']:
+                                    sample_param = param_group['params'][0]
+                                    break
+                            
+                            if sample_param is not None and sample_param in self.optimizer.state:
+                                state = self.optimizer.state[sample_param]
+                                print0(f"\n[SAVE DIAGNOSTIC] Sample parameter state:")
+                                print0(f"  Keys: {list(state.keys())}")
+                                
+                                if 'exp_avg' in state:
+                                    print0(f"  exp_avg shape: {state['exp_avg'].shape}")
+                                    print0(f"  exp_avg mean: {state['exp_avg'].abs().mean():.6e}")
+                                
+                                if 'exp_avg_sq' in state:
+                                    print0(f"  exp_avg_sq shape: {state['exp_avg_sq'].shape}")
+                                    print0(f"  exp_avg_sq mean: {state['exp_avg_sq'].abs().mean():.6e}")
+                                
+                                if 'step' in state:
+                                    print0(f"  step: {state['step']}")
+
+                        # Now test if FSDP.optim_state_dict() can extract it
+                        print0(f"\n[SAVE DIAGNOSTIC] Testing FSDP.optim_state_dict()...")
+
+                        fsdp_model = self.model_map["transformer"]["fsdp_transformer"]
+
+                        try:
+                            with FSDP.state_dict_type(
+                                fsdp_model,
+                                StateDictType.SHARDED_STATE_DICT,
+                                optim_state_dict_config=ShardedOptimStateDictConfig(offload_to_cpu=True),
+                            ):
+                                test_optim_state = FSDP.optim_state_dict(model=fsdp_model, optim=self.optimizer)
+                            
+                            print0(f"[SAVE DIAGNOSTIC] FSDP.optim_state_dict() returned:")
+                            print0(f"  Type: {type(test_optim_state)}")
+                            print0(f"  Keys: {list(test_optim_state.keys())}")
+                            
+                            if 'state' in test_optim_state:
+                                state_len = len(test_optim_state['state'])
+                                print0(f"  'state' length: {state_len}")
+                                
+                                if state_len == 0:
+                                    print0("\n❌ CRITICAL BUG: FSDP.optim_state_dict() returned EMPTY state!")
+                                    print0("   Even though optimizer HAS state!")
+                                    print0("   This is a bug in FSDP state dict extraction.")
+                                    print0("\n   Possible causes:")
+                                    print0("   1. Parameter IDs don't match between optimizer and FSDP model")
+                                    print0("   2. FSDP wrapped model structure changed")
+                                    print0("   3. use_orig_params setting mismatch")
+                                else:
+                                    print0(f"\n✓ FSDP.optim_state_dict() successfully extracted {state_len} parameter states")
+                                    
+                                    # Check first parameter
+                                    first_key = list(test_optim_state['state'].keys())[0]
+                                    first_state = test_optim_state['state'][first_key]
+                                    print0(f"\n[SAVE DIAGNOSTIC] First extracted state:")
+                                    print0(f"  Key: {first_key}")
+                                    print0(f"  Type: {type(first_state)}")
+                                    if isinstance(first_state, dict):
+                                        print0(f"  Keys: {list(first_state.keys())}")
+                            
+                            if 'param_groups' in test_optim_state:
+                                pg_len = len(test_optim_state['param_groups'])
+                                print0(f"  'param_groups' length: {pg_len}")
+                                if pg_len > 0 and 'params' in test_optim_state['param_groups'][0]:
+                                    num_params = len(test_optim_state['param_groups'][0]['params'])
+                                    print0(f"  Number of params in first group: {num_params}")
+
+                        except Exception as e:
+                            print0(f"\n❌ ERROR calling FSDP.optim_state_dict(): {e}")
+                            import traceback
+                            traceback.print_exc()
+
+                        print0("="*80 + "\n")
+
+
                         save_fsdp_checkpoint(
                             self.model_map,
                             self.optimizer,
@@ -494,16 +607,15 @@ class WanT2VTrainer:
             if dist.is_initialized():
                 dist.barrier()
 
-        # Save final checkpoint
-        if is_main_process():
-            save_fsdp_checkpoint(
-                self.model_map,
-                self.optimizer,
-                self.lr_scheduler,
-                output_dir=output_dir,
-                step=optimizer_step,
-                consolidate=True,  # Always consolidate final checkpoint
-            )
+        # Save final checkpoint - ALL RANKS must participate in FSDP save
+        save_fsdp_checkpoint(
+            self.model_map,
+            self.optimizer,
+            self.lr_scheduler,
+            output_dir=output_dir,
+            step=optimizer_step,
+            consolidate=True,  # Always consolidate final checkpoint
+        )
 
         if dist.is_initialized():
             dist.barrier()
