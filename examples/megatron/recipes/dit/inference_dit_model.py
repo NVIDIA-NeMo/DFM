@@ -20,13 +20,13 @@ import torch
 from einops import rearrange
 from megatron.core.tensor_parallel.random import model_parallel_cuda_manual_seed
 from nemo.lightning.megatron_parallel import MegatronParallel
+from nemo_vfm.diffusion.utils.mcore_parallel_utils import Utils
 from transformers import T5EncoderModel, T5TokenizerFast
 
 from dfm.src.common.tokenizers.cosmos.cosmos1.causal_video_tokenizer import CausalVideoTokenizer
 from dfm.src.common.utils.save_video import save_video
 from dfm.src.megatron.model.dit.dit_model_provider import DiTModelProvider
 from dfm.src.megatron.model.dit.edm.edm_pipeline import EDMPipeline
-from nemo_vfm.diffusion.utils.mcore_parallel_utils import Utils
 
 
 MegatronParallel.init_ddp = lambda self: None
