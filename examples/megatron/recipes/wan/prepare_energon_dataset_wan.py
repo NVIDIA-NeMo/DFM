@@ -18,11 +18,11 @@ from pathlib import Path
 from typing import Dict, List, Optional, Tuple
 
 import cv2
-from diffusers import AutoencoderKLWan
 import numpy as np
 import torch
-from transformers import AutoTokenizer, UMT5EncoderModel
 import webdataset as wds
+from diffusers import AutoencoderKLWan
+from transformers import AutoTokenizer, UMT5EncoderModel
 
 
 def _map_interpolation(resize_mode: str) -> int:

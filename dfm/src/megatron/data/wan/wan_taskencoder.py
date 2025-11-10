@@ -22,7 +22,7 @@ from dfm.src.megatron.model.wan.utils import grid_sizes_calculation, patchify
 from megatron.core import parallel_state
 from megatron.energon import SkipSample
 from megatron.energon.task_encoder.base import stateless
-from megatron.energon.task_encoder.cooking import Cooker, basic_sample_keys
+from megatron.energon.task_encoder.cooking import basic_sample_keys, Cooker
 import torch
 import torch.nn.functional as F
 
