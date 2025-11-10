@@ -32,15 +32,13 @@ class WanDataModuleConfig(DiffusionDataModuleConfig):
     global_batch_size: int
     num_workers: int_repr
     dataloader_type: str = "external"
-    
+
     def __post_init__(self):
         self.dataset = DiffusionDataModule(
             path=self.path,
             seq_length=self.seq_length,
             packing_buffer_size=self.packing_buffer_size,
-            task_encoder=WanTaskEncoder(
-                seq_length=self.seq_length, packing_buffer_size=self.packing_buffer_size
-            ),
+            task_encoder=WanTaskEncoder(seq_length=self.seq_length, packing_buffer_size=self.packing_buffer_size),
             micro_batch_size=self.micro_batch_size,
             global_batch_size=self.global_batch_size,
             num_workers=self.num_workers,

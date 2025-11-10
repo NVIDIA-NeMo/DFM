@@ -126,11 +126,10 @@ class FlowPipeline:
                 0
             ]  # shape [noise_seq, c * ( pF * pH * pW)]
 
-
             # because video_latents might be padded, we need to make sure noise also be padded to have the same shape
             sample_noise_seq_len = sample_noise.shape[0]
             cu_seqlens_q_padded = packed_seq_params["self_attention"].cu_seqlens_q_padded
-            seq_len_q_padded = cu_seqlens_q_padded[i+1] - cu_seqlens_q_padded[i]
+            seq_len_q_padded = cu_seqlens_q_padded[i + 1] - cu_seqlens_q_padded[i]
             if sample_noise_seq_len < seq_len_q_padded:
                 pad_len = seq_len_q_padded - sample_noise_seq_len
                 pad = torch.zeros(
@@ -141,7 +140,6 @@ class FlowPipeline:
             noise.append(sample_noise)
         noise = torch.cat(noise, dim=0)  # shape [concatenated_noise_seq, c * ( pF * pH * pW)]
         noise = noise.unsqueeze(1)  # shape [concatenated_noise_seq, 1, c * ( pF * pH * pW)]
-
 
         # CRITICAL: Manual flow matching (NOT scheduler.add_noise!)
         # x_t = (1 - σ) * x_0 + σ * ε

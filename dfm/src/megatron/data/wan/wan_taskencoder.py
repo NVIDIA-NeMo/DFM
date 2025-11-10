@@ -16,15 +16,16 @@
 
 from typing import List
 
-from dfm.src.megatron.data.common.diffusion_task_encoder_with_sp import DiffusionTaskEncoderWithSequencePacking
-from dfm.src.megatron.data.wan.wan_sample import WanSample
-from dfm.src.megatron.model.wan.utils import grid_sizes_calculation, patchify
+import torch
+import torch.nn.functional as F
 from megatron.core import parallel_state
 from megatron.energon import SkipSample
 from megatron.energon.task_encoder.base import stateless
-from megatron.energon.task_encoder.cooking import basic_sample_keys, Cooker
-import torch
-import torch.nn.functional as F
+from megatron.energon.task_encoder.cooking import Cooker, basic_sample_keys
+
+from dfm.src.megatron.data.common.diffusion_task_encoder_with_sp import DiffusionTaskEncoderWithSequencePacking
+from dfm.src.megatron.data.wan.wan_sample import WanSample
+from dfm.src.megatron.model.wan.utils import grid_sizes_calculation, patchify
 
 
 def cook(sample: dict) -> dict:
@@ -145,7 +146,7 @@ class WanTaskEncoder(DiffusionTaskEncoderWithSequencePacking):
         )
 
     # NOTE:
-    # the method select_samples_to_pack() is inherited from the parent 
+    # the method select_samples_to_pack() is inherited from the parent
     #   class DiffusionTaskEncoderWithSequencePacking
 
     @stateless
