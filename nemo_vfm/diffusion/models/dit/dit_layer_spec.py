@@ -27,7 +27,6 @@ from megatron.core.transformer.attention import (
     SelfAttention,
     SelfAttentionSubmodules,
 )
-from megatron.core.transformer.cuda_graphs import CudaGraphManager
 from megatron.core.transformer.custom_layers.transformer_engine import (
     TEColumnParallelLinear,
     TEDotProductAttention,
@@ -43,11 +42,6 @@ from megatron.core.transformer.transformer_block import TransformerConfig
 from megatron.core.transformer.transformer_config import TransformerConfig
 from megatron.core.transformer.transformer_layer import TransformerLayer, TransformerLayerSubmodules
 from megatron.core.utils import make_viewless_tensor
-from nemo.collections.diffusion.models.dit.dit_attention import (
-    FluxSingleAttention,
-    JointSelfAttention,
-    JointSelfAttentionSubmodules,
-)
 
 
 # pylint: disable=C0116
@@ -518,7 +512,6 @@ class DiTLayer(TransformerLayer):
         return hidden_states, context
 
 
-
 def get_dit_adaln_block_with_transformer_engine_spec() -> ModuleSpec:
     params = {"attn_mask_type": AttnMaskType.padding}
     return ModuleSpec(
@@ -556,4 +549,3 @@ def get_dit_adaln_block_with_transformer_engine_spec() -> ModuleSpec:
             ),
         ),
     )
-
