@@ -19,7 +19,7 @@ from dataclasses import dataclass
 import torch
 from megatron.bridge.data.utils import DatasetBuildContext, DatasetProvider
 
-from dfm.src.megatron.data.dit.diffusion_energon_datamodule import DiffusionDataModule
+from dfm.src.megatron.data.common.diffusion_energon_datamodule import DiffusionDataModule
 from dfm.src.megatron.data.wan.wan_taskencoder import WanTaskEncoder
 
 

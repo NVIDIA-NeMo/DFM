@@ -21,8 +21,8 @@ from einops import rearrange
 from megatron.core import parallel_state
 from megatron.energon import SkipSample, stateless
 
-from dfm.src.megatron.data.dit.diffusion_sample import DiffusionSample
-from dfm.src.megatron.data.dit.diffusion_task_encoder_with_sp import DiffusionTaskEncoderWithSequencePacking
+from dfm.src.megatron.data.common.diffusion_sample import DiffusionSample
+from dfm.src.megatron.data.common.diffusion_task_encoder_with_sp import DiffusionTaskEncoderWithSequencePacking
 
 
 class DiTTaskEncoder(DiffusionTaskEncoderWithSequencePacking):

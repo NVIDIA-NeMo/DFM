@@ -21,7 +21,7 @@ from megatron.energon.task_encoder.base import stateless
 from megatron.core import parallel_state
 from typing import List
 from megatron.energon import SkipSample
-from dfm.src.megatron.data.dit.diffusion_task_encoder_with_sp import DiffusionTaskEncoderWithSequencePacking
+from dfm.src.megatron.data.common.diffusion_task_encoder_with_sp import DiffusionTaskEncoderWithSequencePacking
 from megatron.energon.task_encoder.cooking import Cooker, basic_sample_keys
 from dfm.src.megatron.data.wan.wan_sample import WanSample
 from dfm.src.megatron.model.wan.utils import grid_sizes_calculation, patchify

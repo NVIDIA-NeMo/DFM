@@ -7,8 +7,8 @@ from megatron.energon import DefaultTaskEncoder
 from megatron.energon.task_encoder.base import stateless
 from megatron.energon.task_encoder.cooking import Cooker, basic_sample_keys
 
-from dfm.src.megatron.data.dit.diffusion_sample import DiffusionSample
-from dfm.src.megatron.data.dit.sequence_packing_utils import first_fit_decreasing
+from dfm.src.megatron.data.common.diffusion_sample import DiffusionSample
+from dfm.src.megatron.data.common.sequence_packing_utils import first_fit_decreasing
 
 
 def cook(sample: dict) -> dict:
