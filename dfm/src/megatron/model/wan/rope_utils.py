@@ -69,7 +69,7 @@ class Wan3DRopeEmbeddings(torch.nn.Module):
 
         # Pad freqs_real_i to (padded_seq_len, 1, 1, dim_head) with 0s
         for i, freqs_real_i in enumerate(freqs_real):
-            seq_len_q_padded = cu_seqlens_q_padded[i+1] - cu_seqlens_q_padded[i]
+            seq_len_q_padded = cu_seqlens_q_padded[i + 1] - cu_seqlens_q_padded[i]
             if freqs_real_i.shape[0] < seq_len_q_padded:
                 pad_shape = (seq_len_q_padded - freqs_real_i.shape[0], 1, 1, dim_head)
                 freqs_real_i = torch.cat(

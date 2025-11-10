@@ -13,6 +13,7 @@
 # limitations under the License.
 
 from dataclasses import dataclass
+
 from dfm.src.megatron.data.common.diffusion_sample import DiffusionSample
 
 

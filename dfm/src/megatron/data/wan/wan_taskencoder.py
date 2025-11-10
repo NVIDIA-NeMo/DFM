@@ -14,17 +14,17 @@
 
 # pylint: disable=C0115,C0116,C0301
 
-from torch._tensor import Tensor
-import torch
-import torch.nn.functional as F
-from megatron.energon.task_encoder.base import stateless
-from megatron.core import parallel_state
 from typing import List
-from megatron.energon import SkipSample
+
 from dfm.src.megatron.data.common.diffusion_task_encoder_with_sp import DiffusionTaskEncoderWithSequencePacking
-from megatron.energon.task_encoder.cooking import Cooker, basic_sample_keys
 from dfm.src.megatron.data.wan.wan_sample import WanSample
 from dfm.src.megatron.model.wan.utils import grid_sizes_calculation, patchify
+from megatron.core import parallel_state
+from megatron.energon import SkipSample
+from megatron.energon.task_encoder.base import stateless
+from megatron.energon.task_encoder.cooking import Cooker, basic_sample_keys
+import torch
+import torch.nn.functional as F
 
 
 def cook(sample: dict) -> dict:

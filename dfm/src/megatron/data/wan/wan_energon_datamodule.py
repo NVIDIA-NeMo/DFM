@@ -16,10 +16,10 @@
 
 from dataclasses import dataclass
 
-from megatron.bridge.data.utils import DatasetBuildContext, DatasetProvider
+from megatron.bridge.data.utils import DatasetBuildContext
 from torch import int_repr
 
-from dfm.src.megatron.data.common.diffusion_energon_datamodule import DiffusionDataModuleConfig, DiffusionDataModule
+from dfm.src.megatron.data.common.diffusion_energon_datamodule import DiffusionDataModule, DiffusionDataModuleConfig
 from dfm.src.megatron.data.wan.wan_taskencoder import WanTaskEncoder
 
 

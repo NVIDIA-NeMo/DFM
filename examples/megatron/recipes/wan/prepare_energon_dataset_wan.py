@@ -18,12 +18,11 @@ from pathlib import Path
 from typing import Dict, List, Optional, Tuple
 
 import cv2
+from diffusers import AutoencoderKLWan
 import numpy as np
 import torch
-import webdataset as wds
-
-from diffusers import AutoencoderKLWan
 from transformers import AutoTokenizer, UMT5EncoderModel
+import webdataset as wds
 
 
 def _map_interpolation(resize_mode: str) -> int:
@@ -412,7 +411,7 @@ def main():
         for index, meta in enumerate(metadata_list):
             video_name = meta["file_name"]
             start_frame = int(meta["start_frame"])  # inclusive
-            end_frame = int(meta["end_frame"])      # inclusive
+            end_frame = int(meta["end_frame"])  # inclusive
             caption_text = meta.get("vila_caption", "")
 
             video_path = str(video_folder / video_name)
@@ -431,7 +430,9 @@ def main():
 
                 # Encode text and video with HF models exactly like automodel
                 text_embed = _encode_text(tokenizer, text_encoder, args.device, caption_text)
-                latents = _encode_video_latents(vae, args.device, video_tensor, deterministic_latents=not args.stochastic)
+                latents = _encode_video_latents(
+                    vae, args.device, video_tensor, deterministic_latents=not args.stochastic
+                )
 
                 # Move to CPU without changing dtype; keep exact values to match automodel outputs
                 text_embed_cpu = text_embed.detach().to(device="cpu")
