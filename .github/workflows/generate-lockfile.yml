@@ -41,6 +41,8 @@ jobs:
 
       - name: Checkout repository
         uses: actions/checkout@v4
+        with:
+          submodules: recursive
 
       - name: Generate lockfile in NGC container
         run: |
