@@ -60,6 +60,7 @@ from megatron.bridge.training.pretrain import pretrain
 from megatron.bridge.training.utils.omegaconf_utils import (
     apply_overrides,
     create_omegaconf_dict_config,
+    parse_hydra_overrides,
 )
 from megatron.bridge.utils.common_utils import get_rank_safe
 from omegaconf import OmegaConf
@@ -158,13 +159,10 @@ def main() -> None:
         merged_omega_conf = OmegaConf.merge(merged_omega_conf, yaml_overrides_omega)
         logger.debug("YAML overrides merged successfully.")
 
-    # Apply command-line overrides using Hydra-style parsing
-    # TODO: this is not working, need to fix it
-    # if cli_overrides:
-    #     print("INSIDE OVERRIDE")
-    #     logger.debug(f"Applying Hydra-style command-line overrides: {cli_overrides}")
-    #     merged_omega_conf = parse_hydra_overrides(merged_omega_conf, cli_overrides)
-    #     logger.debug("Hydra-style command-line overrides applied successfully.")
+    if cli_overrides:
+        logger.debug(f"Applying Hydra-style command-line overrides: {cli_overrides}")
+        merged_omega_conf = parse_hydra_overrides(merged_omega_conf, cli_overrides)
+        logger.debug("Hydra-style command-line overrides applied successfully.")
 
     # # Apply the final merged OmegaConf configuration back to the original ConfigContainer
     logger.debug("Applying final merged configuration back to Python ConfigContainer...")
