@@ -21,41 +21,4 @@ on:
 
 jobs:
   build-docs:
-    runs-on: ubuntu-latest
-    steps:
-      - name: Checkout repository
-        uses: actions/checkout@v4
-        with:
-          submodules: recursive
-
-      - name: Set up Python
-        uses: actions/setup-python@v5
-        with:
-          python-version: '3.12'
-
-      - name: Install uv
-        run: |
-          curl -LsSf https://astral.sh/uv/0.8.22/install.sh | sh
-          echo "$HOME/.local/bin" >> $GITHUB_PATH
-
-      - name: Create virtual environment
-        run: uv venv
-
-      - name: Pre-install build dependencies
-        run: |
-          uv pip install setuptools wheel torch pybind11 "Cython>=3.0.0" "numpy<2.0.0" ninja packaging
-
-      - name: Install docs dependencies
-        run: uv sync --group docs --no-install-project
-
-      - name: Build documentation
-        run: |
-          source .venv/bin/activate
-          cd docs
-          make html
-
-      - name: Upload docs artifact
-        uses: actions/upload-artifact@v4
-        with:
-          name: documentation
-          path: docs/build/html/
+    uses: NVIDIA-NeMo/FW-CI-templates/.github/workflows/_build_docs.yml@v0.57.0
