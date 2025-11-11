@@ -33,5 +33,8 @@ RUN uv venv ${UV_PROJECT_ENVIRONMENT} --system-site-packages
 COPY pyproject.toml uv.lock ./
 COPY dfm ./dfm
 
-# Install all dependencies using uv sync (without installing the project itself)
-RUN uv sync --link-mode copy --locked --all-groups --no-install-project
+# Install dependencies in two steps:
+# 1. Install build dependencies first (required for packages with no-build-isolation)
+# 2. Install all other dependencies
+RUN uv sync --locked --only-group build && \
+    uv sync --link-mode copy --locked --all-groups --no-install-project
