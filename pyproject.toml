@@ -120,7 +120,7 @@ override-dependencies = [
 ]
 
 [tool.uv.extra-build-dependencies]
-nvidia-resiliency-ext = ["poetry"]
+nvidia-resiliency-ext = ["poetry-core"]
 
 [[tool.uv.index]]
 name = "pypi"
