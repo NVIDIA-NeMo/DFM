@@ -117,6 +117,8 @@ override-dependencies = [
     "torch; sys_platform == 'never'",
     "torchvision; sys_platform == 'never'",
     "triton; sys_platform == 'never'",
+    "transformer-engine>=2.9.0a0,<2.10.0",  # Override [pytorch] extra from megatron-bridge (doesn't exist)
+    "nvidia-modelopt>=0.33.0",  # Override [torch] extra from megatron-bridge (doesn't exist)
 ]
 
 [tool.uv.extra-build-dependencies]
