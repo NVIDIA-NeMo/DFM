@@ -48,6 +48,7 @@ class DiffusionSample(Sample):
     num_frames: Optional[torch.Tensor] = None
     padding_mask: Optional[torch.Tensor] = None
     seq_len_q: Optional[torch.Tensor] = None
+    seq_len_q_padded: Optional[torch.Tensor] = None
     seq_len_kv: Optional[torch.Tensor] = None
     pos_ids: Optional[torch.Tensor] = None
     latent_shape: Optional[torch.Tensor] = None

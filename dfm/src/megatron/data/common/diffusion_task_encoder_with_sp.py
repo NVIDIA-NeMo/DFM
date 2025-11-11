@@ -103,6 +103,7 @@ class DiffusionTaskEncoderWithSequencePacking(DefaultTaskEncoder, ABC):
             context_embeddings=cat("context_embeddings"),
             loss_mask=cat("loss_mask"),
             seq_len_q=cat("seq_len_q"),
+            seq_len_q_padded=cat("seq_len_q_padded"),
             seq_len_kv=cat("seq_len_kv"),
             pos_ids=cat("pos_ids"),
             latent_shape=stack("latent_shape"),
