@@ -132,6 +132,7 @@ explicit = true
 [tool.uv.sources]
 nemo-automodel = { path = "3rdparty/Automodel" }
 megatron-bridge = { path = "3rdparty/Megatron-Bridge" }
+transformer-engine = { git = "https://github.com/NVIDIA/TransformerEngine.git", rev = "release_v2.9" }
 
 [project.urls]
 Download = "https://github.com/NVIDIA-NeMo/DFM/releases"
