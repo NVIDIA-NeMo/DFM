@@ -24,7 +24,7 @@ from megatron.energon.task_encoder.base import stateless
 from megatron.energon.task_encoder.cooking import Cooker, basic_sample_keys
 
 from dfm.src.megatron.data.common.diffusion_task_encoder_with_sp import DiffusionTaskEncoderWithSequencePacking
-from dfm.src.megatron.data.wan.wan_sample import WanSample
+from dfm.src.megatron.data.common.diffusion_sample import DiffusionSample
 from dfm.src.megatron.model.wan.utils import grid_sizes_calculation, patchify
 
 
@@ -130,7 +130,7 @@ class WanTaskEncoder(DiffusionTaskEncoderWithSequencePacking):
         # grid_size: [F_patches, W_patches, H_patches]
         # context_embeddings: [context_seq_len, text_embedding_dim]
 
-        return WanSample(
+        return DiffusionSample(
             __key__=sample["__key__"],
             __restore_key__=sample["__restore_key__"],
             __subflavor__=None,
@@ -142,40 +142,16 @@ class WanTaskEncoder(DiffusionTaskEncoderWithSequencePacking):
             seq_len_q=torch.tensor([seq_len_q], dtype=torch.int32),
             seq_len_q_padded=torch.tensor([seq_len_q_padded], dtype=torch.int32),
             seq_len_kv=torch.tensor([seq_len_kv], dtype=torch.int32),
+            pos_ids=torch.zeros(1, dtype=torch.bfloat16), # dummy pos_ids
             video_metadata=video_metadata,
         )
 
     # NOTE:
-    # the method select_samples_to_pack() is inherited from the parent
+    # the method select_samples_to_pack() and pack_selected_samples() are inherited from the parent
     #   class DiffusionTaskEncoderWithSequencePacking
 
     @stateless
-    def pack_selected_samples(self, samples: List[WanSample]) -> WanSample:
-        """Construct a new Wan sample by concatenating the sequences."""
-
-        def stack(attr):
-            return torch.stack([getattr(sample, attr) for sample in samples], dim=0)
-
-        def cat(attr):
-            return torch.cat([getattr(sample, attr) for sample in samples], dim=0)
-
-        return WanSample(
-            __key__=",".join([s.__key__ for s in samples]),
-            __restore_key__=(),  # Will be set by energon based on `samples`
-            __subflavor__=None,
-            __subflavors__=samples[0].__subflavors__,
-            video=cat("video"),
-            context_embeddings=cat("context_embeddings"),
-            loss_mask=cat("loss_mask"),
-            seq_len_q=cat("seq_len_q"),
-            seq_len_q_padded=cat("seq_len_q_padded"),
-            seq_len_kv=cat("seq_len_kv"),
-            latent_shape=stack("latent_shape"),
-            video_metadata=[sample.video_metadata for sample in samples],
-        )
-
-    @stateless
-    def batch(self, samples: List[WanSample]) -> dict:
+    def batch(self, samples: List[DiffusionSample]) -> dict:
         """Return dictionary with data for batch."""
         if self.packing_buffer_size is None:
             # no packing

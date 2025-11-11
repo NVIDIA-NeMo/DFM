@@ -34,9 +34,11 @@ class DiffusionSample(Sample):
         num_frames (Optional[torch.Tensor]): Number of frames in the video.
         padding_mask (Optional[torch.Tensor]): Mask indicating padding positions.
         seq_len_q (Optional[torch.Tensor]): Sequence length for query embeddings.
+        seq_len_q_padded (Optional[torch.Tensor]): Sequence length for query embeddings after padding.
         seq_len_kv (Optional[torch.Tensor]): Sequence length for key/value embeddings.
         pos_ids (Optional[torch.Tensor]): Positional IDs.
         latent_shape (Optional[torch.Tensor]): Shape of the latent tensor.
+        video_metadata (Optional[dict]): Metadata of the video.
     """
 
     video: torch.Tensor  # video latents (C T H W)
@@ -48,10 +50,12 @@ class DiffusionSample(Sample):
     num_frames: Optional[torch.Tensor] = None
     padding_mask: Optional[torch.Tensor] = None
     seq_len_q: Optional[torch.Tensor] = None
+    seq_len_q_padded: Optional[torch.Tensor] = None
     seq_len_kv: Optional[torch.Tensor] = None
     pos_ids: Optional[torch.Tensor] = None
     latent_shape: Optional[torch.Tensor] = None
-
+    video_metadata: Optional[dict] = None
+    
     def to_dict(self) -> dict:
         """Converts the sample to a dictionary."""
         return dict(
@@ -64,9 +68,11 @@ class DiffusionSample(Sample):
             num_frames=self.num_frames,
             padding_mask=self.padding_mask,
             seq_len_q=self.seq_len_q,
+            seq_len_q_padded=self.seq_len_q_padded,
             seq_len_kv=self.seq_len_kv,
             pos_ids=self.pos_ids,
             latent_shape=self.latent_shape,
+            video_metadata=self.video_metadata,
         )
 
     def __add__(self, other: Any) -> int:
