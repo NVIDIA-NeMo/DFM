@@ -57,7 +57,7 @@ jobs:
 
               # Create venv with system packages (this makes container torch available)
               uv venv /opt/venv --system-site-packages
-              
+
               # Set environment variables like Megatron-Bridge does
               export UV_PROJECT_ENVIRONMENT=/opt/venv
               export VIRTUAL_ENV=/opt/venv
