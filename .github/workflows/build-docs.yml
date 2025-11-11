@@ -41,8 +41,9 @@ jobs:
       - name: Create virtual environment
         run: uv venv
 
-      - name: Install build dependencies
-        run: uv sync --only-group build
+      - name: Pre-install build dependencies
+        run: |
+          uv pip install setuptools wheel torch pybind11 "Cython>=3.0.0" "numpy<2.0.0" ninja packaging
 
       - name: Install docs dependencies
         run: uv sync --group docs --no-install-project
