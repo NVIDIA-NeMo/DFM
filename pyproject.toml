@@ -119,6 +119,9 @@ override-dependencies = [
     "triton; sys_platform == 'never'",
 ]
 
+[tool.uv.extra-build-dependencies]
+nvidia-resiliency-ext = ["poetry"]
+
 [[tool.uv.index]]
 name = "pypi"
 url = "https://pypi.org/simple"
