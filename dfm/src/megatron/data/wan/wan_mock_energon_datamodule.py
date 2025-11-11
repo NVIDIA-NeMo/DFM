@@ -17,10 +17,11 @@
 from dataclasses import dataclass
 
 import torch
-from megatron.bridge.data.utils import DatasetBuildContext, DatasetProvider
 from torch.utils.data import DataLoader, Dataset
+from megatron.bridge.data.utils import DatasetBuildContext, DatasetProvider
 
 from dfm.src.megatron.model.wan.utils import patchify
+
 
 class _MockDataset(Dataset):
     def __init__(self, length: int):
@@ -31,6 +32,7 @@ class _MockDataset(Dataset):
 
     def __getitem__(self, idx: int) -> dict:
         return {}
+
 
 def mock_batch(
     F_latents: int,
@@ -91,6 +93,7 @@ def mock_batch(
     )
 
     return batch
+
 
 @dataclass(kw_only=True)
 class WanMockDataModuleConfig(DatasetProvider):

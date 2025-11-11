@@ -142,7 +142,7 @@ class WanTaskEncoder(DiffusionTaskEncoderWithSequencePacking):
             seq_len_q=torch.tensor([seq_len_q], dtype=torch.int32),
             seq_len_q_padded=torch.tensor([seq_len_q_padded], dtype=torch.int32),
             seq_len_kv=torch.tensor([seq_len_kv], dtype=torch.int32),
-            pos_ids=torch.zeros(1, dtype=torch.bfloat16), # dummy pos_ids
+            pos_ids=torch.zeros(1, dtype=torch.bfloat16),  # dummy pos_ids
             video_metadata=video_metadata,
         )
 

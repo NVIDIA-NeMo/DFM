@@ -43,8 +43,8 @@ class FlowPipeline:
         logit_std: float = 1.0,
         flow_shift: float = 3.0,
         mix_uniform_ratio: float = 0.1,
-        sigma_min: float = 0.0, # Default: no clamping (pretrain)
-        sigma_max: float = 1.0, # Default: no clamping (pretrain)
+        sigma_min: float = 0.0,  # Default: no clamping (pretrain)
+        sigma_max: float = 1.0,  # Default: no clamping (pretrain)
     ) -> tuple[dict[str, torch.Tensor], torch.Tensor]:
         """
         Performs a single training step using flow matching algorithm.
