@@ -54,7 +54,9 @@ classifiers = [
     "Topic :: Software Development :: Libraries",
     "Topic :: Utilities",
 ]
-dependencies = []
+dependencies = [
+    "megatron-energon",
+]
 
 [build-system]
 requires = ["setuptools>=61"]
@@ -91,7 +93,6 @@ automodel = [
     "opencv-python-headless==4.10.0.84",
 ]
 megatron-bridge = ["megatron-bridge"]
-energon = ["megatron-energon"]
 
 [tool.setuptools]
 packages = ["dfm"]
