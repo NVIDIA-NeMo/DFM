@@ -60,7 +60,7 @@ jobs:
               export UV_PROJECT_ENVIRONMENT=/opt/venv
 
               # Pre-install build dependencies before any sync/lock operation
-              uv pip install setuptools wheel pybind11 "Cython>=3.0.0" "numpy<2.0.0" ninja packaging poetry-core
+              uv pip install setuptools wheel pybind11 "Cython>=3.0.0" "numpy<2.0.0" ninja packaging poetry
 
               # Generate lockfile with the EXACT configuration from pyproject.toml
               # No modifications! This ensures lockfile matches what Dockerfile will use
