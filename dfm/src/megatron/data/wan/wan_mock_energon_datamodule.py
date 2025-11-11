@@ -17,11 +17,10 @@
 from dataclasses import dataclass
 
 import torch
-from torch.utils.data import DataLoader, Dataset
 from megatron.bridge.data.utils import DatasetBuildContext, DatasetProvider
-from typing import List
+from torch.utils.data import DataLoader, Dataset
+
 from dfm.src.megatron.model.wan.utils import patchify
-from megatron.energon.task_encoder.cooking import Cooker, basic_sample_keys
 
 class _MockDataset(Dataset):
     def __init__(self, length: int):
@@ -34,14 +33,14 @@ class _MockDataset(Dataset):
         return {}
 
 def mock_batch(
-        F_latents: int,
-        H_latents: int,
-        W_latents: int,
-        patch_temporal: int,
-        patch_spatial: int,
-        number_packed_samples: int,
-        context_seq_len: int,
-        context_embeddings_dim: int,
+    F_latents: int,
+    H_latents: int,
+    W_latents: int,
+    patch_temporal: int,
+    patch_spatial: int,
+    number_packed_samples: int,
+    context_seq_len: int,
+    context_embeddings_dim: int,
 ) -> dict:
 
     # set mock values for one video sample
@@ -74,7 +73,6 @@ def mock_batch(
     grid_sizes_packed = torch.stack([grid_size for _ in range(number_packed_samples)], dim=0)
     context_embeddings_packed = [context_embeddings for _ in range(number_packed_samples)]
     context_embeddings_packed = torch.cat(context_embeddings_packed, dim=0)
-
 
     ### Note: shape of sample's values
     # video_latent: [num_patches, latents_channels * pF * pH * pW]

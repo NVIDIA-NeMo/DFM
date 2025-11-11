@@ -88,10 +88,10 @@ def parse_cli_args() -> Tuple[argparse.Namespace, list[str]]:
     )
     parser.add_argument("--mock", action="store_true", help="Whether to use mock data.")
     parser.add_argument(
-        "--training-mode", 
+        "--training-mode",
         choices=["pretrain", "finetune"],
         default="finetune",
-        help="Set training mode, 'pretrain' or 'finetune'."
+        help="Set training mode, 'pretrain' or 'finetune'.",
     )
     parser.add_argument(
         "--config-file",

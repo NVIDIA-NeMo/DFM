@@ -77,8 +77,8 @@ class WanForwardStep:
         logit_std: float = 1.0,
         flow_shift: float = 3.0,
         mix_uniform_ratio: float = 0.1,
-        sigma_min: float = 0.0, # Default: no clamping (pretrain)
-        sigma_max: float = 1.0, # Default: no clamping (pretrain)
+        sigma_min: float = 0.0,  # Default: no clamping (pretrain)
+        sigma_max: float = 1.0,  # Default: no clamping (pretrain)
     ):
         self.diffusion_pipeline = FlowPipeline()
         self.use_sigma_noise = use_sigma_noise

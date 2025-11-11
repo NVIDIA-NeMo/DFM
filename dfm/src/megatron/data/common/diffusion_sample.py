@@ -55,7 +55,7 @@ class DiffusionSample(Sample):
     pos_ids: Optional[torch.Tensor] = None
     latent_shape: Optional[torch.Tensor] = None
     video_metadata: Optional[dict] = None
-    
+
     def to_dict(self) -> dict:
         """Converts the sample to a dictionary."""
         return dict(
