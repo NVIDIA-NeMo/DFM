@@ -163,7 +163,7 @@ def pretrain_config(
         dataset = WanMockDataModuleConfig(
             path=None,
             seq_length=1024,  # we don't need to use this value, just add because Bridge training requires for LLMs
-            F_latents=3,
+            F_latents=24,
             H_latents=104,
             W_latents=60,
             context_seq_len=512,
@@ -171,6 +171,7 @@ def pretrain_config(
             micro_batch_size=micro_batch_size,
             global_batch_size=global_batch_size,
             num_workers=10,
+            packing_buffer_size=None,
         )
     else:
         dataset = WanDataModuleConfig(

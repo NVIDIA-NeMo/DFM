@@ -88,6 +88,12 @@ def parse_cli_args() -> Tuple[argparse.Namespace, list[str]]:
     )
     parser.add_argument("--mock", action="store_true", help="Whether to use mock data.")
     parser.add_argument(
+        "--training-mode", 
+        choices=["pretrain", "finetune"],
+        default="finetune",
+        help="Set training mode, 'pretrain' or 'finetune'."
+    )
+    parser.add_argument(
         "--config-file",
         type=str,
         default=str(DEFAULT_CONFIG_FILE_PATH),
@@ -164,6 +170,26 @@ def main() -> None:
     # Apply overrides while preserving excluded fields
     apply_overrides(cfg, final_overrides_as_dict, excluded_fields)
 
+    # Config FlowPipeline based on training mode
+    if args.training_mode == "pretrain":
+        wan_forward_step = WanForwardStep(
+            timestep_sampling="logit_normal",
+            logit_std=1.5,
+            flow_shift=2.5,
+            mix_uniform_ratio=0.2,
+            sigma_min=0.0,
+            sigma_max=1.0,
+        )
+    elif args.training_mode == "finetune":
+        wan_forward_step = WanForwardStep(
+            timestep_sampling="uniform",
+            logit_std=1.0,
+            flow_shift=3.0,
+            mix_uniform_ratio=0.1,
+            sigma_min=0.0,
+            sigma_max=1.0,
+        )
+
     # Display final configuration
     if get_rank_safe() == 0:
         logger.info("--- Final Merged Configuration ---")
@@ -172,7 +198,7 @@ def main() -> None:
 
     # Start training
     logger.debug("Starting pretraining...")
-    pretrain(config=cfg, forward_step_func=WanForwardStep())
+    pretrain(config=cfg, forward_step_func=wan_forward_step)
 
 
 if __name__ == "__main__":

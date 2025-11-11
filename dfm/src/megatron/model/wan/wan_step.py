@@ -69,8 +69,26 @@ def wan_data_step(qkv_format, dataloader_iter):
 
 
 class WanForwardStep:
-    def __init__(self):
+    def __init__(
+        self,
+        use_sigma_noise: bool = True,
+        timestep_sampling: str = "uniform",
+        logit_mean: float = 0.0,
+        logit_std: float = 1.0,
+        flow_shift: float = 3.0,
+        mix_uniform_ratio: float = 0.1,
+        sigma_min: float = 0.0, # Default: no clamping (pretrain)
+        sigma_max: float = 1.0, # Default: no clamping (pretrain)
+    ):
         self.diffusion_pipeline = FlowPipeline()
+        self.use_sigma_noise = use_sigma_noise
+        self.timestep_sampling = timestep_sampling
+        self.logit_mean = logit_mean
+        self.logit_std = logit_std
+        self.flow_shift = flow_shift
+        self.mix_uniform_ratio = mix_uniform_ratio
+        self.sigma_min = sigma_min
+        self.sigma_max = sigma_max
 
     def __call__(
         self, state: GlobalState, data_iterator: Iterable, model: VisionModule
@@ -96,7 +114,18 @@ class WanForwardStep:
         # run diffusion training step
         with straggler_timer:
             if parallel_state.is_pipeline_last_stage():
-                output_batch, loss, split_loss_mask = self.diffusion_pipeline.training_step(model, batch)
+                output_batch, loss, split_loss_mask = self.diffusion_pipeline.training_step(
+                    model,
+                    batch,
+                    use_sigma_noise=self.use_sigma_noise,
+                    timestep_sampling=self.timestep_sampling,
+                    logit_mean=self.logit_mean,
+                    logit_std=self.logit_std,
+                    flow_shift=self.flow_shift,
+                    mix_uniform_ratio=self.mix_uniform_ratio,
+                    sigma_min=self.sigma_min,
+                    sigma_max=self.sigma_max,
+                )
                 output_tensor = torch.mean(loss, dim=-1)
                 batch["loss_mask"] = split_loss_mask
             else:
