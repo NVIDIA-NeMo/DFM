@@ -37,5 +37,9 @@ COPY 3rdparty ./3rdparty
 # Install dependencies in two steps:
 # 1. Install build dependencies first (required for packages with no-build-isolation)
 # 2. Install all other dependencies
-RUN uv sync --locked --only-group build && \
-    uv sync --link-mode copy --locked --all-groups --no-install-project
+RUN --mount=type=cache,target=/var/cache/apt,sharing=locked \
+    --mount=type=cache,target=/var/lib/apt,sharing=locked \
+    --mount=type=cache,target=/root/.cache/uv \
+    uv sync --locked --only-group build && \
+    uv sync --link-mode copy --locked --all-extras --all-groups && \
+    uv cache prune
