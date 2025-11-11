@@ -20,36 +20,8 @@ import torch
 from torch.utils.data import DataLoader, Dataset
 from megatron.bridge.data.utils import DatasetBuildContext, DatasetProvider
 from typing import List
-from dfm.src.megatron.data.common.base_energon_datamodule import EnergonMultiModalDataModule
-from megatron.energon import DefaultTaskEncoder
 from dfm.src.megatron.model.wan.utils import patchify
 from megatron.energon.task_encoder.cooking import Cooker, basic_sample_keys
-
-def cook(sample: dict) -> dict:
-    """
-    Produces a cooked sample without requiring any real filesystem-backed fields.
-    This mock version ignores missing keys and synthesizes placeholders so that
-    the pipeline can operate entirely in-memory.
-
-    Args:
-        sample (dict): The input dictionary containing the raw sample data.
-
-    Returns:
-        dict: A new dictionary containing the processed sample data with the following keys:
-            - A best-effort subset of basic keys when available
-            - 'json': mock metadata dict
-            - 'pth': empty tensor placeholder for video latent
-            - 'pickle': empty tensor placeholder for text embeddings
-    """
-    base_keys = {}
-    try:
-        # Attempt to extract any common keys if present; tolerate absence.
-        base_keys = basic_sample_keys(sample)
-    except Exception:
-        base_keys = {}
-    return {
-        **base_keys
-    }
 
 class _MockDataset(Dataset):
     def __init__(self, length: int):
@@ -61,109 +33,148 @@ class _MockDataset(Dataset):
     def __getitem__(self, idx: int) -> dict:
         return {}
 
-class WanMockTaskEncoder(DefaultTaskEncoder):
-    """
-    Mock task encoder for Wan dataset.
-    Attributes:
-        cookers (list): A list of Cooker objects used for processing.
-        patch_spatial (int): The spatial patch size. Defaults to 2.
-        patch_temporal (int): The temporal patch size. Defaults to 1.
-        seq_length (int): The sequence length. Defaults to 1024.
-    """
+# class WanMockTaskEncoder():
+#     """
+#     Mock task encoder for Wan dataset.
+#     """
 
-    patch_spatial: int
-    patch_temporal: int
-    F_latents: int
-    H_latents: int
-    W_latents: int
-    seq_length: int
-    number_packed_samples: int
-    context_seq_len: int
-    context_embeddings_dim: int
+#     def __init__(
+#         self,
+#         *args,
+#         F_latents: int,
+#         H_latents: int,
+#         W_latents: int,
+#         seq_length: int,
+#         patch_spatial: int,
+#         patch_temporal: int,
+#         number_packed_samples: int,
+#         context_seq_len: int,
+#         context_embeddings_dim: int,
+#         **kwargs,
+#     ):
+#         super().__init__(*args, **kwargs)
+#         self.F_latents = F_latents
+#         self.H_latents = H_latents
+#         self.W_latents = W_latents
+#         self.seq_length = seq_length
+#         self.patch_spatial = patch_spatial
+#         self.patch_temporal = patch_temporal
+#         self.number_packed_samples = number_packed_samples
+#         self.context_seq_len = context_seq_len
+#         self.context_embeddings_dim = context_embeddings_dim
 
-    cookers = [
-        Cooker(cook),
-    ]
+#     def batch(self, samples: List[dict]) -> dict:
 
-    def __init__(
-        self,
-        *args,
+#         # set mock values for one video sample
+#         video_latent = torch.randn(16, self.F_latents, self.H_latents, self.W_latents, dtype=torch.float32)
+#         grid_size = torch.tensor(
+#             [
+#                 video_latent.shape[1] // self.patch_temporal,
+#                 video_latent.shape[2] // self.patch_spatial,
+#                 video_latent.shape[3] // self.patch_spatial,
+#             ],
+#             dtype=torch.int32,
+#         )
+#         video_latent = patchify([video_latent], (self.patch_temporal, self.patch_spatial, self.patch_spatial))[0]
+#         video_latent = torch.as_tensor(video_latent, dtype=torch.float32)
+#         seq_len_q = video_latent.shape[0]
+#         seq_len_q_padded = seq_len_q
+#         loss_mask = torch.ones(seq_len_q, dtype=torch.bfloat16)
+#         context_embeddings = torch.randn(self.context_seq_len, self.context_embeddings_dim, dtype=torch.float32)
+#         seq_len_kv = context_embeddings.shape[0]
+#         video_metadata = {}
+
+#         # set mock values for packed video samples
+#         video_latents_packed = [video_latent for _ in range(self.number_packed_samples)]
+#         video_latents_packed = torch.cat(video_latents_packed, dim=0)
+#         loss_masks_packed = [loss_mask for _ in range(self.number_packed_samples)]
+#         loss_masks_packed = torch.cat(loss_masks_packed, dim=0)
+#         seq_len_q_packed = torch.tensor([seq_len_q for _ in range(self.number_packed_samples)], dtype=torch.int32)
+#         seq_len_q_padded_packed = torch.tensor([seq_len_q_padded for _ in range(self.number_packed_samples)], dtype=torch.int32)
+#         seq_len_kv_packed = torch.tensor([seq_len_kv for _ in range(self.number_packed_samples)], dtype=torch.int32)
+#         grid_sizes_packed = torch.stack([grid_size for _ in range(self.number_packed_samples)], dim=0)
+#         context_embeddings_packed = [context_embeddings for _ in range(self.number_packed_samples)]
+#         context_embeddings_packed = torch.cat(context_embeddings_packed, dim=0)
+
+
+#         ### Note: shape of sample's values
+#         # video_latent: [num_patches, latents_channels * pF * pH * pW]
+#         # grid_size: [F_patches, W_patches, H_patches]
+#         # context_embeddings: [context_seq_len, text_embedding_dim]
+
+#         batch = dict(
+#             video_latents=video_latents_packed.unsqueeze(1),
+#             context_embeddings=context_embeddings_packed.unsqueeze(1),
+#             loss_mask=loss_masks_packed.unsqueeze(1),
+#             seq_len_q=seq_len_q_packed,
+#             seq_len_q_padded=seq_len_q_padded_packed,
+#             seq_len_kv=seq_len_kv_packed,
+#             grid_sizes=grid_sizes_packed,
+#             video_metadata=video_metadata,
+#         )
+
+#         return batch
+
+def mock_batch(
         F_latents: int,
         H_latents: int,
         W_latents: int,
-        seq_length: int,
-        patch_spatial: int,
         patch_temporal: int,
+        patch_spatial: int,
         number_packed_samples: int,
         context_seq_len: int,
         context_embeddings_dim: int,
-        **kwargs,
-    ):
-        super().__init__(*args, **kwargs)
-        self.F_latents = F_latents
-        self.H_latents = H_latents
-        self.W_latents = W_latents
-        self.seq_length = seq_length
-        self.patch_spatial = patch_spatial
-        self.patch_temporal = patch_temporal
-        self.number_packed_samples = number_packed_samples
-        self.context_seq_len = context_seq_len
-        self.context_embeddings_dim = context_embeddings_dim
+) -> dict:
 
-    def encode_sample(self, _sample: dict) -> dict:
-        return {}
+    # set mock values for one video sample
+    video_latent = torch.randn(16, F_latents, H_latents, W_latents, dtype=torch.float32)
+    grid_size = torch.tensor(
+        [
+            video_latent.shape[1] // patch_temporal,
+            video_latent.shape[2] // patch_spatial,
+            video_latent.shape[3] // patch_spatial,
+        ],
+        dtype=torch.int32,
+    )
+    video_latent = patchify([video_latent], (patch_temporal, patch_spatial, patch_spatial))[0]
+    video_latent = torch.as_tensor(video_latent, dtype=torch.float32)
+    seq_len_q = video_latent.shape[0]
+    seq_len_q_padded = seq_len_q
+    loss_mask = torch.ones(seq_len_q, dtype=torch.bfloat16)
+    context_embeddings = torch.randn(context_seq_len, context_embeddings_dim, dtype=torch.float32)
+    seq_len_kv = context_embeddings.shape[0]
+    video_metadata = {}
 
-    def batch(self, samples: List[dict]) -> dict:
-
-        # set mock values for one video sample
-        video_latent = torch.randn(16, self.F_latents, self.H_latents, self.W_latents, dtype=torch.float32)
-        grid_size = torch.tensor(
-            [
-                video_latent.shape[1] // self.patch_temporal,
-                video_latent.shape[2] // self.patch_spatial,
-                video_latent.shape[3] // self.patch_spatial,
-            ],
-            dtype=torch.int32,
-        )
-        video_latent = patchify([video_latent], (self.patch_temporal, self.patch_spatial, self.patch_spatial))[0]
-        video_latent = torch.as_tensor(video_latent, dtype=torch.float32)
-        seq_len_q = video_latent.shape[0]
-        seq_len_q_padded = seq_len_q
-        loss_mask = torch.ones(seq_len_q, dtype=torch.bfloat16)
-        context_embeddings = torch.randn(self.context_seq_len, self.context_embeddings_dim, dtype=torch.float32)
-        seq_len_kv = context_embeddings.shape[0]
-        video_metadata = {}
-
-        # set mock values for packed video samples
-        video_latents_packed = [video_latent for _ in range(self.number_packed_samples)]
-        video_latents_packed = torch.cat(video_latents_packed, dim=0)
-        loss_masks_packed = [loss_mask for _ in range(self.number_packed_samples)]
-        loss_masks_packed = torch.cat(loss_masks_packed, dim=0)
-        seq_len_q_packed = torch.tensor([seq_len_q for _ in range(self.number_packed_samples)], dtype=torch.int32)
-        seq_len_q_padded_packed = torch.tensor([seq_len_q_padded for _ in range(self.number_packed_samples)], dtype=torch.int32)
-        seq_len_kv_packed = torch.tensor([seq_len_kv for _ in range(self.number_packed_samples)], dtype=torch.int32)
-        grid_sizes_packed = torch.stack([grid_size for _ in range(self.number_packed_samples)], dim=0)
-        context_embeddings_packed = [context_embeddings for _ in range(self.number_packed_samples)]
-        context_embeddings_packed = torch.cat(context_embeddings_packed, dim=0)
+    # set mock values for packed video samples
+    video_latents_packed = [video_latent for _ in range(number_packed_samples)]
+    video_latents_packed = torch.cat(video_latents_packed, dim=0)
+    loss_masks_packed = [loss_mask for _ in range(number_packed_samples)]
+    loss_masks_packed = torch.cat(loss_masks_packed, dim=0)
+    seq_len_q_packed = torch.tensor([seq_len_q for _ in range(number_packed_samples)], dtype=torch.int32)
+    seq_len_q_padded_packed = torch.tensor([seq_len_q_padded for _ in range(number_packed_samples)], dtype=torch.int32)
+    seq_len_kv_packed = torch.tensor([seq_len_kv for _ in range(number_packed_samples)], dtype=torch.int32)
+    grid_sizes_packed = torch.stack([grid_size for _ in range(number_packed_samples)], dim=0)
+    context_embeddings_packed = [context_embeddings for _ in range(number_packed_samples)]
+    context_embeddings_packed = torch.cat(context_embeddings_packed, dim=0)
 
 
-        ### Note: shape of sample's values
-        # video_latent: [num_patches, latents_channels * pF * pH * pW]
-        # grid_size: [F_patches, W_patches, H_patches]
-        # context_embeddings: [context_seq_len, text_embedding_dim]
+    ### Note: shape of sample's values
+    # video_latent: [num_patches, latents_channels * pF * pH * pW]
+    # grid_size: [F_patches, W_patches, H_patches]
+    # context_embeddings: [context_seq_len, text_embedding_dim]
 
-        batch = dict(
-            video_latents=video_latents_packed.unsqueeze(1),
-            context_embeddings=context_embeddings_packed.unsqueeze(1),
-            loss_mask=loss_masks_packed.unsqueeze(1),
-            seq_len_q=seq_len_q_packed,
-            seq_len_q_padded=seq_len_q_padded_packed,
-            seq_len_kv=seq_len_kv_packed,
-            grid_sizes=grid_sizes_packed,
-            video_metadata=video_metadata,
-        )
+    batch = dict(
+        video_latents=video_latents_packed.unsqueeze(1),
+        context_embeddings=context_embeddings_packed.unsqueeze(1),
+        loss_mask=loss_masks_packed.unsqueeze(1),
+        seq_len_q=seq_len_q_packed,
+        seq_len_q_padded=seq_len_q_padded_packed,
+        seq_len_kv=seq_len_kv_packed,
+        grid_sizes=grid_sizes_packed,
+        video_metadata=video_metadata,
+    )
 
-        return batch
+    return batch
 
 @dataclass(kw_only=True)
 class WanMockDataModuleConfig(DatasetProvider):
@@ -184,23 +195,21 @@ class WanMockDataModuleConfig(DatasetProvider):
     context_embeddings_dim: int = 4096
 
     def __post_init__(self):
-        self._task_encoder = WanMockTaskEncoder(
-            patch_spatial=self.patch_spatial,
-            patch_temporal=self.patch_temporal,
-            F_latents=self.F_latents,
-            H_latents=self.H_latents,
-            W_latents=self.W_latents,
-            seq_length=self.seq_length,
-            number_packed_samples=self.number_packed_samples,
-            context_seq_len=self.context_seq_len,
-            context_embeddings_dim=self.context_embeddings_dim,
-        )
         mock_ds = _MockDataset(length=1024)
         self._train_dl = DataLoader(
             mock_ds,
             batch_size=self.micro_batch_size,
             num_workers=self.num_workers,
-            collate_fn=self._task_encoder.batch,
+            collate_fn=lambda samples: mock_batch(
+                F_latents=self.F_latents,
+                H_latents=self.H_latents,
+                W_latents=self.W_latents,
+                patch_temporal=self.patch_temporal,
+                patch_spatial=self.patch_spatial,
+                number_packed_samples=self.number_packed_samples,
+                context_seq_len=self.context_seq_len,
+                context_embeddings_dim=self.context_embeddings_dim,
+            ),
             shuffle=False,
             drop_last=False,
         )

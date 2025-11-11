@@ -135,9 +135,9 @@ class WanModel(VisionModule):
             )
 
         self.text_embedding = nn.Sequential(
-            nn.Linear(self.config.text_dim, self.config.hidden_size),
+            nn.Linear(self.config.text_dim, self.config.crossattn_emb_size),
             nn.GELU(approximate="tanh"),
-            nn.Linear(self.config.hidden_size, self.config.hidden_size),
+            nn.Linear(self.config.crossattn_emb_size, self.config.crossattn_emb_size),
         )
 
         # As in diffuser's Wan implementation

@@ -24,7 +24,7 @@ logger = logging.getLogger(__name__)
 
 class EnergonMultiModalDataModule:
     """
-    A PyTorch Lightning DataModule for handling multimodal datasets with images and text.
+    A DataModule for handling multimodal datasets with images and text.
 
     This data module is designed to work with multimodal datasets that involve both images and text.
     It provides a seamless interface to load training and validation data, manage batching, and handle

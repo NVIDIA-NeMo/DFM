@@ -12,14 +12,15 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+# pylint: disable=C0115,C0116,C0301
+
 import copy
 from dataclasses import dataclass
-from typing import Optional, Union
+from typing import Union
 
 import torch
 from megatron.core import parallel_state, tensor_parallel
 from megatron.core.extensions.transformer_engine import SplitAlongDim
-from megatron.core.process_groups_config import ProcessGroupCollection
 from megatron.core.transformer.attention import (
     CrossAttention,
     SelfAttention,
@@ -32,6 +33,10 @@ from megatron.core.transformer.transformer_config import TransformerConfig
 
 @dataclass
 class DiTCrossAttentionSubmodules:
+    """
+    Configuration class for specifying the submodules of a cross-attention.
+    """
+
     linear_q: Union[ModuleSpec, type] = None
     linear_kv: Union[ModuleSpec, type] = None
     core_attention: Union[ModuleSpec, type] = None
@@ -48,7 +53,7 @@ class DiTSelfAttention(SelfAttention):
         layer_number: int,
         attn_mask_type: AttnMaskType,
         cp_comm_type: str = None,
-        pg_collection: Optional[ProcessGroupCollection] = None,
+        pg_collection=None,
     ):
         super().__init__(
             config,
@@ -95,7 +100,7 @@ class DiTSelfAttention(SelfAttention):
         else:
             self.k_layernorm = None
 
-    def get_query_key_value_tensors(self, hidden_states, key_value_states=None):
+    def get_query_key_value_tensors(self, hidden_states, key_value_states=None, split_qkv=False):
         """
         Derives `query`, `key` and `value` tensors from `hidden_states`.
         """
@@ -186,7 +191,7 @@ class DiTCrossAttention(CrossAttention):
         layer_number: int,
         attn_mask_type: AttnMaskType,
         cp_comm_type: str = None,
-        pg_collection: Optional[ProcessGroupCollection] = None,
+        pg_collection=None,
     ):
         super().__init__(
             config,
@@ -233,7 +238,20 @@ class DiTCrossAttention(CrossAttention):
         else:
             self.k_layernorm = None
 
-    def get_query_key_value_tensors(self, hidden_states, key_value_states):
+        linear_kv_hidden_size = getattr(self.config, "crossattn_emb_size", self.config.hidden_size)
+        self.linear_kv = build_module(
+            submodules.linear_kv,
+            linear_kv_hidden_size,
+            2 * self.kv_projection_size,
+            config=self.config,
+            init_method=self.config.init_method,
+            gather_output=False,
+            bias=self.config.add_bias_linear,
+            skip_bias_add=False,
+            is_expert=False,
+        )
+
+    def get_query_key_value_tensors(self, hidden_states, key_value_states, split_qkv=False):
         """
         Derives `query` tensor from `hidden_states`, and `key`/`value` tensors
         from `key_value_states`.
