@@ -41,5 +41,5 @@ RUN --mount=type=cache,target=/var/cache/apt,sharing=locked \
     --mount=type=cache,target=/var/lib/apt,sharing=locked \
     --mount=type=cache,target=/root/.cache/uv \
     uv sync --locked --only-group build && \
-    uv sync --link-mode copy --locked --all-extras --all-groups && \
+    uv sync --link-mode copy --locked --all-extras --all-groups --no-install-project && \
     uv cache prune
