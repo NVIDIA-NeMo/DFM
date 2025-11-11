@@ -121,9 +121,6 @@ override-dependencies = [
     "transformer-engine[pytorch]>=2.9.0a0,<2.10.0",
 ]
 
-[tool.uv.extra-build-dependencies]
-nvidia-resiliency-ext = ["poetry-core"]
-
 [[tool.uv.index]]
 name = "pypi"
 url = "https://pypi.org/simple"
@@ -133,6 +130,7 @@ explicit = true
 nemo-automodel = { path = "3rdparty/Automodel" }
 megatron-bridge = { path = "3rdparty/Megatron-Bridge" }
 transformer-engine = { git = "https://github.com/NVIDIA/TransformerEngine.git", rev = "release_v2.9" }
+nvidia-resiliency-ext = { git = "https://github.com/NVIDIA/nvidia-resiliency-ext.git", rev = "54f85fe422d296cf04ea524130014bd3a2c3add1" }
 
 [project.urls]
 Download = "https://github.com/NVIDIA-NeMo/DFM/releases"
