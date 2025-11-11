@@ -17,8 +17,8 @@
 from dataclasses import dataclass
 
 import torch
-from torch.utils.data import DataLoader, Dataset
 from megatron.bridge.data.utils import DatasetBuildContext, DatasetProvider
+from torch.utils.data import DataLoader, Dataset
 
 from dfm.src.megatron.model.wan.utils import patchify
 
@@ -44,7 +44,6 @@ def mock_batch(
     context_seq_len: int,
     context_embeddings_dim: int,
 ) -> dict:
-
     # set mock values for one video sample
     video_latent = torch.randn(16, F_latents, H_latents, W_latents, dtype=torch.float32)
     grid_size = torch.tensor(
