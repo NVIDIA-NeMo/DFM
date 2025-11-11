@@ -114,11 +114,11 @@ no-build-isolation-package = [
     "flash-linear-attention",
 ]
 override-dependencies = [
+    "nvidia-modelopt[torch]>=0.37.0",
     "torch; sys_platform == 'never'",
     "torchvision; sys_platform == 'never'",
     "triton; sys_platform == 'never'",
-    "transformer-engine>=2.9.0a0,<2.10.0",  # Override [pytorch] extra from megatron-bridge (doesn't exist)
-    "nvidia-modelopt>=0.33.0",  # Override [torch] extra from megatron-bridge (doesn't exist)
+    "transformer-engine[pytorch]>=2.9.0a0,<2.10.0",
 ]
 
 [tool.uv.extra-build-dependencies]
