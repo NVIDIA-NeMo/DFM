@@ -141,6 +141,7 @@ runs:
       uses: actions/checkout@v2
       with:
         path: DFM
+        submodules: recursive
 
     - name: Start container
       shell: bash
@@ -181,18 +182,22 @@ runs:
         COVERAGE_PREFIX=$([[ "${{ inputs.is_unit_test }}" == "true" ]] && echo "unit-test" || echo "e2e")
         echo "coverage-prefix=$COVERAGE_PREFIX" | tee -a "$GITHUB_OUTPUT"
 
-        cmd=$(cat <<RUN_TEST_EOF
+        cmd=$(cat <<'RUN_TEST_EOF'
         #!/bin/bash
 
-        (
+        docker exec -t nemo_container_${{ github.run_id }} bash -c '
           set -e
+          source /opt/venv/bin/activate
+          uv pip install --no-deps -e .
+          
+          timeout $(( ${{ inputs.timeout }} * 60 ))s bash tests/${{ inputs.is_unit_test == 'true' && 'unit_tests' || 'functional_tests' }}/${{ inputs.script }}.sh || EXIT_CODE=$?
 
-          docker exec -t nemo_container_${{ github.run_id }} bash -c '\
-            source /opt/venv/bin/activate && \
-            (uv pip install --no-deps -e . && \
-            bash tests/${{ inputs.is_unit_test == 'true' && 'unit_tests' || 'functional_tests' }}/${{ inputs.script }}.sh && \
-            echo "Finished successfully.") || echo "Did not finish."'
-        ) 2>&1 | tee err.log
+          if [[ "$EXIT_CODE" -eq 124 ]]; then
+            echo "::error:: Test timed out after ${{ inputs.timeout }} minutes."
+          fi
+
+          exit $EXIT_CODE
+        '
 
         RUN_TEST_EOF
         )
