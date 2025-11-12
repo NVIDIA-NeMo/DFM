@@ -3401,11 +3401,7 @@ dependencies = [
 
 [package.dev-dependencies]
 automodel = [
-    { name = "diffusers" },
-    { name = "ftfy" },
-    { name = "imageio-ffmpeg" },
     { name = "nemo-automodel" },
-    { name = "opencv-python-headless" },
 ]
 build = [
     { name = "cython" },
@@ -3457,13 +3453,7 @@ requires-dist = [
 ]
 
 [package.metadata.requires-dev]
-automodel = [
-    { name = "diffusers" },
-    { name = "ftfy" },
-    { name = "imageio-ffmpeg" },
-    { name = "nemo-automodel", directory = "3rdparty/Automodel" },
-    { name = "opencv-python-headless", specifier = "==4.10.0.84" },
-]
+automodel = [{ name = "nemo-automodel", directory = "3rdparty/Automodel" }]
 build = [
     { name = "cython", specifier = ">=3.0.0" },
     { name = "ninja" },
