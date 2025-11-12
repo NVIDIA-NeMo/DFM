@@ -61,6 +61,7 @@ def mock_batch(
     loss_mask = torch.ones(seq_len_q, dtype=torch.bfloat16)
     context_embeddings = torch.randn(context_seq_len, context_embeddings_dim, dtype=torch.float32)
     seq_len_kv = context_embeddings.shape[0]
+    seq_len_kv_padded = seq_len_kv
     video_metadata = {}
 
     # set mock values for packed video samples
@@ -71,6 +72,7 @@ def mock_batch(
     seq_len_q_packed = torch.tensor([seq_len_q for _ in range(number_packed_samples)], dtype=torch.int32)
     seq_len_q_padded_packed = torch.tensor([seq_len_q_padded for _ in range(number_packed_samples)], dtype=torch.int32)
     seq_len_kv_packed = torch.tensor([seq_len_kv for _ in range(number_packed_samples)], dtype=torch.int32)
+    seq_len_kv_padded_packed = torch.tensor([seq_len_kv_padded for _ in range(number_packed_samples)], dtype=torch.int32)
     grid_sizes_packed = torch.stack([grid_size for _ in range(number_packed_samples)], dim=0)
     context_embeddings_packed = [context_embeddings for _ in range(number_packed_samples)]
     context_embeddings_packed = torch.cat(context_embeddings_packed, dim=0)
@@ -87,6 +89,7 @@ def mock_batch(
         seq_len_q=seq_len_q_packed,
         seq_len_q_padded=seq_len_q_padded_packed,
         seq_len_kv=seq_len_kv_packed,
+        seq_len_kv_padded=seq_len_kv_padded_packed,
         grid_sizes=grid_sizes_packed,
         video_metadata=video_metadata,
     )

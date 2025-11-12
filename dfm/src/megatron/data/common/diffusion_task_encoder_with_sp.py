@@ -104,6 +104,7 @@ class DiffusionTaskEncoderWithSequencePacking(DefaultTaskEncoder, ABC):
             seq_len_q=cat("seq_len_q"),
             seq_len_q_padded=cat("seq_len_q_padded"),
             seq_len_kv=cat("seq_len_kv"),
+            seq_len_kv_padded=cat("seq_len_kv_padded"),
             pos_ids=cat("pos_ids"),
             latent_shape=stack("latent_shape"),
             video_metadata=[sample.video_metadata for sample in samples],

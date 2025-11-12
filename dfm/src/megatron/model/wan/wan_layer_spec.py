@@ -20,6 +20,7 @@ from typing import Optional, Union
 import torch
 import torch.nn as nn
 from megatron.core.extensions.transformer_engine import TENorm
+from megatron.core.jit import jit_fuser
 from megatron.core.process_groups_config import ProcessGroupCollection
 from megatron.core.transformer.attention import SelfAttentionSubmodules
 from megatron.core.transformer.custom_layers.transformer_engine import (
@@ -68,11 +69,11 @@ class WanAdaLN(MegatronModule):
         e = (self.modulation + timestep_emb).chunk(6, dim=1)
         return e
 
-    # @jit_fuser
+    @jit_fuser
     def modulate(self, x, shift, scale):
         return x * (1 + scale) + shift
 
-    # @jit_fuser
+    @jit_fuser
     def scale_add(self, residual, x, gate):
         return residual + gate * x
 
