@@ -189,7 +189,7 @@ runs:
           set -e
           source /opt/venv/bin/activate
           uv pip install --no-deps -e .
-          
+
           timeout $(( ${{ inputs.timeout }} * 60 ))s bash tests/${{ inputs.is_unit_test == 'true' && 'unit_tests' || 'functional_tests' }}/${{ inputs.script }}.sh || EXIT_CODE=$?
 
           if [[ "$EXIT_CODE" -eq 124 ]]; then
