@@ -40,6 +40,8 @@ def step_fsdp_transformer_t2v(
     logit_std: float = 1.0,
     flow_shift: float = 3.0,
     mix_uniform_ratio: float = 0.1,
+    sigma_min: float = 0.0,  # Default: no clamping (pretrain)
+    sigma_max: float = 1.0,  # Default: no clamping (pretrain)
     global_step: int = 0,
 ) -> Tuple[torch.Tensor, Dict]:
     """
@@ -96,13 +98,25 @@ def step_fsdp_transformer_t2v(
         # Apply flow shift: σ = shift/(shift + (1/u - 1))
         u_clamped = torch.clamp(u, min=1e-5)  # Avoid division by zero
         sigma = flow_shift / (flow_shift + (1.0 / u_clamped - 1.0))
-        sigma = torch.clamp(sigma, 0.0, 1.0)
+
+        # Clamp sigma (only if not full range [0,1])
+        # Pretrain uses [0, 1], finetune uses [0.02, 0.55]
+        if sigma_min > 0.0 or sigma_max < 1.0:
+            sigma = torch.clamp(sigma, sigma_min, sigma_max)
+        else:
+            sigma = torch.clamp(sigma, 0.0, 1.0)
 
     else:
         # Simple uniform without shift
         u = torch.rand(size=(batch_size,), device=device)
-        sigma = u
+
+        # Clamp sigma (only if not full range [0,1])
+        if sigma_min > 0.0 or sigma_max < 1.0:
+            sigma = torch.clamp(u, sigma_min, sigma_max)
+        else:
+            sigma = u
         sampling_method = "uniform_no_shift"
+
 
     # ========================================================================
     # Manual Flow Matching Noise Addition
