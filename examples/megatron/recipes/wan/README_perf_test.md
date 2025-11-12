@@ -28,7 +28,7 @@ cd /opt/
 
 # DFM (pinned)
 git clone --no-checkout https://github.com/NVIDIA-NeMo/DFM.git
-git -C DFM checkout 4647d8931bd58cfc6e596386d4e75a9bd0a4951a
+git -C DFM checkout 174bb7b34de002ebbbcae1ba8e2b12363c7dee01
 export DFM_PATH=/opt/DFM
 
 # Megatron-Bridge (pinned)
