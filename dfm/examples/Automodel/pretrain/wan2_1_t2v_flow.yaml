@@ -1,0 +1,64 @@
+seed: 42
+
+wandb:
+  project: wan-t2v-flow-matching-pretrain
+  mode: online
+  name: wan2_1_t2v_fm_pretrain
+
+dist_env:
+  backend: nccl
+  timeout_minutes: 30
+
+model:
+  pretrained_model_name_or_path: Wan-AI/Wan2.1-T2V-1.3B-Diffusers
+
+data:
+  dataloader:
+    _target_: Automodel.datasets.build_wan21_dataloader
+    meta_folder: /lustre/fsw/portfolios/coreai/users/linnanw/hdvilla_sample/pika/wan21_codes/1.3B_meta/
+    batch_size: 1
+    num_workers: 2
+    device: cpu
+
+batch:
+  batch_size_per_node: 8
+
+training:
+  num_epochs: 100
+
+optim:
+  learning_rate: 5e-5
+  optimizer:
+    weight_decay: 0.1
+    betas: [0.9, 0.95]
+  # "warmup_steps": 1000,
+  # "lr_min": 1e-5,
+
+
+flow_matching:
+  use_sigma_noise: true
+  timestep_sampling: uniform
+  logit_mean: 0.0
+  logit_std: 1.5
+  flow_shift: 2.5
+  mix_uniform_ratio: 0.2
+  # "sigma_min": 0.0,  # PRETRAIN: No clamping, full range
+  # "sigma_max": 1.0,  # PRETRAIN: No clamping, full range
+
+fsdp:
+  tp_size: 1
+  cp_size: 1
+  pp_size: 1
+  dp_replicate_size: 1
+  dp_size: 8
+
+logging:
+  save_every: 1000
+  log_every: 2
+
+checkpoint:
+  enabled: true
+  checkpoint_dir: /opt/DFM/wan_t2v_flow_outputs_base_recipe_fsdp_run_1/
+  model_save_format: torch_save
+  save_consolidated: false
+  restore_from: null
