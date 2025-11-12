@@ -193,7 +193,7 @@ class FlowPipeline:
             noise = thd_split_inputs_cp(
                 noise,
                 packed_seq_params["self_attention"].cu_seqlens_q_padded,
-                parallel_state.get_context_parallel_group()
+                parallel_state.get_context_parallel_group(),
             )
             context_embeddings = thd_split_inputs_cp(
                 context_embeddings,

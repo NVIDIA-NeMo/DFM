@@ -72,7 +72,9 @@ def mock_batch(
     seq_len_q_packed = torch.tensor([seq_len_q for _ in range(number_packed_samples)], dtype=torch.int32)
     seq_len_q_padded_packed = torch.tensor([seq_len_q_padded for _ in range(number_packed_samples)], dtype=torch.int32)
     seq_len_kv_packed = torch.tensor([seq_len_kv for _ in range(number_packed_samples)], dtype=torch.int32)
-    seq_len_kv_padded_packed = torch.tensor([seq_len_kv_padded for _ in range(number_packed_samples)], dtype=torch.int32)
+    seq_len_kv_padded_packed = torch.tensor(
+        [seq_len_kv_padded for _ in range(number_packed_samples)], dtype=torch.int32
+    )
     grid_sizes_packed = torch.stack([grid_size for _ in range(number_packed_samples)], dim=0)
     context_embeddings_packed = [context_embeddings for _ in range(number_packed_samples)]
     context_embeddings_packed = torch.cat(context_embeddings_packed, dim=0)

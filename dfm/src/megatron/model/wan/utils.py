@@ -15,11 +15,9 @@
 import math
 from typing import Tuple
 
-import megatron.core.parallel_state as parallel_state
 import torch
 import torch.distributed as dist
 import transformer_engine_torch as tex
-from torch.distributed import all_gather
 
 
 def grid_sizes_calculation(
@@ -98,6 +96,7 @@ def unpatchify(
         u = u.reshape(c, *[i * j for i, j in zip(v, patch_size)])
         out.append(u)
     return out
+
 
 def thd_split_inputs_cp(
     x: torch.Tensor, cu_seqlens_q_padded: torch.Tensor, cp_group: dist.ProcessGroup
