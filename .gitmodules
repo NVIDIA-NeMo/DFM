@@ -4,4 +4,3 @@
 [submodule "3rdparty/Megatron-Bridge"]
 	path = 3rdparty/Megatron-Bridge
 	url = https://github.com/NVIDIA-NeMo/Megatron-Bridge.git
-	branch = main
