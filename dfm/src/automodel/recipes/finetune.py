@@ -198,6 +198,8 @@ class TrainWan21DiffusionRecipe(BaseRecipe):
         self.logit_std = fm_cfg.get("logit_std", 1.0)
         self.flow_shift = fm_cfg.get("flow_shift", 3.0)
         self.mix_uniform_ratio = fm_cfg.get("mix_uniform_ratio", 0.1)
+        self.sigma_min = fm_cfg.get("sigma_min", 0.0)
+        self.sigma_max = fm_cfg.get("sigma_max", 1.0)
 
         logging.info(f"[INFO] Flow matching: {'ENABLED' if self.use_sigma_noise else 'DISABLED'}")
         if self.use_sigma_noise:
@@ -367,6 +369,8 @@ class TrainWan21DiffusionRecipe(BaseRecipe):
                             logit_std=self.logit_std,
                             flow_shift=self.flow_shift,
                             mix_uniform_ratio=self.mix_uniform_ratio,
+                            sigma_min=self.sigma_min,
+                            sigma_max=self.sigma_max,
                             global_step=global_step,
                         )
                     except Exception as exc:
