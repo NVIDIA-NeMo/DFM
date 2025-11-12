@@ -181,9 +181,9 @@ def print_config_summary(args):
     print0("\n📈 LEARNING RATE SCHEDULE:")
     if args.warmup_steps > 0:
         print0(f"  Warmup steps: {args.warmup_steps}")
-        print0("  Schedule: Linear warmup → Cosine decay")
+        print0("  Schedule: Linear warmup → Linear")
     else:
-        print0("  Schedule: Cosine decay (no warmup)")
+        print0("  Schedule: Linear (no warmup)")
     print0(f"  Min LR: {args.lr_min:.2e}")
 
     print0("\n🌊 FLOW MATCHING:")
