@@ -154,3 +154,60 @@ class NeMoAutoDiffusionPipeline(DiffusionPipeline):
                 parallel_module = manager.parallelize(comp_module)
                 setattr(pipe, comp_name, parallel_module)
         return pipe, created_managers
+
+    @classmethod
+    def from_config(
+        cls,
+        pretrained_model_name_or_path: str,
+        *model_args,
+        parallel_scheme: Optional[Dict[str, Dict[str, Any]]] = None,
+        device: Optional[torch.device] = None,
+        torch_dtype: Any = "auto",
+        move_to_device: bool = True,
+        load_for_training: bool = False,
+        components_to_load: Optional[Iterable[str]] = None,
+        **kwargs,
+    ) -> tuple[DiffusionPipeline, Dict[str, FSDP2Manager]]:
+        config = WanTransformer3DModel.from_pretrained(
+            pretrained_model_name_or_path,
+            subfolder="transformer",
+            torch_dtype=torch_dtype,
+            **kwargs,
+        )
+        pipe: DiffusionPipeline = DiffusionPipeline.from_config(
+            config,
+            *model_args,
+            torch_dtype=torch_dtype,
+            **kwargs,
+        )
+        # Decide device
+        dev = _choose_device(device)
+
+        # Move modules to device/dtype first (helps avoid initial OOM during sharding)
+        if move_to_device:
+            for name, module in _iter_pipeline_modules(pipe):
+                if not components_to_load or name in components_to_load:
+                    logger.info("[INFO] Moving module: %s to device/dtype", name)
+                    _move_module_to_device(module, dev, torch_dtype)
+
+        # If loading for training, ensure the target module parameters are trainable
+        if load_for_training:
+            for name, module in _iter_pipeline_modules(pipe):
+                if not components_to_load or name in components_to_load:
+                    logger.info("[INFO] Ensuring params trainable: %s", name)
+                    _ensure_params_trainable(module, module_name=name)
+
+        # Use per-component FSDP2Manager init-args to parallelize components
+        created_managers: Dict[str, FSDP2Manager] = {}
+        if parallel_scheme is not None:
+            assert torch.distributed.is_initialized(), "Expect distributed environment to be initialized"
+            _init_parallelizer()
+            for comp_name, comp_module in _iter_pipeline_modules(pipe):
+                manager_args = parallel_scheme.get(comp_name)
+                if manager_args is None:
+                    continue
+                manager = FSDP2Manager(**manager_args)
+                created_managers[comp_name] = manager
+                parallel_module = manager.parallelize(comp_module)
+                setattr(pipe, comp_name, parallel_module)
+        return pipe, created_managers
