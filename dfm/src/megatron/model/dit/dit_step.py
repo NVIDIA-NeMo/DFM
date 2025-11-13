@@ -82,8 +82,16 @@ class DITForwardStep:
             video_save_path=f"{image_folder}/validation_step={step}_rank={rank}.mp4",
         )
 
-        wandb_rank = parallel_state.get_data_parallel_world_size() - 1
-        if torch.distributed.get_rank() == wandb_rank:
+        is_last_dp_rank = parallel_state.get_data_parallel_rank() == (
+            parallel_state.get_data_parallel_world_size() - 1
+        )
+
+        last_dp_local_rank = parallel_state.get_data_parallel_world_size() - 1
+        dp_group = parallel_state.get_data_parallel_group()
+        dp_ranks = torch.distributed.get_process_group_ranks(dp_group)
+        wandb_rank = dp_ranks[last_dp_local_rank]
+
+        if is_last_dp_rank:
             gather_list = [None for _ in range(parallel_state.get_data_parallel_world_size())]
         else:
             gather_list = None
@@ -94,7 +102,7 @@ class DITForwardStep:
             dst=wandb_rank,
             group=parallel_state.get_data_parallel_group(),
         )
-        if torch.distributed.get_rank() == wandb_rank:
+        if is_last_dp_rank:
             if gather_list is not None:
                 videos = []
                 for video_data in gather_list:

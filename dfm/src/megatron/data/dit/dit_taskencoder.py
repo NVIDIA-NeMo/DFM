@@ -151,6 +151,7 @@ class DiTTaskEncoder(DiffusionTaskEncoderWithSequencePacking):
             seq_len_q=torch.tensor([seq_len], dtype=torch.int32),
             seq_len_q_padded=torch.tensor([seq_len_q_padded], dtype=torch.int32),
             seq_len_kv=torch.tensor([self.text_embedding_padding_size], dtype=torch.int32),
+            seq_len_kv_padded=torch.tensor([self.text_embedding_padding_size], dtype=torch.int32),
             pos_ids=pos_ids,
             latent_shape=torch.tensor([C, T, H, W], dtype=torch.int32),
         )
@@ -172,6 +173,7 @@ class DiTTaskEncoder(DiffusionTaskEncoderWithSequencePacking):
             seq_len_q=sample.seq_len_q,
             seq_len_q_padded=sample.seq_len_q_padded,
             seq_len_kv=sample.seq_len_kv,
+            seq_len_kv_padded=sample.seq_len_kv_padded,
             pos_ids=sample.pos_ids.unsqueeze_(0) if sample.pos_ids is not None else None,
             latent_shape=sample.latent_shape,
         )
