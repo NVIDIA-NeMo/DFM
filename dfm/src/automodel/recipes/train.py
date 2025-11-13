@@ -31,7 +31,6 @@ from nemo_automodel.recipes.llm.train_ft import build_distributed, build_wandb
 from torch.distributed.fsdp import MixedPrecisionPolicy
 from transformers.utils.hub import TRANSFORMERS_CACHE
 
-import wandb
 from dfm.src.automodel._diffusers.auto_diffusion_pipeline import NeMoWanPipeline
 from dfm.src.automodel.flow_matching.training_step_t2v import (
     step_fsdp_transformer_t2v,
