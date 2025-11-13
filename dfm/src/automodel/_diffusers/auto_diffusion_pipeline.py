@@ -19,11 +19,12 @@ from typing import Any, Dict, Iterable, Optional, Tuple
 
 import torch
 import torch.nn as nn
-from dfm.src.automodel.distributed.dfm_parallelizer import WanParallelizationStrategy
 from diffusers import DiffusionPipeline, WanPipeline
 from nemo_automodel.components.distributed import parallelizer
 from nemo_automodel.components.distributed.fsdp2 import FSDP2Manager
 from nemo_automodel.shared.utils import dtype_from_str
+
+from dfm.src.automodel.distributed.dfm_parallelizer import WanParallelizationStrategy
 
 
 logger = logging.getLogger(__name__)
