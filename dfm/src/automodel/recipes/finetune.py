@@ -40,6 +40,7 @@ from transformers.utils.hub import TRANSFORMERS_CACHE
 def build_model_and_optimizer(
     *,
     model_id: str,
+    finetune_mode: bool,
     learning_rate: float,
     device: torch.device,
     bf16_dtype: torch.dtype,
@@ -84,7 +85,9 @@ def build_model_and_optimizer(
 
     parallel_scheme = {"transformer": manager_args}
 
-    pipe, created_managers = NeMoWanPipeline.from_pretrained(
+    init_fn = NeMoWanPipeline.from_pretrained if finetune_mode else NeMoWanPipeline.from_config
+
+    pipe, created_managers = init_fn(
         model_id,
         torch_dtype=bf16_dtype,
         device=device,
@@ -212,6 +215,7 @@ class TrainWan21DiffusionRecipe(BaseRecipe):
 
         (self.pipe, self.optimizer, self.device_mesh) = build_model_and_optimizer(
             model_id=self.model_id,
+            finetune_mode=self.cfg.get("model.mode", "finetune").lower() == "finetune",
             learning_rate=self.learning_rate,
             device=self.device,
             bf16_dtype=self.bf16,
