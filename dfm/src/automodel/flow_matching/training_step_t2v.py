@@ -28,8 +28,8 @@ logger = logging.getLogger(__name__)
 
 
 def step_fsdp_transformer_t2v(
-    pipe,
-    model_map: Dict,
+    scheduler,
+    model,
     batch,
     device,
     bf16,
@@ -76,7 +76,7 @@ def step_fsdp_transformer_t2v(
     # Flow Matching Timestep Sampling
     # ========================================================================
 
-    num_train_timesteps = pipe.scheduler.config.num_train_timesteps
+    num_train_timesteps = scheduler.config.num_train_timesteps
 
     if use_sigma_noise:
         use_uniform = torch.rand(1).item() < mix_uniform_ratio
@@ -116,7 +116,6 @@ def step_fsdp_transformer_t2v(
         else:
             sigma = u
         sampling_method = "uniform_no_shift"
-
 
     # ========================================================================
     # Manual Flow Matching Noise Addition
@@ -200,10 +199,8 @@ def step_fsdp_transformer_t2v(
     # Forward Pass
     # ========================================================================
 
-    fsdp_model = model_map["transformer"]["fsdp_transformer"]
-
     try:
-        model_pred = fsdp_model(
+        model_pred = model(
             hidden_states=noisy_latents,
             timestep=timesteps_for_model,
             encoder_hidden_states=text_embeddings,
@@ -257,7 +254,7 @@ def step_fsdp_transformer_t2v(
         logger.info(f"[STEP {global_step}] LOSS DEBUG")
         logger.info("=" * 80)
         logger.info("[TARGET] Flow matching: v = ε - x_0")
-        logger.info(f"[PREDICTION] Scheduler type (inference only): {type(pipe.scheduler).__name__}")
+        logger.info(f"[PREDICTION] Scheduler type (inference only): {type(scheduler).__name__}")
         logger.info("")
         logger.info(f"[RANGES] Model pred: [{model_pred.min():.4f}, {model_pred.max():.4f}]")
         logger.info(f"[RANGES] Target (v): [{target.min():.4f}, {target.max():.4f}]")
