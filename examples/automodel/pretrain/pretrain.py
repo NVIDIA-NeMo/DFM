@@ -14,8 +14,9 @@
 
 from __future__ import annotations
 
-from dfm.src.automodel.recipes.train import TrainWan21DiffusionRecipe
 from nemo_automodel.components.config._arg_parser import parse_args_and_load_config
+
+from dfm.src.automodel.recipes.train import TrainWan21DiffusionRecipe
 
 
 def main(default_config_path="/opt/DFM/dfm/examples/Automodel/pretrain/wan2_1_t2v_flow.yaml"):
