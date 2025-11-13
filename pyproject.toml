@@ -13,7 +13,7 @@
 # limitations under the License.
 
 [project]
-name = "nemo-vfm"
+name = "nemo-dfm"
 dynamic = [
     "version",
     "readme",
@@ -54,20 +54,15 @@ classifiers = [
     "Topic :: Software Development :: Libraries",
     "Topic :: Utilities",
 ]
-dependencies = []
+dependencies = [
+    "megatron-energon",
+]
 
 [build-system]
 requires = ["setuptools>=61"]
 build-backend = "setuptools.build_meta"
 
 [dependency-groups]
-automodel = [
-    "nemo-automodel @ git+https://github.com/NVIDIA-NeMo/Automodel@main",
-    "diffusers",
-    "ftfy",
-    "imageio-ffmpeg",
-    "opencv-python-headless==4.10.0.84",
-]
 docs = [
     "myst-parser>=4.0.1",
     "nvidia-sphinx-theme>=0.0.8",
@@ -89,29 +84,53 @@ dev = [
     "ruff>=0.9.9",
     "mypy>=1.8.0",
 ]
+build = ["setuptools", "wheel", "torch", "pybind11", "Cython>=3.0.0", "numpy<2.0.0", "ninja", "packaging", "nvidia-mathdx"]
+automodel = [
+    "nemo-automodel",
+    "diffusers",
+    "ftfy",
+    "imageio-ffmpeg",
+    "opencv-python-headless==4.10.0.84",
+]
+megatron-bridge = ["megatron-bridge"]
 
 [tool.setuptools]
-packages = ["nemo_vfm"]
+packages = ["dfm"]
 
 [tool.setuptools.dynamic]
-version = {attr = "nemo_vfm.__version__"}
+version = {attr = "dfm.__version__"}
 readme = {file = "README.md", content-type = "text/markdown"}
+
+[tool.uv]
+prerelease = "allow"
+# These packages require torch during build, so disable build isolation
+no-build-isolation-package = [
+    "transformer-engine",
+    "transformer-engine-torch",
+    "mamba-ssm",
+    "causal-conv1d",
+    "nv-grouped-gemm",
+    "flash_mla",
+    "flash-linear-attention",
+]
+override-dependencies = [
+    "nvidia-modelopt[torch]>=0.37.0",
+    "torch; sys_platform == 'never'",
+    "torchvision; sys_platform == 'never'",
+    "triton; sys_platform == 'never'",
+    "transformer-engine[pytorch]>=2.9.0a0,<2.10.0",
+]
 
 [[tool.uv.index]]
 name = "pypi"
 url = "https://pypi.org/simple"
 explicit = true
 
-[[tool.uv.index]]
-name = "pytorch"
-url = "https://download.pytorch.org/whl/cu128"
-explicit = true
-
 [tool.uv.sources]
-torch = [
-    { index = "pytorch", marker = "sys_platform != 'darwin'" },
-    { index = "pypi", marker = "sys_platform == 'darwin'" },
-]
+nemo-automodel = { path = "3rdparty/Automodel" }
+megatron-bridge = { path = "3rdparty/Megatron-Bridge" }
+transformer-engine = { git = "https://github.com/NVIDIA/TransformerEngine.git", rev = "release_v2.9" }
+nvidia-resiliency-ext = { index = "pypi" }
 
 [project.urls]
 Download = "https://github.com/NVIDIA-NeMo/DFM/releases"
@@ -124,7 +143,7 @@ addopts = "--verbose --pyargs --durations=0 --strict-markers"  # always add thes
 testpaths = ["tests"]
 # directories to ignore when discovering tests
 norecursedirs = [
-    "nemo_vfm",
+    "dfm",
     "external",
     "examples",
     "docs",
@@ -195,7 +214,7 @@ ignore = [
     "D103",  # Missing docstring in public function
 ]
 [tool.ruff.lint.isort]
-known-first-party = ["nemo_vfm"]
+known-first-party = ["dfm"]
 known-third-party = ["examples", "scripts"]
 section-order = ["future", "standard-library", "third-party", "first-party", "local-folder"]
 lines-after-imports = 2
@@ -219,4 +238,4 @@ concurrency = ["thread", "multiprocessing"]
 omit = ["/tmp/*"]
 
 [tool.coverage.paths]
-source = ["nemo_vfm/", "/workspace/nemo_vfm"]
+source = ["dfm/", "/opt/DFM/dfm"]
