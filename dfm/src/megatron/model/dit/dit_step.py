@@ -18,6 +18,7 @@ from functools import partial
 from typing import Iterable
 
 import torch
+import wandb
 from einops import rearrange
 from megatron.bridge.training.losses import masked_next_token_loss
 from megatron.bridge.training.state import GlobalState
@@ -41,7 +42,7 @@ class DITForwardStep:
         self.train = True
         self.validation_step = 0
 
-    def on_validation_start(self, batch, model, step):
+    def on_validation_start(self, state, batch, model, step):
         C, T, H, W = batch["latent_shape"][0]
         latent = self.diffusion_pipeline.generate_samples_from_batch(
             model,
@@ -81,6 +82,28 @@ class DITForwardStep:
             video_save_path=f"{image_folder}/validation_step={step}_rank={rank}.mp4",
         )
 
+        wandb_rank = parallel_state.get_data_parallel_world_size() - 1
+        if torch.distributed.get_rank() == wandb_rank:
+            gather_list = [None for _ in range(parallel_state.get_data_parallel_world_size())]
+        else:
+            gather_list = None
+
+        torch.distributed.gather_object(
+            obj=decoded_video[0],
+            object_gather_list=gather_list,
+            dst=wandb_rank,
+            group=parallel_state.get_data_parallel_group(),
+        )
+        if torch.distributed.get_rank() == wandb_rank:
+            if gather_list is not None:
+                videos = []
+                for video_data in gather_list:
+                    video_data_transposed = video_data.transpose(0, 3, 1, 2)
+                    videos.append(wandb.Video(video_data_transposed, fps=24, format="mp4"))
+
+                if state.wandb_logger is not None:
+                    state.wandb_logger.log({"prediction": videos})
+
     def __call__(
         self, state: GlobalState, data_iterator: Iterable, model: GPTModel, return_schedule_plan: bool = False
     ) -> tuple[torch.Tensor, partial]:
@@ -103,7 +126,7 @@ class DITForwardStep:
             self.train = False
             self.valid = True
             self.validation_step += 1
-            self.on_validation_start(batch, model, step=self.validation_step)
+            self.on_validation_start(state, batch, model, step=self.validation_step)
         return self.forward_step(state, batch, model, return_schedule_plan)
 
     def data_process(

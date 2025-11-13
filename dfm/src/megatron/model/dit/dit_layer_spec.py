@@ -144,17 +144,11 @@ class DiTLayerWithAdaLN(TransformerLayer):
         # Override Cross Attention to disable CP.
         # Disable TP Comm overlap as well. Not disabling will attempt re-use of buffer size same as Q and lead to
         # incorrect tensor shapes.
-        if submodules.cross_attention != IdentityOp:
-            cp_override_config = copy.deepcopy(config)
-            cp_override_config.context_parallel_size = 1
-            cp_override_config.tp_comm_overlap = False
-            self.cross_attention = build_module(
-                submodules.cross_attention,
-                config=cp_override_config,
-                layer_number=layer_number,
-            )
-        else:
-            self.cross_attention = None
+        self.cross_attention = build_module(
+            submodules.cross_attention,
+            config=self.config,
+            layer_number=layer_number,
+        )
 
         self.full_self_attention = build_module(
             submodules.full_self_attention,
