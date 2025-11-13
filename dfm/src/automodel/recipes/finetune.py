@@ -22,7 +22,7 @@ from typing import Any, Dict, Optional
 import torch
 import torch.distributed as dist
 import wandb
-from Automodel._diffusers.auto_diffusion_pipeline import NeMoAutoDiffusionPipeline
+from Automodel._diffusers.auto_diffusion_pipeline import NeMoWanPipeline
 from Automodel.flow_matching.training_step_t2v import (
     step_fsdp_transformer_t2v,
 )
@@ -51,10 +51,10 @@ def build_model_and_optimizer(
     dp_replicate_size: Optional[int] = None,
     use_hf_tp_plan: bool = False,
     optimizer_cfg: Optional[Dict[str, Any]] = None,
-) -> tuple[NeMoAutoDiffusionPipeline, dict[str, Dict[str, Any]], torch.optim.Optimizer, Any]:
+) -> tuple[NeMoWanPipeline, dict[str, Dict[str, Any]], torch.optim.Optimizer, Any]:
     """Build the WAN 2.1 diffusion model, parallel scheme, and optimizer."""
 
-    logging.info("[INFO] Building NeMoAutoDiffusionPipeline with transformer parallel scheme...")
+    logging.info("[INFO] Building NeMoWanPipeline with transformer parallel scheme...")
 
     if not dist.is_initialized():
         logging.info("[WARN] torch.distributed not initialized; proceeding in single-process mode")
@@ -84,7 +84,7 @@ def build_model_and_optimizer(
 
     parallel_scheme = {"transformer": manager_args}
 
-    pipe, created_managers = NeMoAutoDiffusionPipeline.from_pretrained(
+    pipe, created_managers = NeMoWanPipeline.from_pretrained(
         model_id,
         torch_dtype=bf16_dtype,
         device=device,
@@ -93,11 +93,7 @@ def build_model_and_optimizer(
         components_to_load=["transformer"],
     )
     fsdp2_manager = created_managers["transformer"]
-    transformer_module = getattr(pipe, "transformer", None)
-    if transformer_module is None:
-        raise RuntimeError("transformer not found in pipeline after parallelization")
-
-    model_map: dict[str, Dict[str, Any]] = {"transformer": {"fsdp_transformer": transformer_module}}
+    transformer_module = pipe.transformer
 
     trainable_params = [p for p in transformer_module.parameters() if p.requires_grad]
     if not trainable_params:
@@ -121,7 +117,7 @@ def build_model_and_optimizer(
 
     logging.info("[INFO] NeMoAutoDiffusion setup complete (pipeline + optimizer)")
 
-    return pipe, model_map, optimizer, fsdp2_manager.device_mesh
+    return pipe, optimizer, fsdp2_manager.device_mesh
 
 
 def build_lr_scheduler(
@@ -214,7 +210,7 @@ class TrainWan21DiffusionRecipe(BaseRecipe):
         dp_replicate_size = fsdp_cfg.get("dp_replicate_size", None)
         use_hf_tp_plan = fsdp_cfg.get("use_hf_tp_plan", False)
 
-        (self.pipe, self.model_map, self.optimizer, self.device_mesh) = build_model_and_optimizer(
+        (self.pipe, self.optimizer, self.device_mesh) = build_model_and_optimizer(
             model_id=self.model_id,
             learning_rate=self.learning_rate,
             device=self.device,
@@ -229,7 +225,7 @@ class TrainWan21DiffusionRecipe(BaseRecipe):
             optimizer_cfg=self.cfg.get("optim.optimizer", {}),
         )
 
-        self.model = self.model_map["transformer"]["fsdp_transformer"]
+        self.model = self.pipe.transformer
         self.peft_config = None
 
         batch_cfg = self.cfg.get("batch", {})
@@ -358,8 +354,8 @@ class TrainWan21DiffusionRecipe(BaseRecipe):
                 for micro_batch in batch_group:
                     try:
                         loss, _ = step_fsdp_transformer_t2v(
-                            pipe=self.pipe,
-                            model_map=self.model_map,
+                            scheduler=self.pipe.scheduler,
+                            model=self.model,
                             batch=micro_batch,
                             device=self.device,
                             bf16=self.bf16,
