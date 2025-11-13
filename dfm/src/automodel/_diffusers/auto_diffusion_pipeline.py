@@ -157,7 +157,7 @@ class NeMoAutoDiffusionPipeline(DiffusionPipeline):
         return pipe, created_managers
 
 
-class NeMoWanPipeline(WanPipeline):
+class NeMoWanPipeline:
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
 
@@ -179,7 +179,7 @@ class NeMoWanPipeline(WanPipeline):
         # Load just the config
         from diffusers import WanTransformer3DModel
 
-        if model_id is not None:
+        if config is None:
             transformer = WanTransformer3DModel.from_pretrained(
                 model_id,
                 subfolder="transformer",
