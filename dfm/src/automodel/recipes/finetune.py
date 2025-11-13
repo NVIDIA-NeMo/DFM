@@ -43,14 +43,9 @@ def build_model_and_optimizer(
     finetune_mode: bool,
     learning_rate: float,
     device: torch.device,
-    bf16_dtype: torch.dtype,
+    dtype: torch.dtype,
     cpu_offload: bool = False,
-    tp_size: int = 1,
-    cp_size: int = 1,
-    pp_size: int = 1,
-    dp_size: Optional[int] = None,
-    dp_replicate_size: Optional[int] = None,
-    use_hf_tp_plan: bool = False,
+    fsdp_cfg: Dict[str, Any] = {},
     optimizer_cfg: Optional[Dict[str, Any]] = None,
 ) -> tuple[NeMoWanPipeline, dict[str, Dict[str, Any]], torch.optim.Optimizer, Any]:
     """Build the WAN 2.1 diffusion model, parallel scheme, and optimizer."""
@@ -62,38 +57,42 @@ def build_model_and_optimizer(
 
     world_size = dist.get_world_size() if dist.is_initialized() else 1
 
-    if dp_size is None:
-        denom = max(1, tp_size * cp_size * pp_size)
-        dp_size = max(1, world_size // denom)
+    if fsdp_cfg.get("dp_size", None) is None:
+        denom = max(1, fsdp_cfg.get("tp_size", 1) * fsdp_cfg.get("cp_size", 1) * fsdp_cfg.get("pp_size", 1))
+        fsdp_cfg.dp_size = max(1, world_size // denom)
 
     manager_args: Dict[str, Any] = {
-        "dp_size": dp_size,
-        "dp_replicate_size": dp_replicate_size,
-        "tp_size": tp_size,
-        "cp_size": cp_size,
-        "pp_size": pp_size,
+        "dp_size": fsdp_cfg.get("dp_size", None),
+        "dp_replicate_size": fsdp_cfg.get("dp_replicate_size", None),
+        "tp_size": fsdp_cfg.get("tp_size", 1),
+        "cp_size": fsdp_cfg.get("cp_size", 1),
+        "pp_size": fsdp_cfg.get("pp_size", 1),
         "backend": "nccl",
         "world_size": world_size,
-        "use_hf_tp_plan": use_hf_tp_plan,
+        "use_hf_tp_plan": fsdp_cfg.get("use_hf_tp_plan", False),
         "activation_checkpointing": True,
         "mp_policy": MixedPrecisionPolicy(
-            param_dtype=bf16_dtype,
-            reduce_dtype=bf16_dtype,
-            output_dtype=bf16_dtype,
+            param_dtype=dtype,
+            reduce_dtype=dtype,
+            output_dtype=dtype,
         ),
     }
 
     parallel_scheme = {"transformer": manager_args}
 
+    kwargs = {}
+    if finetune_mode:
+        kwargs["load_for_training"] = True
+        kwargs["low_cpu_mem_usage"] = True
     init_fn = NeMoWanPipeline.from_pretrained if finetune_mode else NeMoWanPipeline.from_config
 
     pipe, created_managers = init_fn(
         model_id,
-        torch_dtype=bf16_dtype,
+        torch_dtype=dtype,
         device=device,
         parallel_scheme=parallel_scheme,
-        load_for_training=True,
         components_to_load=["transformer"],
+        **kwargs,
     )
     fsdp2_manager = created_managers["transformer"]
     transformer_module = pipe.transformer
@@ -206,26 +205,14 @@ class TrainWan21DiffusionRecipe(BaseRecipe):
             logging.info(f"[INFO]   - Flow shift: {self.flow_shift}")
             logging.info(f"[INFO]   - Mix uniform ratio: {self.mix_uniform_ratio}")
 
-        tp_size = fsdp_cfg.get("tp_size", 1)
-        cp_size = fsdp_cfg.get("cp_size", 1)
-        pp_size = fsdp_cfg.get("pp_size", 1)
-        dp_size = fsdp_cfg.get("dp_size", None)
-        dp_replicate_size = fsdp_cfg.get("dp_replicate_size", None)
-        use_hf_tp_plan = fsdp_cfg.get("use_hf_tp_plan", False)
-
         (self.pipe, self.optimizer, self.device_mesh) = build_model_and_optimizer(
             model_id=self.model_id,
             finetune_mode=self.cfg.get("model.mode", "finetune").lower() == "finetune",
             learning_rate=self.learning_rate,
             device=self.device,
-            bf16_dtype=self.bf16,
+            dtype=self.bf16,
             cpu_offload=self.cpu_offload,
-            tp_size=tp_size,
-            cp_size=cp_size,
-            pp_size=pp_size,
-            dp_size=dp_size,
-            dp_replicate_size=dp_replicate_size,
-            use_hf_tp_plan=use_hf_tp_plan,
+            fsdp_cfg=fsdp_cfg,
             optimizer_cfg=self.cfg.get("optim.optimizer", {}),
         )
 
