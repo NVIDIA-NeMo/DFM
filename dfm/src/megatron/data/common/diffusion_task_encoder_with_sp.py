@@ -12,7 +12,6 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-
 import random
 from abc import ABC, abstractmethod
 from typing import List
@@ -103,9 +102,12 @@ class DiffusionTaskEncoderWithSequencePacking(DefaultTaskEncoder, ABC):
             context_embeddings=cat("context_embeddings"),
             loss_mask=cat("loss_mask"),
             seq_len_q=cat("seq_len_q"),
+            seq_len_q_padded=cat("seq_len_q_padded"),
             seq_len_kv=cat("seq_len_kv"),
+            seq_len_kv_padded=cat("seq_len_kv_padded"),
             pos_ids=cat("pos_ids"),
             latent_shape=stack("latent_shape"),
+            video_metadata=[sample.video_metadata for sample in samples],
         )
 
     @stateless
