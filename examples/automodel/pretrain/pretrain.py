@@ -14,7 +14,7 @@
 
 from __future__ import annotations
 
-from automodel.recipes.train import TrainWan21DiffusionRecipe
+from dfm.src.automodel.recipes.train import TrainWan21DiffusionRecipe
 from nemo_automodel.components.config._arg_parser import parse_args_and_load_config
 
 
