@@ -55,6 +55,12 @@ classifiers = [
     "Topic :: Utilities",
 ]
 dependencies = [
+    "diffusers==0.35.1",
+    "easydict",
+    "ftfy",
+    "imageio",
+    "imageio-ffmpeg",
+    "opencv-python-headless==4.10.0.84",
     "megatron-energon",
 ]
 
@@ -87,10 +93,6 @@ dev = [
 build = ["setuptools", "wheel", "torch", "pybind11", "Cython>=3.0.0", "numpy<2.0.0", "ninja", "packaging", "nvidia-mathdx"]
 automodel = [
     "nemo-automodel",
-    "diffusers",
-    "ftfy",
-    "imageio-ffmpeg",
-    "opencv-python-headless==4.10.0.84",
 ]
 megatron-bridge = ["megatron-bridge"]
 
