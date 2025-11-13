@@ -22,8 +22,8 @@ from typing import Any, Dict, Optional
 import torch
 import torch.distributed as dist
 import wandb
-from Automodel._diffusers.auto_diffusion_pipeline import NeMoWanPipeline
-from Automodel.flow_matching.training_step_t2v import (
+from dfm.src.automodel._diffusers.auto_diffusion_pipeline import NeMoWanPipeline
+from dfm.src.automodel.flow_matching.training_step_t2v import (
     step_fsdp_transformer_t2v,
 )
 from nemo_automodel.components.checkpoint.checkpointing import Checkpointer, CheckpointingConfig

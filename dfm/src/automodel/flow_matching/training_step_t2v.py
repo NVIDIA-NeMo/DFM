@@ -19,7 +19,7 @@ import os
 from typing import Dict, Tuple
 
 import torch
-from Automodel.flow_matching.time_shift_utils import (
+from dfm.src.automodel.flow_matching.time_shift_utils import (
     compute_density_for_timestep_sampling,
 )
 

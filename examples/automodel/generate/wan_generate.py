@@ -18,7 +18,7 @@ import os
 
 import torch
 import torch.distributed as dist
-from Automodel._diffusers.auto_diffusion_pipeline import NeMoAutoDiffusionPipeline
+from dfm.src.automodel._diffusers.auto_diffusion_pipeline import NeMoAutoDiffusionPipeline
 from diffusers import AutoencoderKLWan
 from diffusers.utils import export_to_video
 from nemo_automodel.components.distributed.init_utils import initialize_distributed
