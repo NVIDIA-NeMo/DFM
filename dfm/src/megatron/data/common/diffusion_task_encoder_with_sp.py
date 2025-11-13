@@ -101,6 +101,7 @@ class DiffusionTaskEncoderWithSequencePacking(DefaultTaskEncoder, ABC):
             __subflavors__=samples[0].__subflavors__,
             video=cat("video"),
             context_embeddings=cat("context_embeddings"),
+            context_mask=cat("context_mask"),
             loss_mask=cat("loss_mask"),
             seq_len_q=cat("seq_len_q"),
             seq_len_q_padded=cat("seq_len_q_padded"),
