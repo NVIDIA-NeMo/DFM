@@ -193,11 +193,13 @@ class FlowPipeline:
             noise = thd_split_inputs_cp(
                 noise, packed_seq_params["self_attention"].cu_seqlens_q, parallel_state.get_context_parallel_group()
             )
-            context_embeddings = thd_split_inputs_cp(
-                context_embeddings,
-                packed_seq_params["cross_attention"].cu_seqlens_kv,
-                parallel_state.get_context_parallel_group(),
-            )
+            # We don't need to split context embeddings across context parallelism
+            # if we disable context parallelism for cross-attention
+            # context_embeddings = thd_split_inputs_cp(
+            #     context_embeddings,
+            #     packed_seq_params["cross_attention"].cu_seqlens_kv,
+            #     parallel_state.get_context_parallel_group(),
+            # )
             split_loss_mask = thd_split_inputs_cp(
                 loss_mask,
                 packed_seq_params["self_attention"].cu_seqlens_q,
@@ -259,5 +261,4 @@ class FlowPipeline:
                 context=context_embeddings,
                 packed_seq_params=packed_seq_params,
             )
-
             return hidden_states

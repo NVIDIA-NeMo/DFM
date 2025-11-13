@@ -32,10 +32,8 @@ logger = logging.getLogger(__name__)
 
 
 def wan_data_step(qkv_format, dataloader_iter):
-    batch = next(iter(dataloader_iter.iterable))
-
+    batch = next(dataloader_iter)
     batch = {k: v.to(device="cuda", non_blocking=True) if torch.is_tensor(v) else v for k, v in batch.items()}
-
     # Construct packed sequence parameters
     if ("seq_len_q" in batch) and ("seq_len_kv" in batch):
         cu_seqlens = batch["seq_len_q"].cumsum(dim=0).to(torch.int32)

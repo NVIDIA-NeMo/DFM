@@ -108,13 +108,13 @@ class WanMockDataModuleConfig(DatasetProvider):
     W_latents: int = 60
     patch_spatial: int = 2
     patch_temporal: int = 1
-    number_packed_samples: int = 3
+    number_packed_samples: int = 1
     context_seq_len: int = 512
     context_embeddings_dim: int = 4096
 
     def __post_init__(self):
         mock_ds = _MockDataset(length=1024)
-        self._train_dl = DataLoader(
+        self._train_dl = iter(DataLoader(
             mock_ds,
             batch_size=self.micro_batch_size,
             num_workers=self.num_workers,
@@ -130,7 +130,9 @@ class WanMockDataModuleConfig(DatasetProvider):
             ),
             shuffle=False,
             drop_last=False,
-        )
+            pin_memory=True,
+            prefetch_factor=8,
+        ))
         self.sequence_length = self.seq_length
 
     def build_datasets(self, _context: DatasetBuildContext):
