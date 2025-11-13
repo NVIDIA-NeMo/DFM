@@ -11,6 +11,7 @@ dist_env:
 
 model:
   pretrained_model_name_or_path: Wan-AI/Wan2.1-T2V-1.3B-Diffusers
+  mode: pretrain
 
 data:
   dataloader:
