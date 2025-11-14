@@ -25,6 +25,7 @@ from megatron.core.models.common.vision_module.vision_module import VisionModule
 from megatron.core.packed_seq_params import PackedSeqParams
 from megatron.core.transformer.enums import ModelType
 from megatron.core.transformer.transformer_block import TransformerBlock
+from megatron.core.process_groups_config import ProcessGroupCollection
 from megatron.core.transformer.transformer_config import TransformerConfig
 from megatron.core.utils import make_sharded_tensor_for_checkpoint
 from torch import Tensor
@@ -103,6 +104,9 @@ class DiTCrossAttentionModel(VisionModule):
         **kwargs,
     ):
         super(DiTCrossAttentionModel, self).__init__(config=config)
+        # Check if pg_collection exists and is not none then only do this
+        if not hasattr(self, 'pg_collection') or self.pg_collection is None:
+            self.pg_collection = ProcessGroupCollection.use_mpu_process_groups()
 
         self.config: TransformerConfig = config
 
