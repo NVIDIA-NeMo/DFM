@@ -2656,7 +2656,8 @@ wheels = [
 
 [[package]]
 name = "megatron-bridge"
-source = { directory = "3rdparty/Megatron-Bridge" }
+version = "0.3.0rc0"
+source = { git = "https://github.com/NVIDIA-NeMo/Megatron-Bridge.git?rev=b245756e35943083a77aff6217fe60dd1704f6ca#b245756e35943083a77aff6217fe60dd1704f6ca" }
 dependencies = [
     { name = "causal-conv1d" },
     { name = "datasets" },
@@ -2678,70 +2679,10 @@ dependencies = [
     { name = "wandb" },
 ]
 
-[package.metadata]
-requires-dist = [
-    { name = "causal-conv1d" },
-    { name = "datasets" },
-    { name = "hydra-core", specifier = ">1.3,<=1.3.2" },
-    { name = "mamba-ssm" },
-    { name = "megatron-core", extras = ["dev", "mlm"], directory = "3rdparty/Megatron-Bridge/3rdparty/Megatron-LM" },
-    { name = "nemo-run", marker = "extra == 'recipes'", specifier = ">=0.5.0a0,<0.6.0" },
-    { name = "nvdlfw-inspect", marker = "extra == 'tensor-inspect'", specifier = "==0.2.1" },
-    { name = "nvidia-resiliency-ext", git = "https://github.com/NVIDIA/nvidia-resiliency-ext.git?rev=54f85fe422d296cf04ea524130014bd3a2c3add1" },
-    { name = "omegaconf", specifier = ">=2.3.0" },
-    { name = "pyyaml", specifier = ">=6.0.2" },
-    { name = "qwen-vl-utils" },
-    { name = "regex", specifier = ">=2024.11.6" },
-    { name = "rich" },
-    { name = "six", specifier = ">=1.17.0" },
-    { name = "tensorboard", specifier = ">=2.19.0" },
-    { name = "tqdm", specifier = ">=4.67.1" },
-    { name = "transformer-engine", extras = ["pytorch"], git = "https://github.com/NVIDIA/TransformerEngine.git?rev=release_v2.9" },
-    { name = "transformers", specifier = ">=4.57.1" },
-    { name = "typing-extensions" },
-    { name = "wandb", specifier = ">=0.19.10" },
-]
-provides-extras = ["recipes", "tensor-inspect"]
-
-[package.metadata.requires-dev]
-build = [
-    { name = "cython", specifier = ">=3.0.0" },
-    { name = "ninja" },
-    { name = "numpy", specifier = "<2.0.0" },
-    { name = "nvidia-mathdx" },
-    { name = "pybind11" },
-    { name = "setuptools" },
-    { name = "torch" },
-]
-dev = [
-    { name = "mypy", specifier = ">=1.8.0" },
-    { name = "pre-commit", specifier = ">=3.6.0" },
-    { name = "ruff", specifier = ">=0.9.9" },
-]
-docs = [
-    { name = "myst-parser", specifier = ">=4.0.1" },
-    { name = "nvidia-sphinx-theme", specifier = ">=0.0.8" },
-    { name = "sphinx", specifier = ">=8.1.3" },
-    { name = "sphinx-autobuild", specifier = ">=2024.10.3" },
-    { name = "sphinx-autodoc2", specifier = ">=0.5.0" },
-    { name = "sphinx-copybutton", specifier = ">=0.5.2" },
-    { name = "sphinxcontrib-mermaid" },
-]
-test = [
-    { name = "click" },
-    { name = "coverage", specifier = ">=7.8.1" },
-    { name = "flake8", specifier = ">=7.2.0" },
-    { name = "pygithub" },
-    { name = "pylint", specifier = ">=3.3.7" },
-    { name = "pytest", specifier = ">=8.3.5" },
-    { name = "pytest-mock", specifier = ">=3.14.0" },
-    { name = "pytest-runner", specifier = ">=6.0.1" },
-    { name = "pytest-timeout", specifier = ">=2.4.0" },
-]
-
 [[package]]
 name = "megatron-core"
-source = { directory = "3rdparty/Megatron-Bridge/3rdparty/Megatron-LM" }
+version = "0.16.0rc0"
+source = { git = "https://github.com/NVIDIA-NeMo/Megatron-Bridge.git?subdirectory=3rdparty%2FMegatron-LM&rev=b245756e35943083a77aff6217fe60dd1704f6ca#b245756e35943083a77aff6217fe60dd1704f6ca" }
 dependencies = [
     { name = "numpy" },
     { name = "packaging" },
@@ -2779,94 +2720,6 @@ mlm = [
     { name = "tiktoken" },
     { name = "transformers" },
     { name = "wandb" },
-]
-
-[package.metadata]
-requires-dist = [
-    { name = "av", marker = "extra == 'dev'", specifier = "<16.0.0" },
-    { name = "causal-conv1d", marker = "extra == 'dev'", specifier = "~=1.5" },
-    { name = "einops", marker = "extra == 'dev'", specifier = "~=0.8" },
-    { name = "einops", marker = "extra == 'lts'" },
-    { name = "emerging-optimizers", marker = "extra == 'dev'", git = "https://github.com/NVIDIA-NeMo/Emerging-Optimizers.git?rev=cf9909b777ffac18e05b67a6708282cadc000942" },
-    { name = "flash-linear-attention", marker = "extra == 'dev'", specifier = "~=0.3.2" },
-    { name = "flashinfer-python", marker = "extra == 'dev'" },
-    { name = "flask-restful", marker = "extra == 'mlm'" },
-    { name = "mamba-ssm", marker = "extra == 'dev'", specifier = "~=2.2" },
-    { name = "megatron-energon", extras = ["av-decode"], marker = "extra == 'dev'", specifier = "~=6.0" },
-    { name = "multi-storage-client", marker = "extra == 'dev'", specifier = "~=0.27" },
-    { name = "numpy", specifier = "<2.0.0" },
-    { name = "nv-grouped-gemm", marker = "extra == 'dev'", specifier = "~=1.1" },
-    { name = "nvidia-modelopt", extras = ["torch"], marker = "sys_platform != 'darwin' and extra == 'dev'", specifier = ">=0.33.0a0,<0.34.0" },
-    { name = "nvidia-resiliency-ext", marker = "extra == 'dev'", specifier = ">=0.4.0a0,<0.5.0" },
-    { name = "nvtx", marker = "extra == 'dev'", specifier = "~=0.2" },
-    { name = "nvtx", marker = "extra == 'lts'" },
-    { name = "onnxscript", marker = "extra == 'dev'" },
-    { name = "opentelemetry-api", marker = "extra == 'dev'", specifier = "~=1.33.1" },
-    { name = "packaging", specifier = ">=24.2" },
-    { name = "sentencepiece", marker = "extra == 'mlm'" },
-    { name = "setuptools", marker = "extra == 'dev'", specifier = "<80.0.0" },
-    { name = "setuptools", marker = "extra == 'lts'", specifier = "<80.0.0" },
-    { name = "tensorstore", marker = "extra == 'dev'", specifier = "~=0.1,!=0.1.46,!=0.1.72" },
-    { name = "tensorstore", marker = "extra == 'lts'", specifier = "!=0.1.46,!=0.1.72" },
-    { name = "tiktoken", marker = "extra == 'mlm'" },
-    { name = "torch" },
-    { name = "tqdm", marker = "extra == 'dev'" },
-    { name = "tqdm", marker = "extra == 'lts'" },
-    { name = "transformer-engine", extras = ["pytorch"], marker = "extra == 'dev'", git = "https://github.com/NVIDIA/TransformerEngine.git?rev=release_v2.9" },
-    { name = "transformers", marker = "extra == 'lts'" },
-    { name = "transformers", marker = "extra == 'mlm'" },
-    { name = "wandb", marker = "extra == 'mlm'" },
-    { name = "wget", marker = "extra == 'dev'" },
-    { name = "wget", marker = "extra == 'lts'" },
-    { name = "zarr", marker = "extra == 'lts'" },
-]
-provides-extras = ["mlm", "dev", "lts"]
-
-[package.metadata.requires-dev]
-build = [
-    { name = "cython", specifier = ">=3.0.0" },
-    { name = "hatchling" },
-    { name = "nvidia-mathdx" },
-    { name = "packaging", specifier = ">=24.2" },
-    { name = "pybind11" },
-    { name = "setuptools", specifier = "<80.0.0" },
-    { name = "torch" },
-]
-ci = [
-    { name = "pandas" },
-    { name = "python-gitlab" },
-    { name = "slack-sdk" },
-]
-docs = [
-    { name = "myst-parser" },
-    { name = "nvidia-sphinx-theme" },
-    { name = "sphinx" },
-    { name = "sphinx-autobuild" },
-    { name = "sphinx-autodoc2" },
-    { name = "sphinx-copybutton" },
-]
-flash-mla = [{ name = "flash-mla", git = "https://github.com/deepseek-ai/FlashMLA?rev=9edee0c022cd0938148a18e334203b0aab43aa19" }]
-linting = [
-    { name = "black", specifier = "==24.4.2" },
-    { name = "flake8", specifier = "==7.1.0" },
-    { name = "isort", specifier = "==5.13.2" },
-    { name = "pylint", specifier = "==3.2.6" },
-    { name = "ruff", specifier = "~=0.9.0" },
-]
-test = [
-    { name = "coverage" },
-    { name = "nemo-run", git = "https://github.com/NVIDIA-NeMo/Run.git?rev=01a9a8ba360f7b2908728ad0516e0ad9d936966d" },
-    { name = "nltk" },
-    { name = "pydantic" },
-    { name = "pygithub" },
-    { name = "pytest", specifier = "==8.3.5" },
-    { name = "pytest-asyncio" },
-    { name = "pytest-cov" },
-    { name = "pytest-mock" },
-    { name = "pytest-random-order" },
-    { name = "pyyaml" },
-    { name = "tensorboard" },
-    { name = "wrapt" },
 ]
 
 [[package]]
@@ -3360,7 +3213,8 @@ wheels = [
 
 [[package]]
 name = "nemo-automodel"
-source = { directory = "3rdparty/Automodel" }
+version = "0.1.0rc0"
+source = { git = "https://github.com/NVIDIA-NeMo/Automodel.git?rev=17055ab4fe820ba0e4c13aed8fd2c810b6551bf7#17055ab4fe820ba0e4c13aed8fd2c810b6551bf7" }
 dependencies = [
     { name = "bitsandbytes", marker = "platform_machine == 'x86_64' and sys_platform != 'darwin'" },
     { name = "datasets" },
@@ -3378,65 +3232,6 @@ dependencies = [
     { name = "torchdata" },
     { name = "transformers" },
     { name = "wandb" },
-]
-
-[package.metadata]
-requires-dist = [
-    { name = "backoff", marker = "extra == 'vlm'" },
-    { name = "bitsandbytes", marker = "platform_machine == 'x86_64' and sys_platform != 'darwin'", specifier = "==0.45.5" },
-    { name = "datasets", specifier = ">=4.0.0" },
-    { name = "diffusers" },
-    { name = "flash-attn", marker = "extra == 'fa'", specifier = "<=2.8.3" },
-    { name = "ftfy" },
-    { name = "imageio-ffmpeg" },
-    { name = "liger-kernel", marker = "platform_machine == 'x86_64' and sys_platform != 'darwin'", specifier = ">=0.5.9" },
-    { name = "megatron-fsdp" },
-    { name = "mistral-common", extras = ["opencv"], marker = "extra == 'vlm'" },
-    { name = "mlflow" },
-    { name = "numba", marker = "extra == 'vlm'" },
-    { name = "numpy", marker = "extra == 'vlm'" },
-    { name = "opencv-python-headless", specifier = "==4.10.0.84" },
-    { name = "pillow", marker = "extra == 'vlm'" },
-    { name = "pybind11" },
-    { name = "pyyaml" },
-    { name = "qwen-omni-utils", marker = "extra == 'vlm'" },
-    { name = "qwen-vl-utils", extras = ["decord"], marker = "platform_machine == 'x86_64' and sys_platform != 'darwin' and extra == 'vlm'" },
-    { name = "timm", marker = "extra == 'vlm'", specifier = "==1.0.16" },
-    { name = "torch", marker = "sys_platform != 'darwin'", specifier = "<=2.9.0", index = "https://download.pytorch.org/whl/cu129" },
-    { name = "torch", marker = "sys_platform == 'darwin'", specifier = "<=2.9.0", index = "https://pypi.org/simple" },
-    { name = "torchao" },
-    { name = "torchcodec", marker = "platform_machine == 'x86_64' and sys_platform != 'darwin' and extra == 'vlm'" },
-    { name = "torchdata" },
-    { name = "transformer-engine", extras = ["pytorch"], marker = "extra == 'moe'", specifier = "==2.8.0" },
-    { name = "transformers", specifier = "<=4.57.1" },
-    { name = "wandb" },
-]
-provides-extras = ["vlm", "fa", "moe"]
-
-[package.metadata.requires-dev]
-build = [
-    { name = "setuptools" },
-    { name = "torch", marker = "sys_platform != 'darwin'", specifier = "<=2.9.0", index = "https://download.pytorch.org/whl/cu129" },
-    { name = "torch", marker = "sys_platform == 'darwin'", specifier = "<=2.9.0", index = "https://pypi.org/simple" },
-]
-dev = [{ name = "cut-cross-entropy", git = "https://github.com/apple/ml-cross-entropy.git?rev=87a86ab" }]
-docs = [
-    { name = "myst-parser" },
-    { name = "nvidia-sphinx-theme" },
-    { name = "sphinx" },
-    { name = "sphinx-autobuild" },
-    { name = "sphinx-autodoc2" },
-    { name = "sphinx-copybutton" },
-]
-linting = [
-    { name = "import-linter", specifier = "~=2.4" },
-    { name = "pre-commit", specifier = ">=4.2.0" },
-    { name = "ruff", specifier = "~=0.9.0" },
-]
-test = [
-    { name = "coverage" },
-    { name = "peft" },
-    { name = "pytest" },
 ]
 
 [[package]]
@@ -3483,7 +3278,7 @@ docs = [
     { name = "sphinx-autodoc2" },
     { name = "sphinx-copybutton" },
 ]
-megatron-bridge = [
+megatronbridge = [
     { name = "megatron-bridge" },
 ]
 test = [
@@ -3513,7 +3308,7 @@ requires-dist = [
 ]
 
 [package.metadata.requires-dev]
-automodel = [{ name = "nemo-automodel", directory = "3rdparty/Automodel" }]
+automodel = [{ name = "nemo-automodel", git = "https://github.com/NVIDIA-NeMo/Automodel.git?rev=17055ab4fe820ba0e4c13aed8fd2c810b6551bf7" }]
 build = [
     { name = "cython", specifier = ">=3.0.0" },
     { name = "ninja" },
@@ -3538,7 +3333,7 @@ docs = [
     { name = "sphinx-autodoc2", specifier = ">=0.5.0" },
     { name = "sphinx-copybutton", specifier = ">=0.5.2" },
 ]
-megatron-bridge = [{ name = "megatron-bridge", directory = "3rdparty/Megatron-Bridge" }]
+megatronbridge = [{ name = "megatron-bridge", git = "https://github.com/NVIDIA-NeMo/Megatron-Bridge.git?rev=b245756e35943083a77aff6217fe60dd1704f6ca" }]
 test = [
     { name = "coverage", specifier = ">=7.8.1" },
     { name = "flake8", specifier = ">=7.2.0" },
