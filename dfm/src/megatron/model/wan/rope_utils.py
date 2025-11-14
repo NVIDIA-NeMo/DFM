@@ -31,7 +31,7 @@ class Wan3DRopeEmbeddings(torch.nn.Module):
                 self.rope_params(max_position_len, 2 * (dim_head // 6)),
             ],
             dim=1,
-        )
+        ).cuda()
 
     def rope_params(self, max_position_len, dim_head, theta=10000):
         assert dim_head % 2 == 0
@@ -41,10 +41,6 @@ class Wan3DRopeEmbeddings(torch.nn.Module):
         return freqs
 
     def forward(self, n_head, dim_head, cu_seqlens_q_padded, grid_sizes, device):
-        self.freqs = self.freqs.to(
-            device,
-        )
-
         n, c = n_head, dim_head // 2
 
         # split freqs
