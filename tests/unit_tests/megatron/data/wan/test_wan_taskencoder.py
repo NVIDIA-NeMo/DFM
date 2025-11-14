@@ -12,7 +12,6 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-import pytest
 import torch
 
 from dfm.src.megatron.data.wan.wan_taskencoder import WanTaskEncoder, cook, parallel_state
@@ -43,9 +42,13 @@ def test_encode_sample_no_context_parallel(monkeypatch):
     monkeypatch.setattr(parallel_state, "get_context_parallel_world_size", lambda: 1, raising=False)
     # Ensure seeded wrapper has an active worker config
     from megatron.energon.task_encoder.base import WorkerConfig
+
     class _FakeWorkerCfg:
-        def worker_seed(self): return 123
+        def worker_seed(self):
+            return 123
+
         active_worker_sample_index = 0
+
     monkeypatch.setattr(WorkerConfig, "active_worker_config", _FakeWorkerCfg(), raising=False)
 
     # Construct a minimal, consistent sample

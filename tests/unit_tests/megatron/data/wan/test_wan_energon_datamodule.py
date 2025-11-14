@@ -1,4 +1,16 @@
-import types
+# Copyright (c) 2025, NVIDIA CORPORATION.  All rights reserved.
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+#     http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
 
 from dfm.src.megatron.data.wan import wan_energon_datamodule as wan_dm_mod
 from dfm.src.megatron.data.wan.wan_taskencoder import WanTaskEncoder
@@ -53,5 +65,3 @@ def test_wan_datamodule_config_initialization(monkeypatch):
     # build_datasets should return train loader thrice
     train, val, test = cfg.build_datasets(context=None)
     assert train == "train" and val == "train" and test == "train"
-
-
