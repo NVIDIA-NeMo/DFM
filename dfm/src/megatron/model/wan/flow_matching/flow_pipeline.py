@@ -261,4 +261,8 @@ class FlowPipeline:
                 context=context_embeddings,
                 packed_seq_params=packed_seq_params,
             )
+<<<<<<< HEAD
+=======
+
+>>>>>>> 55c42e137929d45ec43e95bf241adc0ffc8df16b
             return hidden_states
