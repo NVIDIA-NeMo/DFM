@@ -257,7 +257,9 @@ class DiTCrossAttention(CrossAttention):
         from `key_value_states`.
         """
 
-        query, key, value = super().get_query_key_value_tensors(hidden_states, key_value_states, output_gate=output_gate, split_qkv=split_qkv)
+        query, key, value = super().get_query_key_value_tensors(
+            hidden_states, key_value_states, output_gate=output_gate, split_qkv=split_qkv
+        )
 
         # gather query and key heads across TP ranks if self.layernorm_across_heads is True
         if self.layernorm_across_heads and parallel_state.get_tensor_model_parallel_world_size() > 1:
