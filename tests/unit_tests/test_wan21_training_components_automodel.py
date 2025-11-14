@@ -39,6 +39,7 @@ class TestFlowMatchingTrainingStep:
     @pytest.fixture
     def mock_model(self):
         """Create a mock model that returns predictions with gradients"""
+
         def model_forward(hidden_states, timestep, encoder_hidden_states, return_dict=False):
             # Return prediction with same shape as input hidden_states
             # Create a tensor that requires grad to preserve gradient flow
@@ -49,7 +50,7 @@ class TestFlowMatchingTrainingStep:
             # Add a small scaled version of input to maintain gradient connection
             output = output + hidden_states * 0.0  # This preserves requires_grad
             return (output,)
-        
+
         model = Mock()
         model.side_effect = model_forward
         return model
@@ -91,7 +92,7 @@ class TestFlowMatchingTrainingStep:
         assert "sigma_min" in metrics
         assert "sigma_max" in metrics
         assert "sampling_method" in metrics
-        
+
         print(f"✓ Uniform sampling test passed - Loss: {loss.item():.4f}")
 
     def test_uniform_sampling_with_flow_shift(self, mock_scheduler, mock_model, sample_batch):
@@ -117,10 +118,10 @@ class TestFlowMatchingTrainingStep:
         assert 0.0 <= metrics["sigma_min"] <= 1.0, "Sigma min should be in [0, 1]"
         assert 0.0 <= metrics["sigma_max"] <= 1.0, "Sigma max should be in [0, 1]"
         assert metrics["sigma_min"] <= metrics["sigma_max"]
-        
+
         # With flow shift, sigma should not simply equal u
         # (would need to check the actual transformation)
-        
+
         print(f"✓ Flow shift test passed - σ: [{metrics['sigma_min']:.3f}, {metrics['sigma_max']:.3f}]")
 
     def test_logit_normal_sampling(self, mock_scheduler, mock_model, sample_batch):
@@ -145,11 +146,11 @@ class TestFlowMatchingTrainingStep:
 
         # Verify sampling method is recorded
         assert metrics["sampling_method"] == "logit_normal"
-        
+
         # Sigma should still be in valid range
         assert 0.0 <= metrics["sigma_min"] <= 1.0
         assert 0.0 <= metrics["sigma_max"] <= 1.0
-        
+
         print(f"✓ Logit-normal sampling test passed - Method: {metrics['sampling_method']}")
 
     def test_mode_sampling(self, mock_scheduler, mock_model, sample_batch):
@@ -172,8 +173,8 @@ class TestFlowMatchingTrainingStep:
 
         # Verify sampling method
         assert metrics["sampling_method"] == "mode"
-        
-        print(f"✓ Mode sampling test passed")
+
+        print("✓ Mode sampling test passed")
 
     def test_sigma_clamping_finetune_range(self, mock_scheduler, mock_model, sample_batch):
         """Test sigma clamping for finetuning (restricted range)"""
@@ -199,11 +200,13 @@ class TestFlowMatchingTrainingStep:
 
         # Verify sigma is within clamped range (with tolerance for floating point precision)
         tolerance = 1e-6
-        assert metrics["sigma_min"] >= sigma_min - tolerance, \
+        assert metrics["sigma_min"] >= sigma_min - tolerance, (
             f"Sigma min {metrics['sigma_min']} should be >= {sigma_min}"
-        assert metrics["sigma_max"] <= sigma_max + tolerance, \
+        )
+        assert metrics["sigma_max"] <= sigma_max + tolerance, (
             f"Sigma max {metrics['sigma_max']} should be <= {sigma_max}"
-        
+        )
+
         print(f"✓ Sigma clamping test passed - Range: [{metrics['sigma_min']:.3f}, {metrics['sigma_max']:.3f}]")
 
     def test_sigma_full_range_pretrain(self, mock_scheduler, mock_model, sample_batch):
@@ -228,14 +231,14 @@ class TestFlowMatchingTrainingStep:
         # Sigma should be able to reach near 0 and 1
         assert 0.0 <= metrics["sigma_min"] <= 1.0
         assert 0.0 <= metrics["sigma_max"] <= 1.0
-        
+
         print(f"✓ Full range test passed - Range: [{metrics['sigma_min']:.3f}, {metrics['sigma_max']:.3f}]")
 
     def test_loss_weighting_formula(self, mock_scheduler, mock_model, sample_batch):
         """Test that loss weighting follows formula: w = 1 + shift * σ"""
         device = torch.device("cpu")
         bf16 = torch.bfloat16
-        
+
         flow_shift = 3.0
 
         loss, metrics = step_fsdp_transformer_t2v(
@@ -256,11 +259,13 @@ class TestFlowMatchingTrainingStep:
         expected_weight_max = 1.0 + flow_shift * metrics["sigma_max"]
 
         # Allow small tolerance for numerical errors
-        assert abs(metrics["weight_min"] - expected_weight_min) < 0.01, \
+        assert abs(metrics["weight_min"] - expected_weight_min) < 0.01, (
             f"Weight min {metrics['weight_min']} should match formula {expected_weight_min}"
-        assert abs(metrics["weight_max"] - expected_weight_max) < 0.01, \
+        )
+        assert abs(metrics["weight_max"] - expected_weight_max) < 0.01, (
             f"Weight max {metrics['weight_max']} should match formula {expected_weight_max}"
-        
+        )
+
         print(f"✓ Loss weighting test passed - w = 1 + {flow_shift} * σ")
 
     def test_different_flow_shift_values(self, mock_scheduler, mock_model, sample_batch):
@@ -284,9 +289,9 @@ class TestFlowMatchingTrainingStep:
             # Larger shift should generally lead to larger weights
             # (since w = 1 + shift * σ, and σ > 0)
             assert metrics["weight_max"] > 1.0, f"Weight max should be > 1.0 for shift={shift}"
-            assert metrics["weight_min"] >= 1.0, f"Weight min should be >= 1.0"
-            
-        print(f"✓ Variable flow shift test passed")
+            assert metrics["weight_min"] >= 1.0, "Weight min should be >= 1.0"
+
+        print("✓ Variable flow shift test passed")
 
     def test_batch_size_variations(self, mock_scheduler, mock_model):
         """Test with different batch sizes"""
@@ -313,8 +318,8 @@ class TestFlowMatchingTrainingStep:
 
             assert isinstance(loss, torch.Tensor), f"Loss should be tensor for batch_size={batch_size}"
             assert not torch.isnan(loss), f"Loss should not be NaN for batch_size={batch_size}"
-            
-        print(f"✓ Batch size variation test passed")
+
+        print("✓ Batch size variation test passed")
 
     def test_video_shape_handling(self, mock_scheduler, mock_model):
         """Test handling of videos with extra dimensions"""
@@ -340,11 +345,11 @@ class TestFlowMatchingTrainingStep:
         # Should handle the shape normalization
         assert isinstance(loss, torch.Tensor)
         assert not torch.isnan(loss)
-        
+
         # Video with missing batch dimension (will be added)
         batch_4d = {
             "video_latents": torch.randn(16, 1, 8, 8),  # 4D instead of 5D
-            "text_embeddings": torch.randn(77, 4096),   # 2D instead of 3D
+            "text_embeddings": torch.randn(77, 4096),  # 2D instead of 3D
         }
 
         loss, metrics = step_fsdp_transformer_t2v(
@@ -358,8 +363,8 @@ class TestFlowMatchingTrainingStep:
         )
 
         assert isinstance(loss, torch.Tensor)
-        
-        print(f"✓ Video shape handling test passed")
+
+        print("✓ Video shape handling test passed")
 
     def test_timesteps_in_valid_range(self, mock_scheduler, mock_model, sample_batch):
         """Test that timesteps are in valid range [0, num_train_timesteps]"""
@@ -381,7 +386,7 @@ class TestFlowMatchingTrainingStep:
         # Timesteps should be in [0, num_train_timesteps]
         assert 0.0 <= metrics["timestep_min"] <= mock_scheduler.config.num_train_timesteps
         assert 0.0 <= metrics["timestep_max"] <= mock_scheduler.config.num_train_timesteps
-        
+
         print(f"✓ Timestep range test passed - t: [{metrics['timestep_min']:.1f}, {metrics['timestep_max']:.1f}]")
 
     def test_noisy_latents_are_finite(self, mock_scheduler, mock_model, sample_batch):
@@ -404,7 +409,7 @@ class TestFlowMatchingTrainingStep:
         # Noisy latents should be finite
         assert torch.isfinite(torch.tensor(metrics["noisy_min"]))
         assert torch.isfinite(torch.tensor(metrics["noisy_max"]))
-        
+
         print(f"✓ Noisy latents finite test passed - Range: [{metrics['noisy_min']:.2f}, {metrics['noisy_max']:.2f}]")
 
     def test_mix_uniform_ratio(self, mock_scheduler, mock_model, sample_batch):
@@ -414,7 +419,7 @@ class TestFlowMatchingTrainingStep:
 
         # Run multiple times to test probabilistic mixing
         methods_seen = set()
-        
+
         for _ in range(20):
             loss, metrics = step_fsdp_transformer_t2v(
                 scheduler=mock_scheduler,
@@ -428,14 +433,14 @@ class TestFlowMatchingTrainingStep:
                 mix_uniform_ratio=0.5,  # 50% chance of uniform
                 global_step=0,
             )
-            
+
             methods_seen.add(metrics["sampling_method"])
-        
+
         # With 50% ratio and 20 runs, we should see both methods
         # (statistically very likely)
         # Note: This is probabilistic, so we just verify the mechanism works
         assert len(methods_seen) >= 1, "Should see at least one sampling method"
-        
+
         print(f"✓ Mix uniform ratio test passed - Methods seen: {methods_seen}")
 
     def test_loss_computation_and_backward(self, mock_scheduler, mock_model, sample_batch):
@@ -460,17 +465,17 @@ class TestFlowMatchingTrainingStep:
         assert loss.ndim == 0, "Loss should be scalar"
         assert not torch.isnan(loss), "Loss should not be NaN"
         assert torch.isfinite(loss), "Loss should be finite"
-        
+
         # Try to backward if gradients are enabled
         if loss.requires_grad:
             try:
                 loss.backward()
-                print(f"✓ Loss gradient and backward test passed")
+                print("✓ Loss gradient and backward test passed")
             except:
-                print(f"✓ Loss computation test passed (backward not required for mock)")
+                print("✓ Loss computation test passed (backward not required for mock)")
         else:
             # With mock models, gradients may not propagate, which is OK for unit tests
-            print(f"✓ Loss computation test passed (mock model)")
+            print("✓ Loss computation test passed (mock model)")
 
     def test_deterministic_with_seed(self, mock_scheduler, mock_model, sample_batch):
         """Test that setting seed produces deterministic results"""
@@ -508,8 +513,8 @@ class TestFlowMatchingTrainingStep:
         # Should produce same sigma values (deterministic sampling)
         assert abs(metrics1["sigma_min"] - metrics2["sigma_min"]) < 1e-6
         assert abs(metrics1["sigma_max"] - metrics2["sigma_max"]) < 1e-6
-        
-        print(f"✓ Deterministic seed test passed")
+
+        print("✓ Deterministic seed test passed")
 
 
 class TestFlowMatchingMath:
@@ -519,69 +524,69 @@ class TestFlowMatchingMath:
         """Test that x_t = (1-σ)x_0 + σ*ε is correct interpolation"""
         x_0 = torch.randn(2, 16, 1, 8, 8)
         noise = torch.randn_like(x_0)
-        
+
         for sigma_val in [0.0, 0.25, 0.5, 0.75, 1.0]:
             sigma = torch.tensor([sigma_val, sigma_val]).view(-1, 1, 1, 1, 1)
-            
+
             x_t = (1.0 - sigma) * x_0 + sigma * noise
-            
+
             # At sigma=0, x_t should equal x_0
             if sigma_val == 0.0:
                 assert torch.allclose(x_t, x_0, atol=1e-6)
-            
+
             # At sigma=1, x_t should equal noise
             if sigma_val == 1.0:
                 assert torch.allclose(x_t, noise, atol=1e-6)
-            
+
             # x_t should be finite
             assert torch.isfinite(x_t).all()
-        
-        print(f"✓ Flow matching interpolation test passed")
+
+        print("✓ Flow matching interpolation test passed")
 
     def test_velocity_target(self):
         """Test that velocity target v = ε - x_0 is correct"""
         x_0 = torch.randn(2, 16, 1, 8, 8)
         noise = torch.randn_like(x_0)
-        
+
         # Velocity target
         target = noise - x_0
-        
+
         # Shape should match
         assert target.shape == x_0.shape
-        
+
         # Target should be finite
         assert torch.isfinite(target).all()
-        
+
         # At x_0 = 0, target should equal noise
         x_0_zero = torch.zeros_like(x_0)
         target_zero = noise - x_0_zero
         assert torch.allclose(target_zero, noise)
-        
-        print(f"✓ Velocity target test passed")
+
+        print("✓ Velocity target test passed")
 
     def test_loss_weight_formula(self):
         """Test loss weight formula: w = 1 + shift * σ"""
         shift = 3.0
-        
+
         for sigma_val in [0.0, 0.25, 0.5, 0.75, 1.0]:
             sigma = torch.tensor([sigma_val])
             weight = 1.0 + shift * sigma
-            
+
             expected = 1.0 + shift * sigma_val
             assert torch.allclose(weight, torch.tensor([expected]), atol=1e-6)
-            
+
             # Weight should always be >= 1.0
             assert weight >= 1.0
-            
+
             # At sigma=0, weight=1
             if sigma_val == 0.0:
                 assert weight == 1.0
-            
+
             # At sigma=1, weight=1+shift
             if sigma_val == 1.0:
                 assert torch.allclose(weight, torch.tensor([1.0 + shift]))
-        
-        print(f"✓ Loss weight formula test passed")
+
+        print("✓ Loss weight formula test passed")
 
 
 if __name__ == "__main__":
