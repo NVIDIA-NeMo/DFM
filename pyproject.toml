@@ -132,6 +132,7 @@ explicit = true
 [tool.uv.sources]
 nemo-automodel = { path = "3rdparty/Automodel" }
 megatron-bridge = { path = "3rdparty/Megatron-Bridge" }
+megatron-core = { path = "3rdparty/Megatron-Bridge/3rdparty/Megatron-LM/" }
 transformer-engine = { git = "https://github.com/NVIDIA/TransformerEngine.git", rev = "release_v2.9" }
 nvidia-resiliency-ext = { index = "pypi" }
 
