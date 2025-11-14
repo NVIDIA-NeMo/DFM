@@ -63,10 +63,12 @@ def test_flow_pipeline_training_step_cpu_stub(monkeypatch):
                 t = t.squeeze(0)
             x_norm = [t]
         return impl(x_norm, patch_size)
+
     monkeypatch.setattr(flow_pipeline_mod, "patchify", _safe_patchify)
 
     # Disable context parallelism and force last pipeline stage
     from megatron.core import parallel_state
+
     monkeypatch.setattr(parallel_state, "get_context_parallel_world_size", lambda: 1, raising=False)
     monkeypatch.setattr(parallel_state, "is_pipeline_last_stage", lambda: True, raising=False)
 
@@ -85,6 +87,7 @@ def test_flow_pipeline_training_step_cpu_stub(monkeypatch):
 
     # Packed seq params with simple cumulative lengths
     from megatron.core.packed_seq_params import PackedSeqParams
+
     cu = torch.tensor([0, seq_len], dtype=torch.int32)
     packed_seq_params = {
         "self_attention": PackedSeqParams(

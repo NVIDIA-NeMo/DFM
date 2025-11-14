@@ -64,5 +64,3 @@ def test_get_flow_match_loss_weight_simple_cases():
     sigma = torch.ones(5, dtype=torch.float32)
     w = get_flow_match_loss_weight(sigma, shift=2.0)
     assert torch.allclose(w, torch.full_like(sigma, 3.0))
-
-

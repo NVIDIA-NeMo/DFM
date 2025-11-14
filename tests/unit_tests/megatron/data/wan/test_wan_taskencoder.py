@@ -69,7 +69,6 @@ def test_encode_sample_no_context_parallel(monkeypatch):
         "pickle": context_embeddings,
     }
 
-
     enc = WanTaskEncoder(
         seq_length=1024, patch_temporal=patch_temporal, patch_spatial=patch_spatial, packing_buffer_size=None
     )

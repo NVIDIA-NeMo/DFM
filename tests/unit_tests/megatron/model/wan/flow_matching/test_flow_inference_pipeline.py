@@ -52,6 +52,7 @@ def test_select_checkpoint_dir_latest(tmp_path):
 def test_forward_pp_step_no_pp(monkeypatch):
     # Build a minimal instance skipping heavy init
     pip = object.__new__(FlowInferencePipeline)
+
     class _Model:
         class _Cfg:
             hidden_size = 16

@@ -38,6 +38,3 @@ def test_supported_sizes_lists():
         assert isinstance(sizes, tuple)
         for s in sizes:
             assert s in SIZE_CONFIGS
-
-
-
