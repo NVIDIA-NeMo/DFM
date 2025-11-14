@@ -31,6 +31,7 @@ from nemo_automodel.recipes.llm.train_ft import build_distributed, build_wandb
 from torch.distributed.fsdp import MixedPrecisionPolicy
 from transformers.utils.hub import TRANSFORMERS_CACHE
 
+import wandb
 from dfm.src.automodel._diffusers.auto_diffusion_pipeline import NeMoWanPipeline
 from dfm.src.automodel.flow_matching.training_step_t2v import (
     step_fsdp_transformer_t2v,
@@ -119,7 +120,7 @@ def build_model_and_optimizer(
 
     logging.info("[INFO] NeMoAutoDiffusion setup complete (pipeline + optimizer)")
 
-    return pipe, optimizer, fsdp2_manager.device_mesh
+    return pipe, optimizer, getattr(fsdp2_manager, "device_mesh", None)
 
 
 def build_lr_scheduler(
@@ -272,6 +273,9 @@ class TrainWan21DiffusionRecipe(BaseRecipe):
             raise RuntimeError("Training dataloader is empty; cannot proceed with training")
 
         # Derive DP size consistent with model parallel config
+        tp_size = fsdp_cfg.get("tp_size", 1)
+        cp_size = fsdp_cfg.get("cp_size", 1)
+        pp_size = fsdp_cfg.get("pp_size", 1)
         denom = max(1, tp_size * cp_size * pp_size)
         self.dp_size = fsdp_cfg.get("dp_size", None)
         if self.dp_size is None:
