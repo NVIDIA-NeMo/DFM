@@ -55,25 +55,30 @@ def test_cache_video_uses_writer_and_returns_path(monkeypatch):
     class _DummyWriter:
         def __init__(self, path, fps=None, codec=None, quality=None):
             calls["path"] = path
+
         def append_data(self, frame):
             calls["frames"] += 1
+
         def close(self):
             pass
 
-    monkeypatch.setattr(inf_utils.imageio, "get_writer", lambda path, fps, codec, quality: _DummyWriter(path, fps, codec, quality))
+    monkeypatch.setattr(
+        inf_utils.imageio, "get_writer", lambda path, fps, codec, quality: _DummyWriter(path, fps, codec, quality)
+    )
 
     # Stub make_grid to return a fixed CHW tensor regardless of input
     def _fake_make_grid(x, nrow, normalize, value_range):
         return torch.rand(3, 4, 5)
+
     monkeypatch.setattr(inf_utils.torchvision.utils, "make_grid", _fake_make_grid)
 
     # Build a tensor whose unbind(2) yields 2 slices so we expect 2 frames written
     vid = torch.rand(3, 3, 2, 2)  # shape chosen to exercise unbind(2)
     with tempfile.TemporaryDirectory() as td:
         out_file = os.path.join(td, "out.mp4")
-        result = inf_utils.cache_video(vid, save_file=out_file, fps=5, suffix=".mp4", nrow=1, normalize=False, value_range=(0.0, 1.0), retry=1)
+        result = inf_utils.cache_video(
+            vid, save_file=out_file, fps=5, suffix=".mp4", nrow=1, normalize=False, value_range=(0.0, 1.0), retry=1
+        )
         assert result == out_file
         assert calls["path"] == out_file
         assert calls["frames"] == vid.shape[2]  # frames equal to number of unbinds on dim=2
-
-

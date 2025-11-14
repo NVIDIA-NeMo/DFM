@@ -37,13 +37,17 @@ class _DummyModel:
 def test_flow_pipeline_training_step_cpu_stub(monkeypatch):
     # Bypass heavy diffusers init
     def _stub_init(self, model_id="x", seed=0):
-        self.pipe = types.SimpleNamespace(scheduler=types.SimpleNamespace(config=types.SimpleNamespace(num_train_timesteps=1000)))
+        self.pipe = types.SimpleNamespace(
+            scheduler=types.SimpleNamespace(config=types.SimpleNamespace(num_train_timesteps=1000))
+        )
+
     monkeypatch.setattr(FlowPipeline, "__init__", _stub_init)
 
     # Make patchify accept both tensor and list for this test
     def _safe_patchify(x, patch_size):
         # Always delegate to the real implementation in utils to avoid recursion
         from dfm.src.megatron.model.wan import utils as wan_utils
+
         impl = wan_utils.patchify
         # Normalize inputs to expected 4D [C, F, H, W] without batch dim
         if isinstance(x, list):
@@ -115,5 +119,3 @@ def test_flow_pipeline_training_step_cpu_stub(monkeypatch):
     assert model_pred.shape == video_latents.shape
     assert weighted_loss.shape[:2] == video_latents.shape[:2]
     assert split_loss_mask.shape == loss_mask.shape
-
-

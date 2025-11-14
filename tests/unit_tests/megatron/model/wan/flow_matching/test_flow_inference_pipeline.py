@@ -36,6 +36,7 @@ def test_select_checkpoint_dir_latest(tmp_path):
 
     # Instantiate object without running heavy init by patching __init__ to a no-op
     pip = object.__new__(FlowInferencePipeline)
+
     pip.inference_cfg = _Cfg()
 
     latest = FlowInferencePipeline._select_checkpoint_dir(pip, str(base), checkpoint_step=None)
@@ -55,15 +56,20 @@ def test_forward_pp_step_no_pp(monkeypatch):
         class _Cfg:
             hidden_size = 16
             qkv_format = "sbhd"
+
         config = _Cfg()
+
         def __call__(self, x, grid_sizes, t, **kwargs):
             return x  # echo input
+
         def set_input_tensor(self, x):
             pass
+
     pip.model = _Model()
 
     # Patch parallel state to no-PP path
     from megatron.core import parallel_state
+
     monkeypatch.setattr(parallel_state, "get_pipeline_model_parallel_world_size", lambda: 1, raising=False)
 
     S, B, H = 8, 1, pip.model.config.hidden_size
@@ -81,5 +87,3 @@ def test_forward_pp_step_no_pp(monkeypatch):
         arg_c=arg_c,
     )
     assert out.shape == latent_model_input.shape
-
-

@@ -69,7 +69,10 @@ def test_encode_sample_no_context_parallel(monkeypatch):
         "pickle": context_embeddings,
     }
 
-    enc = WanTaskEncoder(seq_length=1024, patch_temporal=patch_temporal, patch_spatial=patch_spatial, packing_buffer_size=None)
+
+    enc = WanTaskEncoder(
+        seq_length=1024, patch_temporal=patch_temporal, patch_spatial=patch_spatial, packing_buffer_size=None
+    )
     out = enc.encode_sample(sample)
 
     # Grid / patches
@@ -104,9 +107,13 @@ def test_batch_with_packing_buffer_size(monkeypatch):
     monkeypatch.setattr(parallel_state, "get_context_parallel_world_size", lambda: 1, raising=False)
     # Ensure seeded wrapper has an active worker config
     from megatron.energon.task_encoder.base import WorkerConfig
+
     class _FakeWorkerCfg:
-        def worker_seed(self): return 456
+        def worker_seed(self):
+            return 456
+
         active_worker_sample_index = 0
+
     monkeypatch.setattr(WorkerConfig, "active_worker_config", _FakeWorkerCfg(), raising=False)
 
     c = 4
@@ -122,17 +129,27 @@ def test_batch_with_packing_buffer_size(monkeypatch):
         "pickle": torch.randn(32, 128),
     }
 
-    enc = WanTaskEncoder(seq_length=256, patch_temporal=patch_temporal, patch_spatial=patch_spatial, packing_buffer_size=3)
+    enc = WanTaskEncoder(
+        seq_length=256, patch_temporal=patch_temporal, patch_spatial=patch_spatial, packing_buffer_size=3
+    )
     diff_sample = enc.encode_sample(sample)
     batch = enc.batch([diff_sample])
 
     assert isinstance(batch, dict)
-    for k in ["video_latents", "context_embeddings", "loss_mask", "seq_len_q", "seq_len_q_padded", "seq_len_kv", "seq_len_kv_padded", "grid_sizes", "video_metadata"]:
+    for k in [
+        "video_latents",
+        "context_embeddings",
+        "loss_mask",
+        "seq_len_q",
+        "seq_len_q_padded",
+        "seq_len_kv",
+        "seq_len_kv_padded",
+        "grid_sizes",
+        "video_metadata",
+    ]:
         assert k in batch
 
     # video_latents: [S, 1, ...], where S equals sample.video length when CP world size is 1
     assert batch["video_latents"].shape[1] == 1
     assert batch["context_embeddings"].shape[1] == 1
     assert batch["loss_mask"].shape[1] == 1
-
-

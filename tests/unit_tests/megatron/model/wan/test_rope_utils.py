@@ -47,5 +47,3 @@ def test_wan3d_rope_embeddings_shapes_and_padding():
     first_padded_len = padded_lens[0]
     tail = out[first_seq_len:first_padded_len]
     assert torch.all(tail == 0), "Padded region should be zeros"
-
-
