@@ -180,16 +180,18 @@ class FlowPipeline:
         if parallel_state.get_context_parallel_world_size() > 1:
             video_latents = thd_split_inputs_cp(
                 video_latents,
-                packed_seq_params["self_attention"].cu_seqlens_q,
+                packed_seq_params["self_attention"].cu_seqlens_q_padded,
                 parallel_state.get_context_parallel_group(),
             )
             noisy_latents = thd_split_inputs_cp(
                 noisy_latents,
-                packed_seq_params["self_attention"].cu_seqlens_q,
+                packed_seq_params["self_attention"].cu_seqlens_q_padded,
                 parallel_state.get_context_parallel_group(),
             )
             noise = thd_split_inputs_cp(
-                noise, packed_seq_params["self_attention"].cu_seqlens_q, parallel_state.get_context_parallel_group()
+                noise,
+                packed_seq_params["self_attention"].cu_seqlens_q_padded,
+                parallel_state.get_context_parallel_group(),
             )
             # We don't need to split context embeddings across context parallelism
             # if we disable context parallelism for cross-attention
@@ -200,7 +202,7 @@ class FlowPipeline:
             # )
             split_loss_mask = thd_split_inputs_cp(
                 loss_mask,
-                packed_seq_params["self_attention"].cu_seqlens_q,
+                packed_seq_params["self_attention"].cu_seqlens_q_padded,
                 parallel_state.get_context_parallel_group(),
             )
         else:

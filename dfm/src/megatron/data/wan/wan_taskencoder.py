@@ -117,13 +117,16 @@ class WanTaskEncoder(DiffusionTaskEncoderWithSequencePacking):
         if parallel_state.get_context_parallel_world_size() > 1:
             sharding_factor = parallel_state.get_context_parallel_world_size() * 2
             seq_len_q_padded = ((seq_len_q + sharding_factor - 1) // sharding_factor) * sharding_factor
+            seq_len_kv_padded = ((seq_len_kv + sharding_factor - 1) // sharding_factor) * sharding_factor
         else:
             seq_len_q_padded = seq_len_q
+            seq_len_kv_padded = seq_len_kv
 
         # padding
         if seq_len_q < seq_len_q_padded:
             video_latent = F.pad(video_latent, (0, 0, 0, seq_len_q_padded - seq_len_q))
             loss_mask = F.pad(loss_mask, (0, seq_len_q_padded - seq_len_q))
+            context_embeddings = F.pad(context_embeddings, (0, 0, 0, seq_len_kv_padded - seq_len_kv))
 
         ### Note: shape of sample's values
         # video_latent: [num_patches, latents_channels * pF * pH * pW]
@@ -142,6 +145,7 @@ class WanTaskEncoder(DiffusionTaskEncoderWithSequencePacking):
             seq_len_q=torch.tensor([seq_len_q], dtype=torch.int32),
             seq_len_q_padded=torch.tensor([seq_len_q_padded], dtype=torch.int32),
             seq_len_kv=torch.tensor([seq_len_kv], dtype=torch.int32),
+            seq_len_kv_padded=torch.tensor([seq_len_kv_padded], dtype=torch.int32),
             pos_ids=torch.zeros(1, dtype=torch.bfloat16),  # dummy pos_ids
             video_metadata=video_metadata,
         )
@@ -179,6 +183,7 @@ class WanTaskEncoder(DiffusionTaskEncoderWithSequencePacking):
             seq_len_q=sample.seq_len_q,
             seq_len_q_padded=sample.seq_len_q_padded,
             seq_len_kv=sample.seq_len_kv,
+            seq_len_kv_padded=sample.seq_len_kv_padded,
             grid_sizes=sample.latent_shape,
             video_metadata=sample.video_metadata,
         )
@@ -190,6 +195,7 @@ class WanTaskEncoder(DiffusionTaskEncoderWithSequencePacking):
         # seq_len_q: [num_samples]
         # seq_len_q_padded: [num_samples]
         # seq_len_kv: [num_samples]
+        # seq_len_kv_padded: [num_samples]
         # grid_sizes: [num_samples, 3]
         # video_metadata: [num_samples]
 

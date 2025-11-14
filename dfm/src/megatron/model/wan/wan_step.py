@@ -36,16 +36,19 @@ def wan_data_step(qkv_format, dataloader_iter):
     batch = {k: v.to(device="cuda", non_blocking=True) if torch.is_tensor(v) else v for k, v in batch.items()}
     # Construct packed sequence parameters
     if ("seq_len_q" in batch) and ("seq_len_kv" in batch):
-        cu_seqlens = batch["seq_len_q"].cumsum(dim=0).to(torch.int32)
         zero = torch.zeros(1, dtype=torch.int32, device="cuda")
+
+        cu_seqlens = batch["seq_len_q"].cumsum(dim=0).to(torch.int32)
         cu_seqlens = torch.cat((zero, cu_seqlens))
 
         cu_seqlens_padded = batch["seq_len_q_padded"].cumsum(dim=0).to(torch.int32)
-        zero = torch.zeros(1, dtype=torch.int32, device="cuda")
         cu_seqlens_padded = torch.cat((zero, cu_seqlens_padded))
 
         cu_seqlens_kv = batch["seq_len_kv"].cumsum(dim=0).to(torch.int32)
         cu_seqlens_kv = torch.cat((zero, cu_seqlens_kv))
+
+        cu_seqlens_kv_padded = batch["seq_len_kv_padded"].cumsum(dim=0).to(torch.int32)
+        cu_seqlens_kv_padded = torch.cat((zero, cu_seqlens_kv_padded))
 
         batch["packed_seq_params"] = {
             "self_attention": PackedSeqParams(
@@ -59,6 +62,7 @@ def wan_data_step(qkv_format, dataloader_iter):
                 cu_seqlens_q=cu_seqlens,
                 cu_seqlens_q_padded=cu_seqlens_padded,
                 cu_seqlens_kv=cu_seqlens_kv,
+                cu_seqlens_kv_padded=cu_seqlens_kv_padded,
                 qkv_format=qkv_format,
             ),
         }

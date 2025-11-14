@@ -28,7 +28,7 @@ cd /opt/
 
 # DFM (pinned)
 git clone --no-checkout https://github.com/NVIDIA-NeMo/DFM.git
-git -C DFM checkout aa2050466b8b9b8844d754cc61ea93c1f7a0e90e
+git -C DFM checkout 174bb7b34de002ebbbcae1ba8e2b12363c7dee01
 export DFM_PATH=/opt/DFM
 
 # Megatron-Bridge (pinned)
@@ -67,6 +67,7 @@ cd ${DFM_PATH}
 
 ```bash
 NVTE_FUSED_ATTN=1 torchrun --nproc_per_node=8 examples/megatron/recipes/wan/pretrain_wan.py \
+  --training-mode pretrain \
   model.tensor_model_parallel_size=1 \
   model.pipeline_model_parallel_size=1 \
   model.context_parallel_size=4 \
@@ -102,6 +103,7 @@ NVTE_FUSED_ATTN=1 torchrun --nproc_per_node=8 examples/megatron/recipes/wan/pret
 
 ```bash
 NVTE_FUSED_ATTN=1 torchrun --nproc_per_node=8 examples/megatron/recipes/wan/pretrain_wan.py \
+  --training-mode pretrain \
   model.tensor_model_parallel_size=2 \
   model.pipeline_model_parallel_size=1 \
   model.context_parallel_size=4 \
@@ -138,9 +140,8 @@ NVTE_FUSED_ATTN=1 torchrun --nproc_per_node=8 examples/megatron/recipes/wan/pret
 
 ### Using mock data (optional, for debugging)
 
-- Edit `dfm/src/megatron/data/wan/wan_taskencoder.py`.
-- Comment out the production `encode_sample()` and uncomment the mock version.
-- Adjust `video_size` (F_latents, H_latents, W_latents). Total `seq_len = F * H * W`.
+- Using `--mock` argument.
+- Adjust `video_size` (F_latents, H_latents, W_latents) and `number_packed_samples` of `WanMockDataModuleConfig` in `wan.py`. Total `seq_len = F * H * W * number_packed_samples`.
 
 ## Inference
 
@@ -152,7 +153,7 @@ T5_DIR="/lustre/fsw/coreai_dlalgo_genai/huvu/data/nemo_vfm/wan_checkpoints/t5"
 VAE_DIR="/lustre/fsw/coreai_dlalgo_genai/huvu/data/nemo_vfm/wan_checkpoints/vae"
 CKPT_DIR="/lustre/fsw/coreai_dlalgo_genai/huvu/data/nemo_vfm/datasets/shared_checkpoints/megatron_checkpoint_1.3B"
 
-NVTE_FUSED_ATTN=1 torchrun --nproc_per_node=1 examples/megatron/recipes/wan/inference_wan.py \
+NVTE_FUSED_ATTN=1 torchrun --nproc_per_node=1 examples/megatron/recipes/wan/inference_wan.py  \
   --task t2v-1.3B \
   --sizes 480*832 \
   --checkpoint_dir "${CKPT_DIR}" \

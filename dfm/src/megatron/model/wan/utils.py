@@ -15,11 +15,9 @@
 import math
 from typing import Tuple
 
-import megatron.core.parallel_state as parallel_state
 import torch
 import torch.distributed as dist
 import transformer_engine_torch as tex
-from torch.distributed import all_gather
 
 
 def grid_sizes_calculation(
@@ -98,55 +96,6 @@ def unpatchify(
         u = u.reshape(c, *[i * j for i, j in zip(v, patch_size)])
         out.append(u)
     return out
-
-
-def split_inputs_cp(x: torch.Tensor, seq_dim: int = 0) -> torch.Tensor:
-    """
-    Split input tensor along the sequence dimension for context parallelism.
-
-    Args:
-        x: Input tensor to be split. (e.g. shape [seq_len, batch_size, ...])
-        seq_dim: The dimension along which to split the input (sequence dimension).
-
-    Returns:
-        A slice of the input tensor corresponding to the current rank. (e.g. shape [seq_len/cp_size, batch_size, ...])
-    """
-
-    cp_size = parallel_state.get_context_parallel_world_size()
-    if cp_size > 1:
-        cp_rank = parallel_state.get_context_parallel_rank()
-        assert x.shape[seq_dim] % cp_size == 0, f"{x.shape[seq_dim]} cannot divide cp_size {cp_size}"
-        x = x.view(*x.shape[:seq_dim], cp_size, x.shape[seq_dim] // cp_size, *x.shape[(seq_dim + 1) :])
-        seq_idx = torch.tensor([cp_rank], device=x.device)
-        x = x.index_select(seq_dim, seq_idx)
-        # Note that the new sequence length is the original sequence length / cp_size
-        x = x.view(*x.shape[:seq_dim], -1, *x.shape[(seq_dim + 2) :])
-    return x
-
-
-def cat_outputs_cp(x: torch.Tensor, seq_dim: int) -> torch.Tensor:
-    """
-    Concatenate tensors from multiple processes along a specified dimension.
-
-    Args:
-        x: Input tensor to be concatenated. (e.g. shape [seq_len/cp_size, batch_size, ...])
-        seq_dim: The dimension along which to concatenate the input tensors.
-
-    Returns:
-        A tensor with the concatenated tensors. (e.g. shape [seq_len, batch_size, ...])
-    """
-
-    cp_group = parallel_state.get_context_parallel_group()
-    cp_size = parallel_state.get_context_parallel_world_size()
-    if cp_size > 1:
-        gathered_tensors = [torch.zeros_like(x) for _ in range(cp_size)]
-        # Attempt to gather tensors from all ranks
-        # PyTorch’s all_gather orders outputs by rank within the group, which matches how chunks were selected by cp_rank
-        all_gather(gathered_tensors, x, group=cp_group)
-        gathered_tensors = torch.cat(gathered_tensors, dim=seq_dim)
-        return gathered_tensors
-    else:
-        return x
 
 
 def thd_split_inputs_cp(

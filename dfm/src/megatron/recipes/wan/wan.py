@@ -32,7 +32,7 @@ from megatron.bridge.training.mixed_precision import MixedPrecisionConfig, get_m
 from megatron.core.distributed import DistributedDataParallelConfig
 
 from dfm.src.megatron.data.wan.wan_energon_datamodule import WanDataModuleConfig
-from dfm.src.megatron.data.wan.wan_mock_energon_datamodule import WanMockDataModuleConfig
+from dfm.src.megatron.data.wan.wan_mock_datamodule import WanMockDataModuleConfig
 from dfm.src.megatron.model.wan.wan_provider import WanModelProvider
 
 
