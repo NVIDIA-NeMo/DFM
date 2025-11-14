@@ -55,6 +55,7 @@ classifiers = [
     "Topic :: Utilities",
 ]
 dependencies = [
+    "accelerate",
     "diffusers==0.35.1",
     "easydict",
     "ftfy",
