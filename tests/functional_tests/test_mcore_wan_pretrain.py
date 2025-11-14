@@ -16,7 +16,6 @@
 
 import os
 import subprocess
-import tempfile
 
 import pytest
 
@@ -106,4 +105,3 @@ class TestMcoreWanPretrain:
             pytest.fail("WAN pretrain mock run exceeded timeout of 300 seconds")
         except subprocess.CalledProcessError as e:
             pytest.fail(f"WAN pretrain mock run failed with error:\nSTDOUT: {e.stdout}\nSTDERR: {e.stderr}")
-
