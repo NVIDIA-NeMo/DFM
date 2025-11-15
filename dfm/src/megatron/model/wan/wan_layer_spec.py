@@ -103,25 +103,25 @@ class WanLayerWithAdaLN(TransformerLayer):
             return modified_submods
         
         # Replace any submodules that will have CP disabled and build them manually later after TransformerLayer init.
-        modified_submods = _replace_no_cp_submodules(submodules)
+        # modified_submods = _replace_no_cp_submodules(submodules)
         super().__init__(
-            config=config, submodules=modified_submods, layer_number=layer_number, hidden_dropout=hidden_dropout
+            config=config, submodules=submodules, layer_number=layer_number, hidden_dropout=hidden_dropout
         )
 
         # Override Cross Attention to disable CP.
         # Disable TP Comm overlap as well. Not disabling will attempt re-use of buffer size same as
         #   Q and lead to incorrect tensor shapes.
-        if submodules.cross_attention != IdentityOp:
-            cp_override_config = copy.deepcopy(config)
-            cp_override_config.context_parallel_size = 1
-            cp_override_config.tp_comm_overlap = False
-            self.cross_attention = build_module(
-                submodules.cross_attention,
-                config=cp_override_config,
-                layer_number=layer_number,
-            )
-        else:
-            self.cross_attention = None
+        # if submodules.cross_attention != IdentityOp:
+        #     cp_override_config = copy.deepcopy(config)
+        #     cp_override_config.context_parallel_size = 1
+        #     cp_override_config.tp_comm_overlap = False
+        #     self.cross_attention = build_module(
+        #         submodules.cross_attention,
+        #         config=cp_override_config,
+        #         layer_number=layer_number,
+        #     )
+        # else:
+        #     self.cross_attention = None
 
         self.full_self_attention = build_module(
             submodules.full_self_attention,
@@ -213,7 +213,12 @@ class WanLayerWithAdaLN(TransformerLayer):
 
         # ******************************************** cross attention ******************************************************
 
-        packed_seq_params['cross_attention'].cu_seqlens_q = torch.tensor([0, hidden_states.shape[0]], device=packed_seq_params['cross_attention'].cu_seqlens_kv.device, dtype=torch.int32)
+        # TODO (pmannan): Disable CP for CrossAttention as KV context is small.
+        # But needs better support for packed sequences and padding to ensure correct calculations
+        # packed_seq_params['cross_attention'].cu_seqlens_q = torch.tensor(
+        #     [0, hidden_states.shape[0]], 
+        #     device=packed_seq_params['cross_attention'].cu_seqlens_kv.device, 
+        #     dtype=torch.int32)
         attention_output, bias = self.cross_attention(
             self.norm3(hidden_states),
             attention_mask=context_mask,
