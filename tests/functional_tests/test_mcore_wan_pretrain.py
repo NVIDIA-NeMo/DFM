@@ -45,6 +45,8 @@ class TestMcoreWanPretrain:
         cmd = [
             "uv",
             "run",
+            "--group",
+            "megatron-bridge",
             "python",
             "-m",
             "torch.distributed.run",
