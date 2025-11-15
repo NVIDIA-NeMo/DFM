@@ -43,6 +43,8 @@ class TestMcoreWanPretrain:
 
         # Build the command for the mock run
         cmd = [
+            "uv",
+            "run",
             "python",
             "-m",
             "torch.distributed.run",
