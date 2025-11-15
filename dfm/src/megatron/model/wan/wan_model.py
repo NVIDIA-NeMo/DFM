@@ -104,8 +104,6 @@ class WanModel(VisionModule):
         super(WanModel, self).__init__(config=config)
 
         self.config: TransformerConfig = config
-        if not hasattr(self, "pg_collection") or self.pg_collection is None:
-            self.pg_collection = ProcessGroupCollection.use_mpu_process_groups()
 
         self.transformer_decoder_layer_spec = transformer_decoder_layer_spec()
         self.pre_process = pre_process
