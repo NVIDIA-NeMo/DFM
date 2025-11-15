@@ -85,7 +85,7 @@ class TestMcoreWanPretrain:
                 cmd,
                 capture_output=True,
                 text=True,
-                timeout=3000,  # 5 minute timeout
+                timeout=300,  # 5 minute timeout
                 check=True,
             )
 
