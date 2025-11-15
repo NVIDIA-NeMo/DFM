@@ -103,7 +103,7 @@ class DiTCrossAttentionModel(VisionModule):
         **kwargs,
     ):
         super(DiTCrossAttentionModel, self).__init__(config=config)
-        
+
         self.config: TransformerConfig = config
         self.transformer_decoder_layer_spec = transformer_decoder_layer_spec()
         self.pre_process = pre_process
