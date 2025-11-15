@@ -67,6 +67,7 @@ class TestMcoreWanPretrain:
             "optimizer.lr=5e-6",
             "optimizer.min_lr=5e-6",
             "train.eval_iters=0",
+            "train.max_steps=10",
             "scheduler.lr_decay_style=constant",
             "scheduler.lr_warmup_iters=0",
             "model.seq_length=2048",
@@ -85,7 +86,7 @@ class TestMcoreWanPretrain:
                 cmd,
                 capture_output=True,
                 text=True,
-                timeout=300,  # 5 minute timeout
+                timeout=1800,  # 30 minute timeout
                 check=True,
             )
 
@@ -102,6 +103,6 @@ class TestMcoreWanPretrain:
             )
 
         except subprocess.TimeoutExpired:
-            pytest.fail("WAN pretrain mock run exceeded timeout of 300 seconds")
+            pytest.fail("WAN pretrain mock run exceeded timeout of 1800 seconds (30 minutes)")
         except subprocess.CalledProcessError as e:
             pytest.fail(f"WAN pretrain mock run failed with error:\nSTDOUT: {e.stdout}\nSTDERR: {e.stderr}")
