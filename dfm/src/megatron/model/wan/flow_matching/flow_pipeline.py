@@ -193,6 +193,7 @@ class FlowPipeline:
                 packed_seq_params["self_attention"].cu_seqlens_q_padded,
                 parallel_state.get_context_parallel_group(),
             )
+            # TODO (pmannan): Disable CP for CrossAttention as KV context is small.
             # We don't need to split context embeddings across context parallelism
             # if we disable context parallelism for cross-attention
             context_embeddings = thd_split_inputs_cp(
