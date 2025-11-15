@@ -67,7 +67,6 @@ class TestMcoreWanPretrain:
             "optimizer.lr=5e-6",
             "optimizer.min_lr=5e-6",
             "train.eval_iters=0",
-            "train.max_steps=10",
             "scheduler.lr_decay_style=constant",
             "scheduler.lr_warmup_iters=0",
             "model.seq_length=2048",
