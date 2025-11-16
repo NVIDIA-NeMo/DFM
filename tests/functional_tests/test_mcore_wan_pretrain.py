@@ -85,9 +85,16 @@ class TestMcoreWanPretrain:
             # Stream output in real-time instead of capturing it
             result = subprocess.run(
                 cmd,
+                capture_output=True,
+                text=True,
                 timeout=1800,  # 30 minute timeout
                 check=True,
             )
+
+
+            # Print output for debugging if needed
+            print("STDOUT:", result.stdout)
+            print("STDERR:", result.stderr)
 
             # Basic verification that the run completed
             assert result.returncode == 0, f"Command failed with return code {result.returncode}"
