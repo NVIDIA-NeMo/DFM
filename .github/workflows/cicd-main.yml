@@ -98,7 +98,7 @@ jobs:
             runner: self-hosted-nemo
             timeout: 30
           - script: L2_Automodel_Wan21_Test
-            runner: linux-amd64-gpu-rtxa6000-latest-2-nemo
+            runner: self-hosted-nemo
             timeout: 30
 
     needs: [cicd-unit-tests]
