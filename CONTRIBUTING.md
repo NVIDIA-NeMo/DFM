@@ -14,13 +14,14 @@ docker build -f docker/Dockerfile.ci -t dfm:latest .
 
 ### Run the container
 ```bash
-docker run --ipc=host --ulimit memlock=-1 --ulimit stack=67108864 --gpus all -v $(pwd):/opt/DFM -it dfm:latest bash
+docker run --gpus all -v $(pwd):/opt/DFM -it dfm:latest bash
 ```
 
-### inside the container
+### Inside the container
 ```bash
-# Add DFM to PYTHONPATH
-export PYTHONPATH=$PYTHONPATH:/opt/DFM
+# Install DFM in editable mode (automatically handles Python path)
+source /opt/venv/bin/activate
+uv pip install --no-deps -e .
 
 # Run a Mock Run:
 ```
@@ -52,7 +53,7 @@ export PYTHONPATH=$PYTHONPATH:/opt/DFM
   git config --global gpg.format ssh
   git config --global user.signingkey ~/.ssh/id_rsa.pub  # or id_ed25519.pub
   git config --global commit.gpgsign true
-
+  
   # Add your SSH key as a "Signing Key" on GitHub: https://github.com/settings/keys
   ```
 
@@ -60,11 +61,11 @@ export PYTHONPATH=$PYTHONPATH:/opt/DFM
   ```bash
   # Generate a GPG key
   gpg --full-generate-key
-
+  
   # Configure GPG signing
   git config --global user.signingkey YOUR_GPG_KEY_ID
   git config --global commit.gpgsign true
-
+  
   # Add your GPG key to GitHub: https://github.com/settings/keys
   ```
 
