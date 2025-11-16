@@ -91,7 +91,6 @@ class TestMcoreWanPretrain:
                 check=True,
             )
 
-
             # Print output for debugging if needed
             print("STDOUT:", result.stdout)
             print("STDERR:", result.stderr)
