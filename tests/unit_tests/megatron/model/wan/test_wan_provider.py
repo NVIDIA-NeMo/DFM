@@ -13,10 +13,12 @@
 # limitations under the License.
 
 import torch
+import torch.nn as nn
 from megatron.core import parallel_state
 
 from dfm.src.megatron.model.wan.wan_model import WanModel
 from dfm.src.megatron.model.wan.wan_provider import WanModelProvider
+import dfm.src.megatron.model.wan.wan_model as wan_model_module
 
 
 def test_wan_model_provider_provide_returns_model(monkeypatch):
@@ -25,6 +27,21 @@ def test_wan_model_provider_provide_returns_model(monkeypatch):
     monkeypatch.setattr(parallel_state, "is_pipeline_last_stage", lambda: True, raising=False)
     # Avoid querying uninitialized PP groups
     monkeypatch.setattr(parallel_state, "get_pipeline_model_parallel_world_size", lambda: 1, raising=False)
+
+    # Bypass Megatron's ProcessGroupCollection usage inside TransformerBlock during construction.
+    # CI does not initialize distributed groups; a dummy block suffices for construction checks.
+    class DummyTransformerBlock(nn.Module):
+        def __init__(self, *args, **kwargs):
+            super().__init__()
+            self.input_tensor = None
+
+        def set_input_tensor(self, input_tensor):
+            self.input_tensor = input_tensor
+
+        def forward(self, hidden_states, **kwargs):
+            return hidden_states
+
+    monkeypatch.setattr(wan_model_module, "TransformerBlock", DummyTransformerBlock, raising=False)
 
     provider = WanModelProvider(
         num_layers=2,  # keep small
