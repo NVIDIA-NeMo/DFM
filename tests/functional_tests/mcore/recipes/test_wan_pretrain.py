@@ -102,3 +102,4 @@ class TestMcoreWanPretrain:
             pytest.fail("WAN pretrain mock run exceeded timeout of 1800 seconds (30 minutes)")
         except subprocess.CalledProcessError as e:
             pytest.fail(f"WAN pretrain mock run failed with return code {e.returncode}")
+
