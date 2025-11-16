@@ -43,10 +43,6 @@ class TestMcoreWanPretrain:
 
         # Build the command for the mock run
         cmd = [
-            "uv",
-            "run",
-            "--group",
-            "megatron-bridge",
             "python",
             "-m",
             "torch.distributed.run",
@@ -85,27 +81,17 @@ class TestMcoreWanPretrain:
 
         # Run the command with a timeout
         try:
+            # Stream output in real-time instead of capturing it
             result = subprocess.run(
                 cmd,
-                capture_output=True,
-                text=True,
-                timeout=3000,  # 5 minute timeout
+                timeout=1800,  # 30 minute timeout
                 check=True,
             )
-
-            # Print output for debugging if needed
-            print("STDOUT:", result.stdout)
-            print("STDERR:", result.stderr)
 
             # Basic verification that the run completed
             assert result.returncode == 0, f"Command failed with return code {result.returncode}"
 
-            # Check for common success indicators in output
-            assert "iteration" in result.stdout.lower() or "iteration" in result.stderr.lower(), (
-                "Expected to see iteration progress in output"
-            )
-
         except subprocess.TimeoutExpired:
-            pytest.fail("WAN pretrain mock run exceeded timeout of 300 seconds")
+            pytest.fail("WAN pretrain mock run exceeded timeout of 1800 seconds (30 minutes)")
         except subprocess.CalledProcessError as e:
-            pytest.fail(f"WAN pretrain mock run failed with error:\nSTDOUT: {e.stdout}\nSTDERR: {e.stderr}")
+            pytest.fail(f"WAN pretrain mock run failed with return code {e.returncode}")
