@@ -94,7 +94,9 @@ class DiTTaskEncoder(DiffusionTaskEncoderWithSequencePacking):
             pw=self.patch_spatial,
             pt=self.patch_temporal,
         )
-        sample["pickle"] = sample["pickle"].cpu().float().numpy().squeeze(0)
+        sample["pickle"] = sample["pickle"].cpu().float().numpy()
+        if sample["pickle"].shape[0] == 1:
+            sample["pickle"] = sample["pickle"][0]
         if is_image:
             t5_text_embeddings = torch.from_numpy(sample["pickle"]).to(torch.bfloat16)
         else:
@@ -103,27 +105,7 @@ class DiTTaskEncoder(DiffusionTaskEncoderWithSequencePacking):
 
         if t5_text_embeddings_seq_length > self.text_embedding_padding_size:
             t5_text_embeddings = t5_text_embeddings[: self.text_embedding_padding_size]
-        else:
-            t5_text_embeddings = F.pad(
-                t5_text_embeddings,
-                (
-                    0,
-                    0,
-                    0,
-                    self.text_embedding_padding_size - t5_text_embeddings_seq_length,
-                ),
-            )
         t5_text_mask = torch.ones(t5_text_embeddings_seq_length, dtype=torch.bfloat16)
-
-        if is_image:
-            h, w = info["image_height"], info["image_width"]
-            fps = torch.tensor([30] * 1, dtype=torch.bfloat16)
-            num_frames = torch.tensor([1] * 1, dtype=torch.bfloat16)
-        else:
-            h, w = info["height"], info["width"]
-            fps = torch.tensor([info["framerate"]] * 1, dtype=torch.bfloat16)
-            num_frames = torch.tensor([info["num_frames"]] * 1, dtype=torch.bfloat16)
-        image_size = torch.tensor([[h, w, h, w]] * 1, dtype=torch.bfloat16)
 
         pos_ids = rearrange(
             pos_id_3d.get_pos_id_3d(t=T // self.patch_temporal, h=H // self.patch_spatial, w=W // self.patch_spatial),
@@ -133,11 +115,20 @@ class DiTTaskEncoder(DiffusionTaskEncoderWithSequencePacking):
         loss_mask = torch.ones(seq_len, dtype=torch.bfloat16)
         sharding_factor = 64
         seq_len_q_padded = ((seq_len + sharding_factor - 1) // sharding_factor) * sharding_factor
+        seq_len_kv_padded = (
+            (t5_text_embeddings_seq_length + sharding_factor - 1) // sharding_factor
+        ) * sharding_factor
 
         if seq_len < seq_len_q_padded:
             video_latent = F.pad(video_latent, (0, 0, 0, seq_len_q_padded - seq_len))
             loss_mask = F.pad(loss_mask, (0, seq_len_q_padded - seq_len))
             pos_ids = F.pad(pos_ids, (0, 0, 0, seq_len_q_padded - seq_len))
+
+        if t5_text_embeddings_seq_length < seq_len_kv_padded:
+            t5_text_embeddings = F.pad(
+                t5_text_embeddings, (0, 0, 0, seq_len_kv_padded - t5_text_embeddings_seq_length)
+            )
+            t5_text_mask = F.pad(t5_text_mask, (0, seq_len_kv_padded - t5_text_embeddings_seq_length))
 
         return DiffusionSample(
             __key__=sample["__key__"],
@@ -150,8 +141,8 @@ class DiTTaskEncoder(DiffusionTaskEncoderWithSequencePacking):
             loss_mask=loss_mask,
             seq_len_q=torch.tensor([seq_len], dtype=torch.int32),
             seq_len_q_padded=torch.tensor([seq_len_q_padded], dtype=torch.int32),
-            seq_len_kv=torch.tensor([self.text_embedding_padding_size], dtype=torch.int32),
-            seq_len_kv_padded=torch.tensor([self.text_embedding_padding_size], dtype=torch.int32),
+            seq_len_kv=torch.tensor([t5_text_embeddings_seq_length], dtype=torch.int32),
+            seq_len_kv_padded=torch.tensor([seq_len_kv_padded], dtype=torch.int32),
             pos_ids=pos_ids,
             latent_shape=torch.tensor([C, T, H, W], dtype=torch.int32),
         )

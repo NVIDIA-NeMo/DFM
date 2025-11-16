@@ -40,17 +40,22 @@ def encode_seq_length(batch, format):
         cu_seqlens_q_padded = batch["seq_len_q_padded"].cumsum(dim=0).to(torch.int32)
         cu_seqlens_q_padded = torch.cat((zero, cu_seqlens_q_padded))
 
+        cu_seqlens_kv_padded = batch["seq_len_kv_padded"].cumsum(dim=0).to(torch.int32)
+        cu_seqlens_kv_padded = torch.cat((zero, cu_seqlens_kv_padded))
+
         batch["packed_seq_params"] = {
             "self_attention": PackedSeqParams(
                 cu_seqlens_q=cu_seqlens_q,
                 cu_seqlens_kv=cu_seqlens_q,
                 cu_seqlens_q_padded=cu_seqlens_q_padded,
+                cu_seqlens_kv_padded=cu_seqlens_q_padded,
                 qkv_format=format,
             ),
             "cross_attention": PackedSeqParams(
                 cu_seqlens_q=cu_seqlens_q,
                 cu_seqlens_kv=cu_seqlens_kv,
                 cu_seqlens_q_padded=cu_seqlens_q_padded,
+                cu_seqlens_kv_padded=cu_seqlens_kv_padded,
                 qkv_format=format,
             ),
         }

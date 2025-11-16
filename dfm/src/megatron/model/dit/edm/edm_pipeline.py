@@ -367,7 +367,8 @@ class EDMPipeline:
         samples = self.sampler(x0_fn, x_sigma_max, num_steps=num_steps, sigma_max=self.sde.sigma_max)
         if cp_enabled:
             cp_group = parallel_state.get_context_parallel_group()
-            samples = cat_outputs_cp(samples, seq_dim=1, cp_group=cp_group)
+            thd_cu_seqlen_q_padded = data_batch["packed_seq_params"]["self_attention"].cu_seqlens_q_padded
+            samples = cat_outputs_cp(samples, seq_dim=1, cp_group=cp_group, thd_cu_seqlens=thd_cu_seqlen_q_padded)
 
         return samples
 
