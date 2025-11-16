@@ -127,7 +127,7 @@ DFM provides out-of-the-box support for state-of-the-art diffusion architectures
 
 ## Performance Benchmarking
 
-For detailed performance benchmarks including throughput metrics across different GPU systems and model configurations, see the (Performance Summary)[https://github.com/NVIDIA-NeMo/DFM/blob/main/docs/performance.md] in our documentation.
+For detailed performance benchmarks including throughput metrics across different GPU systems and model configurations, see the (Performance Summary)[https://github.com/NVIDIA-NeMo/DFM/blob/main/docs/performance-summary.md] in our documentation.
 
 ## Project Structure
 
