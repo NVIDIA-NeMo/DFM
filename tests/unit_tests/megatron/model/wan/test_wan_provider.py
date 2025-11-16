@@ -16,9 +16,9 @@ import torch
 import torch.nn as nn
 from megatron.core import parallel_state
 
+import dfm.src.megatron.model.wan.wan_model as wan_model_module
 from dfm.src.megatron.model.wan.wan_model import WanModel
 from dfm.src.megatron.model.wan.wan_provider import WanModelProvider
-import dfm.src.megatron.model.wan.wan_model as wan_model_module
 
 
 def test_wan_model_provider_provide_returns_model(monkeypatch):
