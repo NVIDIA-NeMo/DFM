@@ -52,7 +52,7 @@ export PYTHONPATH=$PYTHONPATH:/opt/DFM
   git config --global gpg.format ssh
   git config --global user.signingkey ~/.ssh/id_rsa.pub  # or id_ed25519.pub
   git config --global commit.gpgsign true
-  
+
   # Add your SSH key as a "Signing Key" on GitHub: https://github.com/settings/keys
   ```
 
@@ -60,11 +60,11 @@ export PYTHONPATH=$PYTHONPATH:/opt/DFM
   ```bash
   # Generate a GPG key
   gpg --full-generate-key
-  
+
   # Configure GPG signing
   git config --global user.signingkey YOUR_GPG_KEY_ID
   git config --global commit.gpgsign true
-  
+
   # Add your GPG key to GitHub: https://github.com/settings/keys
   ```
 
