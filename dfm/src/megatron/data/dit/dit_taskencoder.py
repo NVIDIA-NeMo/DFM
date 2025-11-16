@@ -133,11 +133,16 @@ class DiTTaskEncoder(DiffusionTaskEncoderWithSequencePacking):
         loss_mask = torch.ones(seq_len, dtype=torch.bfloat16)
         sharding_factor = 64
         seq_len_q_padded = ((seq_len + sharding_factor - 1) // sharding_factor) * sharding_factor
+        seq_len_kv = self.text_embedding_padding_size
+        seq_len_kv_padded = ((seq_len_kv + sharding_factor - 1) // sharding_factor) * sharding_factor
 
         if seq_len < seq_len_q_padded:
             video_latent = F.pad(video_latent, (0, 0, 0, seq_len_q_padded - seq_len))
             loss_mask = F.pad(loss_mask, (0, seq_len_q_padded - seq_len))
             pos_ids = F.pad(pos_ids, (0, 0, 0, seq_len_q_padded - seq_len))
+        
+        if seq_len_kv < seq_len_kv_padded:
+            t5_text_embeddings = F.pad(t5_text_embeddings, (0, 0, 0, seq_len_kv_padded - seq_len_kv))
 
         return DiffusionSample(
             __key__=sample["__key__"],
@@ -150,7 +155,8 @@ class DiTTaskEncoder(DiffusionTaskEncoderWithSequencePacking):
             loss_mask=loss_mask,
             seq_len_q=torch.tensor([seq_len], dtype=torch.int32),
             seq_len_q_padded=torch.tensor([seq_len_q_padded], dtype=torch.int32),
-            seq_len_kv=torch.tensor([self.text_embedding_padding_size], dtype=torch.int32),
+            seq_len_kv=torch.tensor([seq_len_kv], dtype=torch.int32),
+            seq_len_kv_padded=torch.tensor([seq_len_kv_padded], dtype=torch.int32),
             pos_ids=pos_ids,
             latent_shape=torch.tensor([C, T, H, W], dtype=torch.int32),
         )
@@ -172,6 +178,7 @@ class DiTTaskEncoder(DiffusionTaskEncoderWithSequencePacking):
             seq_len_q=sample.seq_len_q,
             seq_len_q_padded=sample.seq_len_q_padded,
             seq_len_kv=sample.seq_len_kv,
+            seq_len_kv_padded=sample.seq_len_kv_padded,
             pos_ids=sample.pos_ids.unsqueeze_(0) if sample.pos_ids is not None else None,
             latent_shape=sample.latent_shape,
         )
