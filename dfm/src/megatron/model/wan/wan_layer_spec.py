@@ -101,7 +101,7 @@ class WanLayerWithAdaLN(TransformerLayer):
             modified_submods = copy.deepcopy(submodules)
             modified_submods.cross_attention = IdentityOp
             return modified_submods
-        
+
         # Replace any submodules that will have CP disabled and build them manually later after TransformerLayer init.
         # modified_submods = _replace_no_cp_submodules(submodules)
         super().__init__(
