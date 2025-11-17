@@ -5,30 +5,30 @@ Use the instructions below to setup a dev environment and a dev container
 
 ### Building a container
 ```bash
-# We recommend you to get the latest commits for Megatron-Bridge and Autmodel
-# The easiest way to do that might be to remove the 3rdparty directly completely before running the following commands
-git submodule update --init --recursive --remote # Get all the 3rd party submodules
-cd 3rdparty/Megatron-Bridge/3rdparty/Megatron-LM # Megatron LM commit might be wrong
-# Get the right megatron commit from here: https://github.com/NVIDIA-NeMo/Megatron-Bridge/tree/main/3rdparty
-git checkout <commit_hash>
-cd ../../../../
+# Initialize all submodules (Megatron-Bridge, Automodel, and nested Megatron-LM)
+git submodule update --init --recursive
+
+# Build the container
 docker build -f docker/Dockerfile.ci -t dfm:latest .
 ```
 
 ### Run the container
 ```bash
-docker run --ipc=host --ulimit memlock=-1 --ulimit stack=67108864 --gpus all $(pwd):/opt/DFM -it dfm:latest bash
+docker run --gpus all -v $(pwd):/opt/DFM -it dfm:latest bash
 ```
 
-### inside the container
+### Inside the container
 ```bash
-# Add DFM to PYTHONPATH
-export PYTHONPATH=$PYTHONPATH:/opt/DFM
+# Install DFM in editable mode (automatically handles Python path)
+source /opt/venv/bin/activate
+uv pip install --no-deps -e .
 
 # Run a Mock Run:
 ```
 
 ## Signing Your Work
+
+### Sign-Off (Required)
 
 * We require that all contributors "sign-off" on their commits. This certifies that the contribution is your original work, or you have rights to submit it under the same license, or a compatible license.
 
@@ -41,6 +41,32 @@ export PYTHONPATH=$PYTHONPATH:/opt/DFM
   This will append the following to your commit message:
   ```
   Signed-off-by: Your Name <your@email.com>
+  ```
+
+### Commit Verification (Recommended)
+
+* We recommend signing your commits with SSH or GPG to get the "Verified" badge on GitHub.
+
+* **SSH Signing (Easiest):**
+  ```bash
+  # Configure SSH signing
+  git config --global gpg.format ssh
+  git config --global user.signingkey ~/.ssh/id_rsa.pub  # or id_ed25519.pub
+  git config --global commit.gpgsign true
+
+  # Add your SSH key as a "Signing Key" on GitHub: https://github.com/settings/keys
+  ```
+
+* **GPG Signing (Alternative):**
+  ```bash
+  # Generate a GPG key
+  gpg --full-generate-key
+
+  # Configure GPG signing
+  git config --global user.signingkey YOUR_GPG_KEY_ID
+  git config --global commit.gpgsign true
+
+  # Add your GPG key to GitHub: https://github.com/settings/keys
   ```
 
 * Full text of the DCO:
