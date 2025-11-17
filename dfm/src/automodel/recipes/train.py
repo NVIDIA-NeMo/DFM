@@ -22,10 +22,6 @@ from typing import Any, Dict, Optional
 import torch
 import torch.distributed as dist
 import wandb
-from Automodel._diffusers.auto_diffusion_pipeline import NeMoAutoDiffusionPipeline
-from Automodel.flow_matching.training_step_t2v import (
-    step_fsdp_transformer_t2v,
-)
 from nemo_automodel.components.checkpoint.checkpointing import Checkpointer, CheckpointingConfig
 from nemo_automodel.components.loggers.log_utils import setup_logging
 from nemo_automodel.components.loggers.wandb_utils import suppress_wandb_log_messages
@@ -36,68 +32,71 @@ from nemo_automodel.recipes.llm.train_ft import build_distributed, build_wandb
 from torch.distributed.fsdp import MixedPrecisionPolicy
 from transformers.utils.hub import TRANSFORMERS_CACHE
 
+from dfm.src.automodel._diffusers.auto_diffusion_pipeline import NeMoWanPipeline
+from dfm.src.automodel.flow_matching.training_step_t2v import (
+    step_fsdp_transformer_t2v,
+)
+
 
 def build_model_and_optimizer(
     *,
     model_id: str,
+    finetune_mode: bool,
     learning_rate: float,
     device: torch.device,
-    bf16_dtype: torch.dtype,
+    dtype: torch.dtype,
     cpu_offload: bool = False,
-    tp_size: int = 1,
-    cp_size: int = 1,
-    pp_size: int = 1,
-    dp_size: Optional[int] = None,
-    dp_replicate_size: Optional[int] = None,
-    use_hf_tp_plan: bool = False,
+    fsdp_cfg: Dict[str, Any] = {},
     optimizer_cfg: Optional[Dict[str, Any]] = None,
-) -> tuple[NeMoAutoDiffusionPipeline, dict[str, Dict[str, Any]], torch.optim.Optimizer, Any]:
+) -> tuple[NeMoWanPipeline, dict[str, Dict[str, Any]], torch.optim.Optimizer, Any]:
     """Build the WAN 2.1 diffusion model, parallel scheme, and optimizer."""
 
-    logging.info("[INFO] Building NeMoAutoDiffusionPipeline with transformer parallel scheme...")
+    logging.info("[INFO] Building NeMoWanPipeline with transformer parallel scheme...")
 
     if not dist.is_initialized():
         logging.info("[WARN] torch.distributed not initialized; proceeding in single-process mode")
 
     world_size = dist.get_world_size() if dist.is_initialized() else 1
 
-    if dp_size is None:
-        denom = max(1, tp_size * cp_size * pp_size)
-        dp_size = max(1, world_size // denom)
+    if fsdp_cfg.get("dp_size", None) is None:
+        denom = max(1, fsdp_cfg.get("tp_size", 1) * fsdp_cfg.get("cp_size", 1) * fsdp_cfg.get("pp_size", 1))
+        fsdp_cfg.dp_size = max(1, world_size // denom)
 
     manager_args: Dict[str, Any] = {
-        "dp_size": dp_size,
-        "dp_replicate_size": dp_replicate_size,
-        "tp_size": tp_size,
-        "cp_size": cp_size,
-        "pp_size": pp_size,
+        "dp_size": fsdp_cfg.get("dp_size", None),
+        "dp_replicate_size": fsdp_cfg.get("dp_replicate_size", None),
+        "tp_size": fsdp_cfg.get("tp_size", 1),
+        "cp_size": fsdp_cfg.get("cp_size", 1),
+        "pp_size": fsdp_cfg.get("pp_size", 1),
         "backend": "nccl",
         "world_size": world_size,
-        "use_hf_tp_plan": use_hf_tp_plan,
+        "use_hf_tp_plan": fsdp_cfg.get("use_hf_tp_plan", False),
         "activation_checkpointing": True,
         "mp_policy": MixedPrecisionPolicy(
-            param_dtype=bf16_dtype,
-            reduce_dtype=bf16_dtype,
-            output_dtype=bf16_dtype,
+            param_dtype=dtype,
+            reduce_dtype=dtype,
+            output_dtype=dtype,
         ),
     }
 
     parallel_scheme = {"transformer": manager_args}
 
-    pipe, created_managers = NeMoAutoDiffusionPipeline.from_pretrained(
+    kwargs = {}
+    if finetune_mode:
+        kwargs["load_for_training"] = True
+        kwargs["low_cpu_mem_usage"] = True
+    init_fn = NeMoWanPipeline.from_pretrained if finetune_mode else NeMoWanPipeline.from_config
+
+    pipe, created_managers = init_fn(
         model_id,
-        torch_dtype=bf16_dtype,
+        torch_dtype=dtype,
         device=device,
         parallel_scheme=parallel_scheme,
-        load_for_training=True,
         components_to_load=["transformer"],
+        **kwargs,
     )
     fsdp2_manager = created_managers["transformer"]
-    transformer_module = getattr(pipe, "transformer", None)
-    if transformer_module is None:
-        raise RuntimeError("transformer not found in pipeline after parallelization")
-
-    model_map: dict[str, Dict[str, Any]] = {"transformer": {"fsdp_transformer": transformer_module}}
+    transformer_module = pipe.transformer
 
     trainable_params = [p for p in transformer_module.parameters() if p.requires_grad]
     if not trainable_params:
@@ -121,7 +120,7 @@ def build_model_and_optimizer(
 
     logging.info("[INFO] NeMoAutoDiffusion setup complete (pipeline + optimizer)")
 
-    return pipe, model_map, optimizer, fsdp2_manager.device_mesh
+    return pipe, optimizer, getattr(fsdp2_manager, "device_mesh", None)
 
 
 def build_lr_scheduler(
@@ -198,6 +197,8 @@ class TrainWan21DiffusionRecipe(BaseRecipe):
         self.logit_std = fm_cfg.get("logit_std", 1.0)
         self.flow_shift = fm_cfg.get("flow_shift", 3.0)
         self.mix_uniform_ratio = fm_cfg.get("mix_uniform_ratio", 0.1)
+        self.sigma_min = fm_cfg.get("sigma_min", 0.0)
+        self.sigma_max = fm_cfg.get("sigma_max", 1.0)
 
         logging.info(f"[INFO] Flow matching: {'ENABLED' if self.use_sigma_noise else 'DISABLED'}")
         if self.use_sigma_noise:
@@ -205,29 +206,18 @@ class TrainWan21DiffusionRecipe(BaseRecipe):
             logging.info(f"[INFO]   - Flow shift: {self.flow_shift}")
             logging.info(f"[INFO]   - Mix uniform ratio: {self.mix_uniform_ratio}")
 
-        tp_size = fsdp_cfg.get("tp_size", 1)
-        cp_size = fsdp_cfg.get("cp_size", 1)
-        pp_size = fsdp_cfg.get("pp_size", 1)
-        dp_size = fsdp_cfg.get("dp_size", None)
-        dp_replicate_size = fsdp_cfg.get("dp_replicate_size", None)
-        use_hf_tp_plan = fsdp_cfg.get("use_hf_tp_plan", False)
-
-        (self.pipe, self.model_map, self.optimizer, self.device_mesh) = build_model_and_optimizer(
+        (self.pipe, self.optimizer, self.device_mesh) = build_model_and_optimizer(
             model_id=self.model_id,
+            finetune_mode=self.cfg.get("model.mode", "finetune").lower() == "finetune",
             learning_rate=self.learning_rate,
             device=self.device,
-            bf16_dtype=self.bf16,
+            dtype=self.bf16,
             cpu_offload=self.cpu_offload,
-            tp_size=tp_size,
-            cp_size=cp_size,
-            pp_size=pp_size,
-            dp_size=dp_size,
-            dp_replicate_size=dp_replicate_size,
-            use_hf_tp_plan=use_hf_tp_plan,
+            fsdp_cfg=fsdp_cfg,
             optimizer_cfg=self.cfg.get("optim.optimizer", {}),
         )
 
-        self.model = self.model_map["transformer"]["fsdp_transformer"]
+        self.model = self.pipe.transformer
         self.peft_config = None
 
         batch_cfg = self.cfg.get("batch", {})
@@ -283,6 +273,9 @@ class TrainWan21DiffusionRecipe(BaseRecipe):
             raise RuntimeError("Training dataloader is empty; cannot proceed with training")
 
         # Derive DP size consistent with model parallel config
+        tp_size = fsdp_cfg.get("tp_size", 1)
+        cp_size = fsdp_cfg.get("cp_size", 1)
+        pp_size = fsdp_cfg.get("pp_size", 1)
         denom = max(1, tp_size * cp_size * pp_size)
         self.dp_size = fsdp_cfg.get("dp_size", None)
         if self.dp_size is None:
@@ -356,8 +349,8 @@ class TrainWan21DiffusionRecipe(BaseRecipe):
                 for micro_batch in batch_group:
                     try:
                         loss, _ = step_fsdp_transformer_t2v(
-                            pipe=self.pipe,
-                            model_map=self.model_map,
+                            scheduler=self.pipe.scheduler,
+                            model=self.model,
                             batch=micro_batch,
                             device=self.device,
                             bf16=self.bf16,
@@ -367,6 +360,8 @@ class TrainWan21DiffusionRecipe(BaseRecipe):
                             logit_std=self.logit_std,
                             flow_shift=self.flow_shift,
                             mix_uniform_ratio=self.mix_uniform_ratio,
+                            sigma_min=self.sigma_min,
+                            sigma_max=self.sigma_max,
                             global_step=global_step,
                         )
                     except Exception as exc:

@@ -12,19 +12,19 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-from dfm.src.automodel.datasets.wan21 import (
-    MetaFilesDataset,
-    build_node_parallel_sampler,
-    build_wan21_dataloader,
-    collate_fn,
-    create_dataloader,
-)
+from __future__ import annotations
+
+from nemo_automodel.components.config._arg_parser import parse_args_and_load_config
+
+from dfm.src.automodel.recipes.train import TrainWan21DiffusionRecipe
 
 
-__all__ = [
-    "MetaFilesDataset",
-    "build_node_parallel_sampler",
-    "build_wan21_dataloader",
-    "collate_fn",
-    "create_dataloader",
-]
+def main(default_config_path="/opt/DFM/dfm/examples/Automodel/pretrain/wan2_1_t2v_flow.yaml"):
+    cfg = parse_args_and_load_config(default_config_path)
+    recipe = TrainWan21DiffusionRecipe(cfg)
+    recipe.setup()
+    recipe.run_train_validation_loop()
+
+
+if __name__ == "__main__":
+    main()
