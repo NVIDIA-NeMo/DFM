@@ -3483,7 +3483,7 @@ docs = [
     { name = "sphinx-autodoc2" },
     { name = "sphinx-copybutton" },
 ]
-megatronbridge = [
+megatron-bridge = [
     { name = "megatron-bridge" },
 ]
 test = [
@@ -3538,7 +3538,7 @@ docs = [
     { name = "sphinx-autodoc2", specifier = ">=0.5.0" },
     { name = "sphinx-copybutton", specifier = ">=0.5.2" },
 ]
-megatronbridge = [{ name = "megatron-bridge", directory = "3rdparty/Megatron-Bridge" }]
+megatron-bridge = [{ name = "megatron-bridge", directory = "3rdparty/Megatron-Bridge" }]
 test = [
     { name = "coverage", specifier = ">=7.8.1" },
     { name = "flake8", specifier = ">=7.2.0" },
