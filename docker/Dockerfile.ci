@@ -37,7 +37,7 @@ COPY dfm ./dfm
 # Copy Automodel
 COPY 3rdparty/Automodel ./3rdparty/Automodel
 
-# Copy Megatron-Bridge
+# Copy minimal Megatron-Bridge files for metadata (prevents full source build)
 COPY 3rdparty/Megatron-Bridge/pyproject.toml ./3rdparty/Megatron-Bridge/
 COPY 3rdparty/Megatron-Bridge/src ./3rdparty/Megatron-Bridge/src
 

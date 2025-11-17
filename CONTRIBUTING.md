@@ -14,13 +14,14 @@ docker build -f docker/Dockerfile.ci -t dfm:latest .
 
 ### Run the container
 ```bash
-docker run --ipc=host --ulimit memlock=-1 --ulimit stack=67108864 --gpus all -v $(pwd):/opt/DFM -it dfm:latest bash
+docker run --gpus all -v $(pwd):/opt/DFM -it dfm:latest bash
 ```
 
-### inside the container
+### Inside the container
 ```bash
-# Add DFM to PYTHONPATH
-export PYTHONPATH=$PYTHONPATH:/opt/DFM
+# Install DFM in editable mode (automatically handles Python path)
+source /opt/venv/bin/activate
+uv pip install --no-deps -e .
 
 # Run a Mock Run:
 ```
