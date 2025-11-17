@@ -94,10 +94,12 @@ jobs:
           - script: L2_Functional_Tests_GPU
             runner: self-hosted-nemo
             timeout: 30
+          - script: L2_Mcore_Mock_Tests_GPU
+            runner: self-hosted-nemo
+            timeout: 30
           - script: L2_Automodel_Wan21_Test
             runner: self-hosted-nemo
             timeout: 30
-
     needs: [cicd-unit-tests]
     runs-on: ${{ matrix.runner }}
     name: ${{ matrix.is_optional && 'PLEASEFIXME_' || '' }}${{ matrix.script }}
