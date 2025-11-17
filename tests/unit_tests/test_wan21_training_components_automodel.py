@@ -27,7 +27,7 @@ from dfm.src.automodel.flow_matching.training_step_t2v import step_fsdp_transfor
 
 
 class TestFlowMatchingTrainingStep:
-    """Test the core flow matching training step logic"""
+    """Test the core flow matching training step logic."""
 
     @pytest.fixture
     def mock_scheduler(self):
