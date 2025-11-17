@@ -141,8 +141,10 @@ class FlowPipeline:
 
             # because video_latents might be padded, we need to make sure noise also be padded to have the same shape
             sample_noise_seq_len = sample_noise.shape[0]
+            cu_seqlens_q_padded = packed_seq_params["self_attention"].cu_seqlens_q_padded
+            seq_len_q_padded = cu_seqlens_q_padded[i + 1] - cu_seqlens_q_padded[i]
             if sample_noise_seq_len < video_latents.shape[0]:
-                pad_len = video_latents.shape[0] - sample_noise_seq_len
+                pad_len = seq_len_q_padded - sample_noise_seq_len
                 pad = torch.zeros(
                     (pad_len, sample_noise.shape[1]), device=sample_noise.device, dtype=sample_noise.dtype
                 )

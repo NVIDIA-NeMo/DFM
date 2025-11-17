@@ -26,7 +26,6 @@ from megatron.bridge.training.config import (
     RNGConfig,
     TokenizerConfig,
     TrainingConfig,
-    ProfilingConfig,
 )
 from megatron.bridge.training.mixed_precision import MixedPrecisionConfig, get_mixed_precision_config
 from megatron.core.distributed import DistributedDataParallelConfig
@@ -226,13 +225,6 @@ def pretrain_config(
         rng=RNGConfig(seed=1234),
         comm_overlap=comm_overlap_config,
         mixed_precision=precision_config,
-        profiling=ProfilingConfig(
-            use_nsys_profiler=False,
-            profile_step_start=10,
-            profile_step_end=11,
-            record_shapes=True,
-            profile_ranks=[0],
-        ),
     )
 
     return cfg

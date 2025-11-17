@@ -14,9 +14,9 @@
 
 # pylint: disable=C0115,C0116,C0301
 
+import copy
 from dataclasses import dataclass
 from typing import Optional, Union
-import copy
 
 import torch
 import torch.nn as nn
@@ -216,8 +216,8 @@ class WanLayerWithAdaLN(TransformerLayer):
         # TODO (pmannan): Disable CP for CrossAttention as KV context is small.
         # But needs better support for packed sequences and padding to ensure correct calculations
         # packed_seq_params['cross_attention'].cu_seqlens_q = torch.tensor(
-        #     [0, hidden_states.shape[0]], 
-        #     device=packed_seq_params['cross_attention'].cu_seqlens_kv.device, 
+        #     [0, hidden_states.shape[0]],
+        #     device=packed_seq_params['cross_attention'].cu_seqlens_kv.device,
         #     dtype=torch.int32)
         attention_output, bias = self.cross_attention(
             self.norm3(hidden_states),
