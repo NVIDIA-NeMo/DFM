@@ -21,6 +21,8 @@ on:
       - main
       - "pull-request/[0-9]+"
       - "r[0-9]+.[0-9]+.[0-9]+"
+  label:
+    types: [created]
 
 concurrency:
   group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}-${{ github.event.label.name || 'main' }}-${{ github.event_name }}
@@ -35,6 +37,9 @@ jobs:
   cicd-wait-in-queue:
     runs-on: ubuntu-latest
     environment: test
+    if: |
+      github.event_name != 'label' ||
+      (github.event_name == 'label' && github.event.label.name == 'Run CICD' && github.event.pull_request != null)
     steps:
       - name: Running CI tests
         run: |
