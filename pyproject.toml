@@ -99,6 +99,11 @@ automodel = [
     "nemo-automodel",
 ]
 megatron-bridge = ["megatron-bridge"]
+torch-cu124 = [
+    "torch",
+    "torchvision",
+    "torchaudio",
+]
 
 [tool.setuptools]
 packages = ["dfm"]
@@ -126,6 +131,11 @@ override-dependencies = [
     "triton; sys_platform == 'never'",
     "transformer-engine[pytorch]>=2.9.0a0,<2.10.0",
 ]
+
+[[tool.uv.index]]
+name = "pytorch-cu124"
+url = "https://download.pytorch.org/whl/cu124"
+explicit = true
 
 [[tool.uv.index]]
 name = "pypi"
