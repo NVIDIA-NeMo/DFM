@@ -54,7 +54,7 @@ def build_model_and_optimizer(
 ) -> tuple[NeMoAutoDiffusionPipeline, dict[str, Dict[str, Any]], torch.optim.Optimizer, Any]:
     """Build the WAN 2.1 diffusion model, parallel scheme, and optimizer."""
 
-    logging.info("[INFO] Building NeMoAutoDiffusionPipeline with transformer parallel scheme...")
+    logging.info("[INFO] Buildin NeMoAutoDiffusionPipeline with transformer parallel scheme...")
 
     if not dist.is_initialized():
         logging.info("[WARN] torch.distributed not initialized; proceeding in single-process mode")
