@@ -100,7 +100,7 @@ class DiTSelfAttention(SelfAttention):
         else:
             self.k_layernorm = None
 
-    def get_query_key_value_tensors(self, hidden_states, key_value_states=None, split_qkv=False):
+    def get_query_key_value_tensors(self, hidden_states, key_value_states=None, output_gate=None, split_qkv=True):
         """
         Derives `query`, `key` and `value` tensors from `hidden_states`.
         """
@@ -251,13 +251,15 @@ class DiTCrossAttention(CrossAttention):
             is_expert=False,
         )
 
-    def get_query_key_value_tensors(self, hidden_states, key_value_states, split_qkv=False):
+    def get_query_key_value_tensors(self, hidden_states, key_value_states, output_gate=None, split_qkv=True):
         """
         Derives `query` tensor from `hidden_states`, and `key`/`value` tensors
         from `key_value_states`.
         """
 
-        query, key, value = super().get_query_key_value_tensors(hidden_states, key_value_states)
+        query, key, value = super().get_query_key_value_tensors(
+            hidden_states, key_value_states, output_gate=output_gate, split_qkv=split_qkv
+        )
 
         # gather query and key heads across TP ranks if self.layernorm_across_heads is True
         if self.layernorm_across_heads and parallel_state.get_tensor_model_parallel_world_size() > 1:
