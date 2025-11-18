@@ -229,13 +229,13 @@ class FlowInferencePipeline:
         """
 
         pp_world_size = parallel_state.get_pipeline_model_parallel_world_size()
-        is_pp_first = parallel_state.is_pipeline_first_stage(ignore_virtual=True)
-        is_pp_last = parallel_state.is_pipeline_last_stage(ignore_virtual=True)
-
-        # PP=1: no pipeline parallelism
+        # PP=1: no pipeline parallelism (avoid touching PP groups which may be uninitialized in unit tests)
         if pp_world_size == 1:
             noise_pred_pp = self.model(latent_model_input, grid_sizes=grid_sizes, t=timestep, **arg_c)
             return noise_pred_pp
+        # For PP>1, safe to query stage information
+        is_pp_first = parallel_state.is_pipeline_first_stage(ignore_virtual=True)
+        is_pp_last = parallel_state.is_pipeline_last_stage(ignore_virtual=True)
 
         # PP>1: pipeline parallelism
         hidden_size = self.model.config.hidden_size
