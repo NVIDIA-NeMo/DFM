@@ -110,6 +110,7 @@ version = {attr = "dfm.__version__"}
 readme = {file = "README.md", content-type = "text/markdown"}
 
 [tool.uv]
+managed = true
 prerelease = "allow"
 # These packages require torch during build, so disable build isolation
 no-build-isolation-package = [
