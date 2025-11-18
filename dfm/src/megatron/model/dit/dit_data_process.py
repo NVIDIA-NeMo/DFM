@@ -31,17 +31,13 @@ def encode_seq_length(batch, format):
     if ("seq_len_q" in batch) and ("seq_len_kv" in batch):
         zero = torch.zeros([1], dtype=torch.int32, device="cuda")
 
-        cu_seqlens_q = batch["seq_len_q"].cumsum(dim=0).to(torch.int32)
-        cu_seqlens_q = torch.cat((zero, cu_seqlens_q))
+        def cumsum(key):
+            return torch.cat((zero, batch[key].cumsum(dim=0).to(torch.int32)))
 
-        cu_seqlens_kv = batch["seq_len_kv"].cumsum(dim=0).to(torch.int32)
-        cu_seqlens_kv = torch.cat((zero, cu_seqlens_kv))
-
-        cu_seqlens_q_padded = batch["seq_len_q_padded"].cumsum(dim=0).to(torch.int32)
-        cu_seqlens_q_padded = torch.cat((zero, cu_seqlens_q_padded))
-
-        cu_seqlens_kv_padded = batch["seq_len_kv_padded"].cumsum(dim=0).to(torch.int32)
-        cu_seqlens_kv_padded = torch.cat((zero, cu_seqlens_kv_padded))
+        cu_seqlens_q = cumsum("seq_len_q")
+        cu_seqlens_kv = cumsum("seq_len_kv")
+        cu_seqlens_q_padded = cumsum("seq_len_q_padded")
+        cu_seqlens_kv_padded = cumsum("seq_len_kv_padded")
 
         batch["packed_seq_params"] = {
             "self_attention": PackedSeqParams(
