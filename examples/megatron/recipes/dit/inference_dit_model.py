@@ -66,10 +66,9 @@ def parse_args():
     parser.add_argument("--num_steps", type=float, default=35, help="Number of diffusion sampling steps")
     parser.add_argument("--num_video_frames", type=int, default=121, help="Number of video frames to sample")
     parser.add_argument(
-        "--tokenizer_model", type=str, default="nvidia/Cosmos-1.0-Tokenizer-CV8x8x8", help="Mode of video tokenizer"
+        "--tokenizer_model", type=str, default="Cosmos-0.1-Tokenizer-CV4x8x8", help="Mode of video tokenizer"
     )
-    parser.add_argument("--tokenizer_dir", type=str, default="", help="Directory for video tokenizer")
-    parser.add_argument("--cosmos_assets_dir", type=str, default="", help="Directory containing cosmos assets")
+    parser.add_argument("--tokenizer_cache_dir", type=str, default=None, help="Directory for video tokenizer cache")
     parser.add_argument("--guardrail_dir", type=str, default="", help="Guardrails weights directory")
     parser.add_argument("--checkpoint_path", type=str, default="", help="Video diffusion model checkpoint path")
     parser.add_argument("--t5_cache_dir", type=str, default=None, help="Path to T5 model")
@@ -281,10 +280,9 @@ def data_preprocess(data_batch, state_shape):
 
 def initialize_distributed(tensor_model_parallel_size=1, pipeline_model_parallel_size=1, context_parallel_size=1):
     ps.destroy_model_parallel()
-    rank = int(os.environ["LOCAL_RANK"])
-    world_size = 1  # torch.cuda.device_count()
-    torch.cuda.set_device(rank)
-    torch.distributed.init_process_group(world_size=world_size, rank=rank)
+    local_rank = int(os.environ.get("LOCAL_RANK", 0))
+    torch.cuda.set_device(local_rank)
+    torch.distributed.init_process_group(backend="nccl")
     ps.initialize_model_parallel(
         tensor_model_parallel_size, pipeline_model_parallel_size, context_parallel_size=context_parallel_size
     )
@@ -319,8 +317,8 @@ def main(args):
 
     print_rank_0("preparing data batch...")
     data_batch, state_shape = prepare_data_batch(args)
-    vae = CausalVideoTokenizer.from_pretrained("Cosmos-0.1-Tokenizer-CV4x8x8")
-    vae.to("cuda")
+    vae = CausalVideoTokenizer.from_pretrained(args.tokenizer_model, cache_dir=args.tokenizer_cache_dir)
+    vae.to("cuda").eval()
 
     print_rank_0("generating video...")
     data_batch = data_preprocess(data_batch, state_shape)
