@@ -13,6 +13,7 @@
 # limitations under the License.
 name: CICD NeMo
 on:
+  workflow_dispatch:
   schedule:
     - cron: 0 0 * * *
   push:
@@ -34,6 +35,7 @@ concurrency:
 permissions:
   id-token: write
   contents: read
+  pull-requests: read
 
 jobs:
   pre-flight:
