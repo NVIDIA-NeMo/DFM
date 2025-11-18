@@ -220,8 +220,6 @@ class TrainWan21DiffusionRecipe(BaseRecipe):
         self.model = self.pipe.transformer
         self.peft_config = None
 
-        batch_cfg = self.cfg.get("batch", {})
-        logging_cfg = self.cfg.get("logging", {})
         checkpoint_cfg = self.cfg.get("checkpoint", None)
 
         self.num_epochs = self.cfg.step_scheduler.num_epochs
