@@ -31,6 +31,7 @@ from megatron.bridge.training.mixed_precision import MixedPrecisionConfig, get_m
 from megatron.core.distributed import DistributedDataParallelConfig
 
 from dfm.src.megatron.data.common.diffusion_energon_datamodule import DiffusionDataModuleConfig
+from dfm.src.megatron.data.dit.dit_mock_datamodule import DiTMockDataModuleConfig
 from dfm.src.megatron.model.dit.dit_model_provider import DiTModelProvider
 
 
@@ -158,6 +159,33 @@ def pretrain_config(
 
     precision_config.grad_reduce_in_fp32 = False
 
+    if mock:
+        dataset = DiTMockDataModuleConfig(
+            path=None,
+            seq_length=2048,
+            micro_batch_size=micro_batch_size,
+            global_batch_size=global_batch_size,
+            task_encoder_seq_length=8000,
+            packing_buffer_size=40,
+            num_workers=10,
+            # mock arguments
+            F_latents=1,
+            H_latents=96,
+            W_latents=64,
+            context_seq_len=512,
+            context_embeddings_dim=1024,
+        )
+    else:
+        dataset = DiffusionDataModuleConfig(
+            path=dataset_path,
+            seq_length=2048,
+            micro_batch_size=micro_batch_size,
+            global_batch_size=global_batch_size,
+            task_encoder_seq_length=8000,
+            packing_buffer_size=40,
+            num_workers=10,
+        )
+
     # Config Container
     cfg = ConfigContainer(
         model=model_cfg,
@@ -182,15 +210,7 @@ def pretrain_config(
             use_distributed_optimizer=True,
             use_megatron_fsdp=use_megatron_fsdp,  # need use_distributed_optimizer=True
         ),
-        dataset=DiffusionDataModuleConfig(
-            path=dataset_path,
-            seq_length=2048,
-            task_encoder_seq_length=8000,
-            packing_buffer_size=40,
-            micro_batch_size=micro_batch_size,
-            global_batch_size=global_batch_size,
-            num_workers=10,
-        ),
+        dataset=dataset,
         logger=LoggerConfig(
             log_interval=10,
             tensorboard_dir=tensorboard_dir,

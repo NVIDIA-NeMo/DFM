@@ -12,17 +12,19 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+import copy
 import logging
 import os
 from typing import Any, Dict, Iterable, Optional, Tuple
 
 import torch
 import torch.nn as nn
-from Automodel.distributed.dfm_parallelizer import WanParallelizationStrategy
-from diffusers import DiffusionPipeline
+from diffusers import DiffusionPipeline, WanPipeline
 from nemo_automodel.components.distributed import parallelizer
 from nemo_automodel.components.distributed.fsdp2 import FSDP2Manager
 from nemo_automodel.shared.utils import dtype_from_str
+
+from dfm.src.automodel.distributed.dfm_parallelizer import WanParallelizationStrategy
 
 
 logger = logging.getLogger(__name__)
@@ -139,6 +141,74 @@ class NeMoAutoDiffusionPipeline(DiffusionPipeline):
                 if not components_to_load or name in components_to_load:
                     logger.info("[INFO] Ensuring params trainable: %s", name)
                     _ensure_params_trainable(module, module_name=name)
+
+        # Use per-component FSDP2Manager init-args to parallelize components
+        created_managers: Dict[str, FSDP2Manager] = {}
+        if parallel_scheme is not None:
+            assert torch.distributed.is_initialized(), "Expect distributed environment to be initialized"
+            _init_parallelizer()
+            for comp_name, comp_module in _iter_pipeline_modules(pipe):
+                manager_args = parallel_scheme.get(comp_name)
+                if manager_args is None:
+                    continue
+                manager = FSDP2Manager(**manager_args)
+                created_managers[comp_name] = manager
+                parallel_module = manager.parallelize(comp_module)
+                setattr(pipe, comp_name, parallel_module)
+        return pipe, created_managers
+
+
+class NeMoWanPipeline:
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+
+    @classmethod
+    def from_pretrained(cls, *args, **kwargs):
+        return NeMoAutoDiffusionPipeline.from_pretrained(*args, **kwargs)
+
+    @classmethod
+    def from_config(
+        cls,
+        model_id,
+        torch_dtype: torch.dtype = torch.bfloat16,
+        config: dict = None,
+        parallel_scheme: Optional[Dict[str, Dict[str, Any]]] = None,
+        device: Optional[torch.device] = None,
+        move_to_device: bool = True,
+        components_to_load: Optional[Iterable[str]] = None,
+    ):
+        # Load just the config
+        from diffusers import WanTransformer3DModel
+
+        if config is None:
+            transformer = WanTransformer3DModel.from_pretrained(
+                model_id,
+                subfolder="transformer",
+                torch_dtype=torch.bfloat16,
+            )
+
+            # Get config and reinitialize with random weights
+            config = copy.deepcopy(transformer.config)
+            del transformer
+
+        # Initialize with random weights
+        transformer = WanTransformer3DModel.from_config(config)
+
+        # Load pipeline with random transformer
+        pipe = WanPipeline.from_pretrained(
+            model_id,
+            transformer=transformer,
+            torch_dtype=torch_dtype,
+        )
+        # Decide device
+        dev = _choose_device(device)
+
+        # Move modules to device/dtype first (helps avoid initial OOM during sharding)
+        if move_to_device:
+            for name, module in _iter_pipeline_modules(pipe):
+                if not components_to_load or name in components_to_load:
+                    logger.info("[INFO] Moving module: %s to device/dtype", name)
+                    _move_module_to_device(module, dev, torch_dtype)
 
         # Use per-component FSDP2Manager init-args to parallelize components
         created_managers: Dict[str, FSDP2Manager] = {}

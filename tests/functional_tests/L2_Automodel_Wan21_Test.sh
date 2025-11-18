@@ -1,4 +1,4 @@
-# Copyright (c) 2025, NVIDIA CORPORATION. All rights reserved.
+# Copyright (c) 2025, NVIDIA CORPORATION.  All rights reserved.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -12,19 +12,4 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-from dfm.src.automodel.datasets.wan21 import (
-    MetaFilesDataset,
-    build_node_parallel_sampler,
-    build_wan21_dataloader,
-    collate_fn,
-    create_dataloader,
-)
-
-
-__all__ = [
-    "MetaFilesDataset",
-    "build_node_parallel_sampler",
-    "build_wan21_dataloader",
-    "collate_fn",
-    "create_dataloader",
-]
+CUDA_VISIBLE_DEVICES="0,1" uv run coverage run -a --data-file=/opt/DFM/.coverage --source=/opt/DFM/ -m pytest tests/functional_tests/automodel/wan21 -m "not pleasefixme" --with_downloads
