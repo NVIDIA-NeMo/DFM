@@ -38,7 +38,7 @@ class TestFlowMatchingTrainingStep:
 
     @pytest.fixture
     def mock_model(self):
-        """Create a mock model that returns predictions with gradients"""
+        """Create a mock model that returns predictions with gradients."""
 
         def model_forward(hidden_states, timestep, encoder_hidden_states, return_dict=False):
             # Return prediction with same shape as input hidden_states
