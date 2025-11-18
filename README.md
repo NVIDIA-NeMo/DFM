@@ -59,7 +59,7 @@ docker run --rm -it --gpus all \
 ### Megatron Bridge Path
 
 #### Run a Receipe
-You can find all predefined recipes under [recipes](https://github.com/NVIDIA-NeMo/DFM/tree/main/examples/megatron/recipes) directory. 
+You can find all predefined recipes under [recipes](https://github.com/NVIDIA-NeMo/DFM/tree/main/examples/megatron/recipes) directory.
 
 > **Note:** You will have to use [uv](https://docs.astral.sh/uv/) to run the recipes. Please use `--group` as `megatron-bridge`.
 
@@ -122,7 +122,7 @@ DFM provides out-of-the-box support for state-of-the-art diffusion architectures
 
 | Model | Type | Megatron Bridge | AutoModel | Description |
 |-------|------|-----------------|-----------|-------------|
-| **DiT** | Image/Video | [pretrain, finetune](@Sajad)  | 🔜 | Diffusion Transformers with scalable architecture |
+| **DiT** | Image/Video | [pretrain](https://github.com/NVIDIA-NeMo/DFM/blob/main/examples/megatron/recipes/dit/pretrain_dit_model.py), [inference](https://github.com/NVIDIA-NeMo/DFM/blob/main/examples/megatron/recipes/dit/inference_dit_model.py)  | 🔜 | Diffusion Transformers with scalable architecture |
 | **WAN 2.1** | Video | [inference](https://github.com/NVIDIA-NeMo/DFM/blob/main/examples/megatron/recipes/wan/inference_wan.py), [pretrain, finetune](https://github.com/NVIDIA-NeMo/DFM/blob/main/examples/megatron/recipes/wan/pretrain_wan.py), conversion(@Huy) | @Linnan, @Alex | World Action Networks for video generation |
 
 ## Performance Benchmarking
@@ -169,7 +169,7 @@ DFM/
 | **Learning Curve** | Steeper (more knobs) | Gentler (YAML-driven) |
 | **Performance** | Highest at scale | Excellent, pytorch-native |
 
-**Recommendation**: 
+**Recommendation**:
 - Start with **AutoModel** for quick prototyping and HF model compatibility
 - Move to **Megatron Bridge** when scaling to 100+ GPUs or need advanced parallelism
 - Use **both**: prototype with AutoModel, scale with Megatron Bridge!
@@ -195,4 +195,3 @@ NeMo DFM builds upon the excellent work of:
 - [NeMo AutoModel](https://github.com/NVIDIA-NeMo/Automodel) - PyTorch-native SPMD training
 - [PyTorch Distributed](https://pytorch.org/docs/stable/distributed.html) - Foundation for distributed training
 - [Diffusers](https://github.com/huggingface/diffusers) - Diffusion model implementations
-
