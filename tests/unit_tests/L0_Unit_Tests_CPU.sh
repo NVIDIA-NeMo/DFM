@@ -14,4 +14,4 @@
 
 # Hide GPU from PyTorch by setting CUDA_VISIBLE_DEVICES to empty
 # This makes torch.cuda.is_available() return False
-CUDA_VISIBLE_DEVICES="" uv run coverage run -a --data-file=/opt/DFM/.coverage --source=/opt/DFM/ -m pytest tests/unit_tests -m "not pleasefixme" --with_downloads
+CUDA_VISIBLE_DEVICES="" uv run --group megatron-bridge coverage run -a --data-file=/opt/DFM/.coverage --source=/opt/DFM/ -m pytest tests/unit_tests -m "not pleasefixme" --with_downloads
