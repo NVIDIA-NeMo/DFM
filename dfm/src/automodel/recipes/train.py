@@ -225,7 +225,7 @@ class TrainWan21DiffusionRecipe(BaseRecipe):
         checkpoint_cfg = self.cfg.get("checkpoint", None)
 
         self.num_epochs = self.cfg.step_scheduler.num_epochs
-        self.log_every = self.cfg.get('step_scheduler.log_every', 5)
+        self.log_every = self.cfg.get("step_scheduler.log_every", 5)
 
         # Strictly require checkpoint config from YAML (no fallback)
         if checkpoint_cfg is None:
