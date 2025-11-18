@@ -15,9 +15,9 @@ model:
 step_scheduler:
   global_batch_size: 8
   local_batch_size: 1
-  ckpt_every_steps: 200
-  val_every_steps: 100  # will run every x number of gradient steps
-  num_epochs: 2
+  ckpt_every_steps: 1000
+  num_epochs: 100
+  log_every: 2
 
 data:
   dataloader:
@@ -26,8 +26,6 @@ data:
     num_workers: 2
     device: cpu
 
-training:
-  num_epochs: 100
 
 optim:
   learning_rate: 5e-6
@@ -49,10 +47,6 @@ fsdp:
   pp_size: 1
   dp_replicate_size: 2
   dp_size: 16
-
-logging:
-  save_every: 1000
-  log_every: 2
 
 checkpoint:
   enabled: true
