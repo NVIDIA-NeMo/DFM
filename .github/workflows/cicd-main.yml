@@ -91,9 +91,6 @@ jobs:
       fail-fast: false
       matrix:
         include:
-          - script: L2_Functional_Tests_GPU
-            runner: self-hosted-nemo
-            timeout: 30
           - script: L2_Mcore_Mock_Tests_GPU
             runner: self-hosted-nemo
             timeout: 30

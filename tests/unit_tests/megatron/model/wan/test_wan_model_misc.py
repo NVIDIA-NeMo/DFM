@@ -11,4 +11,15 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
-CUDA_VISIBLE_DEVICES="0,1" uv run --group megatron-bridge coverage run -a --data-file=/opt/DFM/.coverage --source=/opt/DFM/ -m pytest tests/unit_tests -m "not pleasefixme" --with_downloads
+
+import torch
+
+from dfm.src.megatron.model.wan.wan_model import sinusoidal_embedding_1d
+
+
+def test_sinusoidal_embedding_1d_shape_and_dtype():
+    dim = 16
+    pos = torch.arange(10, dtype=torch.float32)
+    emb = sinusoidal_embedding_1d(dim, pos)
+    assert emb.shape == (pos.shape[0], dim)
+    assert emb.dtype == torch.float32

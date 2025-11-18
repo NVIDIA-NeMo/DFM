@@ -11,4 +11,16 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
-CUDA_VISIBLE_DEVICES="0,1" uv run coverage run -a --data-file=/opt/DFM/.coverage --source=/opt/DFM/ -m pytest tests/unit_tests -m "not pleasefixme" --with_downloads
+
+from dfm.src.megatron.model.wan.wan_layer_spec import get_wan_block_with_transformer_engine_spec
+
+
+def test_get_wan_block_with_transformer_engine_spec_basic():
+    spec = get_wan_block_with_transformer_engine_spec()
+    # Basic structure checks
+    assert hasattr(spec, "module")
+    assert hasattr(spec, "submodules")
+    sub = spec.submodules
+    # Expected submodule fields exist
+    for name in ["norm1", "norm2", "norm3", "full_self_attention", "cross_attention", "mlp"]:
+        assert hasattr(sub, name), f"Missing submodule {name}"
