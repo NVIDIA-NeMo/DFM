@@ -14,22 +14,20 @@
 # limitations under the License.
 
 import argparse
+import os
+from pathlib import Path
 
 import numpy as np
 import torch
 from einops import rearrange
+from megatron.core import parallel_state as ps
 from megatron.core.tensor_parallel.random import model_parallel_cuda_manual_seed
-from nemo.lightning.megatron_parallel import MegatronParallel
-from nemo_vfm.diffusion.utils.mcore_parallel_utils import Utils
 from transformers import T5EncoderModel, T5TokenizerFast
 
 from dfm.src.common.tokenizers.cosmos.cosmos1.causal_video_tokenizer import CausalVideoTokenizer
 from dfm.src.common.utils.save_video import save_video
-from dfm.src.megatron.model.dit.dit_model_provider import DiTModelProvider
 from dfm.src.megatron.model.dit.edm.edm_pipeline import EDMPipeline
 
-
-MegatronParallel.init_ddp = lambda self: None
 
 EXAMPLE_PROMPT = (
     "The teal robot is cooking food in a kitchen. Steam rises from a simmering pot "
@@ -73,7 +71,7 @@ def parse_args():
     parser.add_argument("--tokenizer_dir", type=str, default="", help="Directory for video tokenizer")
     parser.add_argument("--cosmos_assets_dir", type=str, default="", help="Directory containing cosmos assets")
     parser.add_argument("--guardrail_dir", type=str, default="", help="Guardrails weights directory")
-    parser.add_argument("--nemo_checkpoint", type=str, default="", help="Video diffusion model nemo weights")
+    parser.add_argument("--checkpoint_path", type=str, default="", help="Video diffusion model checkpoint path")
     parser.add_argument("--t5_cache_dir", type=str, default=None, help="Path to T5 model")
     args = parser.parse_args()
     return args
@@ -154,7 +152,7 @@ def prepare_data_batch(args, t5_embeding_max_length=512):
 
     print("[args.prompt]: ", args.prompt)
     # Encode text to T5 embedding
-    out = encode_for_batch(tokenizer, text_encoder, args.prompt.split(","))
+    out = encode_for_batch(tokenizer, text_encoder, [args.prompt])
     encoded_text = torch.tensor(out, dtype=torch.bfloat16)
     B, L, C = encoded_text.shape
     t5_embed = torch.zeros(B, t5_embeding_max_length, C, dtype=torch.bfloat16)
@@ -166,7 +164,7 @@ def prepare_data_batch(args, t5_embeding_max_length=512):
         B,  # batch dimension
         ((h // 8) // ph)
         * ((w // 8) // pw)
-        * 1,  # number of tokens: (h //8) * (w // 8) * 1 -> ((h // 8) // ph) * ((w // 8) // pw) * 1
+        * t,  # number of tokens: (h //8) * (w // 8) * 1 -> ((h // 8) // ph) * ((w // 8) // pw) * 1
         16 * (ph * pw * pt),  # token hidden size (channel * patch_spatial * patch_spatial * patch_temporal)
     ]
     # prepare pos_emb
@@ -174,8 +172,8 @@ def prepare_data_batch(args, t5_embeding_max_length=512):
     pt, ph, pw = 1, 2, 2
     pos_ids = rearrange(
         # pos_id_3d.get_pos_id_3d(t=t // 4, h=h // 8, w=w // 8),
-        pos_id_3d.get_pos_id_3d(t=1, h=(h // 8) // ph, w=(w // 8) // pw),
-        "T H W d -> T (H W) d",
+        pos_id_3d.get_pos_id_3d(t=t // pt, h=(h // 8) // ph, w=(w // 8) // pw),
+        "T H W d -> (T H W) d",
     )
     data_batch = {
         "video": torch.zeros((B, 3, t, h, w), dtype=torch.uint8).cuda(),
@@ -187,21 +185,83 @@ def prepare_data_batch(args, t5_embeding_max_length=512):
         "fps": torch.tensor([[args.fps]] * B, dtype=torch.bfloat16).cuda(),
         "num_frames": torch.tensor([[args.num_video_frames]] * B, dtype=torch.bfloat16).cuda(),
         "padding_mask": torch.zeros((B, 1, args.height, args.width), dtype=torch.bfloat16).cuda(),
-        "pos_ids": pos_ids,
+        "pos_ids": pos_ids.unsqueeze(0).expand(B, -1, -1),
         "latent_shape": [16, t // pt, h // 8 // ph, w // 8 // pw],
     }
     return data_batch, state_shape
 
 
-def setup_diffusion_pipeline(args):
+def find_latest_checkpoint(checkpoint_dir):
     """
-    Initialize DiT model, parallel strategy, and diffusion pipeline for inference.
+    Find the latest checkpoint iteration in a checkpoint directory.
+
+    Args:
+        checkpoint_dir: Path to checkpoint directory
+
+    Returns:
+        Path to the latest iter_* folder, or the original path if no iter folders found
     """
-    model_config = DiTModelProvider()
-    model = model_config.provide()
+    checkpoint_path = Path(checkpoint_dir)
+    iter_folders = [f for f in checkpoint_path.iterdir() if f.is_dir() and f.name.startswith("iter_")]
+
+    if iter_folders:
+        # Find the folder with the largest iteration number
+        def get_iter_number(folder_name):
+            try:
+                return int(folder_name.replace("iter_", ""))
+            except ValueError:
+                return -1
+
+        latest_iter = max(iter_folders, key=lambda f: get_iter_number(f.name))
+        return checkpoint_path / latest_iter.name
+    else:
+        return checkpoint_path
+
+
+def load_model_from_checkpoint(args):
+    """
+    Load DiT model from a Megatron checkpoint using Megatron-Bridge utilities.
+
+    Args:
+        args: Command line arguments containing checkpoint_path
+
+    Returns:
+        model: Loaded model
+        diffusion_pipeline: EDM pipeline with loaded model
+        model_config: Model configuration
+    """
+    from megatron.bridge.training.model_load_save import build_and_load_model, load_model_config
+
+    checkpoint_path = find_latest_checkpoint(args.checkpoint_path)
+    print_rank_0(f"Loading model from checkpoint: {checkpoint_path}")
+
+    # Load the model configuration from checkpoint
+    model_config, _ = load_model_config(str(checkpoint_path))
+
+    # Override parallelism settings for inference if needed
+    # Keep context parallel size from args if specified
+    if hasattr(args, "cp_size") and args.cp_size:
+        model_config.context_parallel_size = args.cp_size
+
+    # Build and load the model with weights from checkpoint
+    model = build_and_load_model(
+        checkpoint_path=str(checkpoint_path),
+        model_cfg=model_config,
+        skip_temp_dist_context=True,  # Already initialized distributed
+        use_cpu_init=False,
+    )
+
+    # If model is returned as a list, extract the first element
+    if isinstance(model, list):
+        model = model[0]
+
     model = model.cuda().to(torch.bfloat16)
+    model.eval()
+
+    print_rank_0(f"✅ Model loaded successfully from {checkpoint_path}")
+
+    # Setup diffusion pipeline
     diffusion_pipeline = EDMPipeline(seed=args.seed)
-    diffusion_pipeline.net = model
     return model, diffusion_pipeline, model_config
 
 
@@ -212,14 +272,27 @@ def data_preprocess(data_batch, state_shape):
     data_batch["inference_fwd"] = True
 
     data_batch["seq_len_q"] = torch.tensor([state_shape[1]] * state_shape[0]).cuda()
+    data_batch["seq_len_q_padded"] = torch.tensor([state_shape[1]] * state_shape[0]).cuda()
     data_batch["seq_len_kv"] = torch.tensor([data_batch["context_embeddings"].shape[1]] * state_shape[0]).cuda()
-    data_batch = encode_seq_length(data_batch, format="sbhd")
+    data_batch["seq_len_kv_padded"] = torch.tensor([data_batch["context_embeddings"].shape[1]] * state_shape[0]).cuda()
+    data_batch = encode_seq_length(data_batch, format="thd")
     return data_batch
+
+
+def initialize_distributed(tensor_model_parallel_size=1, pipeline_model_parallel_size=1, context_parallel_size=1):
+    ps.destroy_model_parallel()
+    rank = int(os.environ["LOCAL_RANK"])
+    world_size = 1  # torch.cuda.device_count()
+    torch.cuda.set_device(rank)
+    torch.distributed.init_process_group(world_size=world_size, rank=rank)
+    ps.initialize_model_parallel(
+        tensor_model_parallel_size, pipeline_model_parallel_size, context_parallel_size=context_parallel_size
+    )
 
 
 def main(args):
     # Initialize distributed environment and model parallel groups
-    Utils.initialize_distributed(1, 1, context_parallel_size=args.cp_size)
+    initialize_distributed(1, 1, context_parallel_size=args.cp_size)
     model_parallel_cuda_manual_seed(args.seed)
 
     # Setup model / diffusion pipeline
@@ -239,17 +312,10 @@ def main(args):
         torch.backends.cudnn.benchmark = False
 
     set_seed(42)
-    model, diffusion_pipeline, model_config = setup_diffusion_pipeline(args)
 
-    # TODO: load model from checkpoint path argument
-    new_state = {}
-    print("loading model....")
-    state = torch.load("model.pth")
-    for key, value in state.items():
-        if "extra_state" in key:
-            continue
-        new_state[key.replace("0.module.", "")] = value
-    model.load_state_dict(new_state, strict=False)
+    # Load model from checkpoint or initialize from scratch
+    print_rank_0("Loading model from checkpoint...")
+    model, diffusion_pipeline, model_config = load_model_from_checkpoint(args)
 
     print_rank_0("preparing data batch...")
     data_batch, state_shape = prepare_data_batch(args)
@@ -282,16 +348,15 @@ def main(args):
     )
     decoded_video = (1.0 + vae.decode(latent / model_config.sigma_data)).clamp(0, 2) / 2
     decoded_video = (decoded_video * 255).to(torch.uint8).permute(0, 2, 3, 4, 1).cpu().numpy()
-    for i in range(len(decoded_video)):
-        save_video(
-            grid=decoded_video[i],
-            fps=args.fps,
-            H=args.height,
-            W=args.width,
-            video_save_quality=5,
-            video_save_path=f"idx={i}_rank={rank}_" + args.video_save_path,
-        )
-        print_rank_0(f"saved video to idx={i}_rank={rank}_{args.video_save_path}")
+    save_video(
+        grid=decoded_video[0],
+        fps=args.fps,
+        H=args.height,
+        W=args.width,
+        video_save_quality=5,
+        video_save_path=f"rank={rank}_" + args.video_save_path,
+    )
+    print_rank_0(f"saved video to rank={rank}_{args.video_save_path}")
 
 
 if __name__ == "__main__":
