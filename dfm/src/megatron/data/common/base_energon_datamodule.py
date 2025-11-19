@@ -195,7 +195,7 @@ class EnergonMultiModalDataModule:
         train_dataset = self.datasets_provider(worker_config, split="train")
         energon_dataloader = get_savable_loader(train_dataset, worker_config=worker_config)
         self.train_dataloader_object = energon_dataloader
-        return self.train_dataloader_object
+        return EnergonDataloader(self.train_dataloader_object)
 
     def val_dataloader(self):
         """
@@ -233,7 +233,7 @@ class EnergonMultiModalDataModule:
         val_dataset = self.datasets_provider(worker_config, split="val")
         energon_loader = get_savable_loader(val_dataset, worker_config=worker_config)
         self.val_dataloader_object = energon_loader
-        return self.val_dataloader_object
+        return EnergonDataloader(self.val_dataloader_object)
 
     def test_dataloader(self) -> None:
         """
@@ -337,3 +337,25 @@ class EnergonMultiModalDataModule:
             consumed_samples=consumed_samples,
             consistency_check=False,
         )
+
+
+class EnergonDataloader:
+    """A wrapper to use Megatron Energon dataloader with the Megatron-LM training loop."""
+    def __init__(self, dataloader):
+        self._dataloader = dataloader
+        self._iter = iter(cyclic_iter(dataloader))
+
+    def __next__(self):
+        return self._iter.__next__()
+
+    def __iter__(self):
+        return self._iter.__iter__()
+
+    def save_state(self):
+        return self._dataloader.save_state_rank()
+
+
+def cyclic_iter(iter):
+    while True:
+        for x in iter:
+            yield x
