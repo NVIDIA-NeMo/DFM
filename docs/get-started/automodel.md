@@ -344,7 +344,7 @@ Generate videos using pretrained models from Hugging Face.
 
 ### Generate from Pretrained Model
 
-#### Generate a Video 
+#### Generate a Video
 
 ```bash
 python dfm/examples/automodel/generate/wan_generate.py \

@@ -18,7 +18,7 @@ NeMo DFM uses a layered configuration system: base recipes provide defaults, YAM
 Configuration precedence: Base Recipe < YAML File < CLI Overrides
 
 1. **Base recipes**: Python functions with framework defaults
-2. **YAML files**: Reusable configuration templates  
+2. **YAML files**: Reusable configuration templates
 3. **CLI overrides**: Runtime argument overrides (highest precedence)
 
 ## Automodel Configuration

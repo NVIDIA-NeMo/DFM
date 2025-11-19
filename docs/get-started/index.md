@@ -8,9 +8,9 @@ This guide helps you get started with training video diffusion models using NeMo
 
 **By completing a tutorial, you will have:**
 
-✅ A working NeMo DFM installation  
-✅ Hands-on experience with video model training and inference  
-✅ Understanding of Automodel vs. Megatron approaches  
+✅ A working NeMo DFM installation
+✅ Hands-on experience with video model training and inference
+✅ Understanding of Automodel vs. Megatron approaches
 ✅ Ability to generate videos from trained checkpoints
 
 ## Before You Start

@@ -211,18 +211,18 @@ torchrun --nproc-per-node 2 \
      tensor_model_parallel_size: 2
      pipeline_model_parallel_size: 1
      context_parallel_size: 1
-     
+
    # Training parameters
    train:
      global_batch_size: 64
      micro_batch_size: 2
      train_iters: 10000
-     
+
    # Optimizer
    optimizer:
      lr: 0.0001
      weight_decay: 0.01
-     
+
    # Checkpointing
    checkpoint:
      save_interval: 500
