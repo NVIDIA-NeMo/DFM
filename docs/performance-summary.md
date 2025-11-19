@@ -1,8 +1,8 @@
 # Performance
 
-As part of the NVIDIA NeMo Framework, DFM, provides optimal performance for training advanced generative AI models by incorporating the most recent training techniques, such as model parallelization, optimized attention mechanisms, and more, to achieve high training throughput.
+As part of the NVIDIA NeMo Framework, DFM, provides the most recent training techniques for training advanced generative AI models, such as model parallelization, optimized attention mechanisms, and more, to achieve high training throughput.
 
-This page provides performance benchmarks for large language models using DFM across different GPU systems and configurations.
+This page provides the current performance benchmarks for large language models using DFM across different GPU systems and configurations as we continue to optimize the model for optimal performance. Please refer to `examples/megatron/recipes/wan/conf` for updated YAML configurations.
 
 ## Nomenclature
 
@@ -12,11 +12,11 @@ This page provides performance benchmarks for large language models using DFM ac
   - FSDP = 1: use FSDP
   - FSDP = 0: use DDP (Distributed Data Parallel)
 - **TP**: Tensor Parallel Size
+- **SP**: Sequence Parallel
 - **PP**: Pipeline Parallel Size
 - **CP**: Context Parallel Size
 - **VP**: Virtual Pipeline Parallel Size
 - **EP**: Expert Parallel Size
-- **GA**: Number of Gradient Accumulations
 
 ## Performance Metrics
 
@@ -36,7 +36,7 @@ Below are performance benchmarks for various large language models organized by 
 The performance data includes:
 
 - **Pre-training Performance**: Throughput metrics for various model sizes and architectures
-- **System Configurations**: Results across different GPU systems (DGX-GB200, DGX-B200, DGX-H100)
+- **System Configurations**: Results across different GPU systems (DGX-GB200, DGX-GB300, DGX-H100)
 
 ---
 
@@ -44,19 +44,22 @@ The performance data includes:
 
 #### System: DGX-GB200
 
-| Model | #-GPUs | GBS | MBS | Sequence Length | FSDP | TP | PP | CP | VP | EP | GA | Tokens / sec / GPU | Model TFLOP / sec / GPU |
+| Model | #-GPUs | GBS | MBS | Sequence Length | FSDP | TP | SP | PP | CP | VP | EP | Tokens / sec / GPU | Model TFLOP / sec / GPU |
 |-------|--------|-----|-----|-----------------|------|----|----|----|----|----|----|-----------------------|-------------------------|
+|Wan 2.1 14B|32|64|1|37440|0|1|1|1|4|0|0|4747.17|787.59|
 
 
-#### System: DGX-B200
+#### System: DGX-GB300
 
-| Model | #-GPUs | GBS | MBS | Sequence Length | FSDP | TP | PP | CP | VP | EP | GA | Tokens / sec / GPU | Model TFLOP / sec / GPU |
+| Model | #-GPUs | GBS | MBS | Sequence Length | FSDP | TP | SP | PP | CP | VP | EP | Tokens / sec / GPU | Model TFLOP / sec / GPU |
 |-------|--------|-----|-----|-----------------|------|----|----|----|----|----|----|-----------------------|-------------------------|
+|Wan 2.1 14B|32|64|1|37440|0|1|1|1|2|0|0|6161.63|1,022.26|
 
 #### System: DGX-H100
 
-| Model | #-GPUs | GBS | MBS | Sequence Length | FSDP | TP | PP | CP | VP | EP | GA | Tokens / sec / GPU | Model TFLOP / sec / GPU |
+| Model | #-GPUs | GBS | MBS | Sequence Length | FSDP | TP | SP | PP | CP | VP | EP | Tokens / sec / GPU | Model TFLOP / sec / GPU |
 |-------|--------|-----|-----|-----------------|------|----|----|----|----|----|----|-----------------------|-------------------------|
+|Wan 2.1 14B|64|64|1|37440|0|2|1|1|4|0|0|1866.47|309.66|
 
 ## Automodel Pre-Training Performance
 
