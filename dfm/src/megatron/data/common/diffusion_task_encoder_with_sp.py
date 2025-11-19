@@ -88,10 +88,16 @@ class DiffusionTaskEncoderWithSequencePacking(DefaultTaskEncoder, ABC):
         """Construct a new Diffusion sample by concatenating the sequences."""
 
         def stack(attr):
-            return torch.stack([getattr(sample, attr) for sample in samples], dim=0)
+            if hasattr(samples[0], attr) and getattr(samples[0], attr) is not None:
+                return torch.stack([getattr(sample, attr) for sample in samples], dim=0)
+            else:
+                return None     
 
         def cat(attr):
-            return torch.cat([getattr(sample, attr) for sample in samples], dim=0)
+            if hasattr(samples[0], attr) and getattr(samples[0], attr) is not None:
+                return torch.cat([getattr(sample, attr) for sample in samples], dim=0)
+            else:
+                return None
 
         return DiffusionSample(
             __key__=",".join([s.__key__ for s in samples]),
