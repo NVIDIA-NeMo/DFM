@@ -13,7 +13,22 @@ content_type: "how-to"
 
 Set up your environment for training and inference with NeMo DFM. This guide covers three installation methods: Docker (recommended), pip, and source.
 
-## Prerequisites
+:::{card}
+
+**Goal**: Get NeMo DFM installed and verify your setup with a quick test.
+
+^^^
+
+**In this tutorial, you will**:
+
+1. Choose an installation method (Docker, pip, or source)
+2. Install NeMo DFM and dependencies
+3. Verify your installation works correctly
+4. Confirm GPU availability for training and inference
+
+:::
+
+## Before You Start
 
 Verify you have the following before installation:
 
@@ -73,8 +88,8 @@ Docker installation provides a pre-configured environment with all dependencies.
 The Docker image includes:
 
 - PyTorch 25.09 with CUDA support
-- All required dependencies (accelerate, diffusers, megatron-energon)
-- Pre-configured virtual environment
+- All core dependencies (accelerate, diffusers==0.35.1, easydict, ftfy, imageio, imageio-ffmpeg, megatron-energon, opencv-python-headless==4.10.0.84)
+- Pre-configured virtual environment at `/opt/venv` (requires activation with `source /opt/venv/bin/activate`)
 
 :::
 
@@ -178,6 +193,10 @@ if torch.cuda.is_available():
     print(f"GPU name: {torch.cuda.get_device_name(0)}")
 ```
 
+```{note}
+PyTorch is included in the Docker image. For pip or source installations, install PyTorch separately if needed for GPU checks.
+```
+
 :::
 
 :::{tab-item} Package Version
@@ -207,13 +226,5 @@ All core dependencies install automatically with NeMo DFM:
 
 Install these with extras flags:
 
-- `nemo-automodel`: Automodel support via `pip install -e ".[automodel]"`
+- `nemo-automodel`: AutoModel support via `pip install -e ".[automodel]"`
 - `megatron-bridge`: Megatron-Bridge support via `pip install -e ".[megatron-bridge]"`
-
-## Next Steps
-
-Now that installation is complete:
-
-1. **[Run training](gs-training)**: Start your first training job with sample data
-2. **[Generate videos](gs-inference)**: Use pre-trained models for inference
-3. **[Learn core concepts](about-concepts)**: Understand DiT, WAN, and EDM architectures
