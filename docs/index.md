@@ -49,32 +49,52 @@ Explore the core concepts for diffusion models, architectures, and training in N
 
 ::::
 
-## Quickstarts
+## Get Started
 
-Install and run NeMo DFM for training and inference.
+Install NeMo DFM and choose your training path: Automodel for quick prototyping or Megatron for large-scale training.
 
-::::{grid} 1 2 2 2
-:gutter: 1 1 1 2
+::::::{grid} 1 1 1 1
 
-:::{grid-item-card} {octicon}`rocket;1.5em;sd-mr-1` Installation Quickstart
+:::::{grid-item-card} {octicon}`package;1.5em;sd-mr-1` 1. Installation
 :link: gs-installation
 :link-type: ref
-Set up your environment and install NeMo DFM.
+
+Get NeMo DFM installed and verify your setup with a quick test.
++++
+{bdg-secondary}`environment` {bdg-secondary}`first-run`
+:::::
+
+:::::{grid-item}
+:margin: 0
+:padding: 0
+
+::::{grid} 1 2 2 2
+:margin: 3 1 0 0
+:gutter: 3
+:padding: 3
+
+:::{grid-item-card} {octicon}`zap;1.5em;sd-mr-1` 2a. Automodel Tutorial
+:link: gs-automodel
+:link-type: ref
+
+Fine-tune pretrained models with automatic parallelism. Best for quick prototyping.
++++
+{bdg-secondary}`automodel` {bdg-success}`Fast start` {bdg-primary}`Data scientists`
 :::
 
-:::{grid-item-card} {octicon}`play;1.5em;sd-mr-1` Training Quickstart
-:link: gs-index
+:::{grid-item-card} {octicon}`server;1.5em;sd-mr-1` 2b. Megatron Tutorial
+:link: gs-megatron
 :link-type: ref
-Run your first video diffusion model training job.
-:::
 
-:::{grid-item-card} {octicon}`image;1.5em;sd-mr-1` Inference Quickstart
-:link: gs-index
-:link-type: ref
-Generate videos using trained models.
+Train from scratch with full distributed control. Best for large-scale training.
++++
+{bdg-secondary}`megatron` {bdg-info}`Full control` {bdg-primary}`MLEs`
 :::
 
 ::::
+:::::
+
+::::::
 
 ---
 
