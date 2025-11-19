@@ -328,7 +328,7 @@ class TestFlowMatchingTrainingStep:
 
         # Video with extra batch dimension
         batch_extra = {
-            "video_latents": torch.randn(1, 2, 16, 1, 8, 8),  # Extra dim
+            "video_latents": torch.randn(2, 16, 1, 8, 8),  # Extra dim
             "text_embeddings": torch.randn(1, 2, 77, 4096),
         }
 
