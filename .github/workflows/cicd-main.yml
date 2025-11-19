@@ -13,6 +13,7 @@
 # limitations under the License.
 name: CICD NeMo
 on:
+  workflow_dispatch:
   schedule:
     - cron: 0 0 * * *
   push:
@@ -45,6 +46,7 @@ jobs:
     with:
       image-name: dfm
       dockerfile: docker/Dockerfile.ci
+      runner: self-hosted-nemo
     secrets:
       AZURE_CLIENT_ID: ${{ secrets.AZURE_CLIENT_ID }}
       AZURE_TENANT_ID: ${{ secrets.AZURE_TENANT_ID }}
@@ -56,7 +58,7 @@ jobs:
       matrix:
         include:
           - script: L0_Unit_Tests_GPU
-            runner: linux-amd64-gpu-rtxa6000-latest-2-nemo
+            runner: self-hosted-nemo
             timeout: 30
           - script: L0_Unit_Tests_CPU
             runner: linux-amd64-cpu16
@@ -89,8 +91,11 @@ jobs:
       fail-fast: false
       matrix:
         include:
-          - script: L2_Functional_Tests_GPU
-            runner: linux-amd64-gpu-rtxa6000-latest-2-nemo
+          - script: L2_Mcore_Mock_Tests_GPU
+            runner: self-hosted-nemo
+            timeout: 30
+          - script: L2_Automodel_Wan21_Test
+            runner: self-hosted-nemo
             timeout: 30
     needs: [cicd-unit-tests]
     runs-on: ${{ matrix.runner }}

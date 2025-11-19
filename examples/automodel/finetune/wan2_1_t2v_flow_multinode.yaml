@@ -1,0 +1,56 @@
+seed: 42
+
+wandb:
+  project: wan-t2v-flow-matching
+  mode: online
+  name: wan2_1_t2v_fm_updated
+
+dist_env:
+  backend: nccl
+  timeout_minutes: 30
+
+model:
+  pretrained_model_name_or_path: Wan-AI/Wan2.1-T2V-1.3B-Diffusers
+
+step_scheduler:
+  global_batch_size: 8
+  local_batch_size: 1
+  ckpt_every_steps: 1000
+  num_epochs: 100
+  log_every: 2
+
+data:
+  dataloader:
+    _target_: dfm.src.automodel.datasets.build_wan21_dataloader
+    meta_folder: /lustre/fsw/portfolios/coreai/users/linnanw/hdvilla_sample/pika/wan21_codes/1.3B_meta/
+    num_workers: 2
+    device: cpu
+
+
+optim:
+  learning_rate: 5e-6
+  optimizer:
+    weight_decay: 0.01
+    betas: [0.9, 0.999]
+
+flow_matching:
+  use_sigma_noise: true
+  timestep_sampling: uniform
+  logit_mean: 0.0
+  logit_std: 1.0
+  flow_shift: 3.0
+  mix_uniform_ratio: 0.1
+
+fsdp:
+  tp_size: 1
+  cp_size: 1
+  pp_size: 1
+  dp_replicate_size: 2
+  dp_size: 16
+
+checkpoint:
+  enabled: true
+  checkpoint_dir: /opt/DFM/wan_t2v_flow_outputs_base_recipe_multi_node_fsdp_run_3/
+  model_save_format: torch_save
+  save_consolidated: false
+  restore_from: null

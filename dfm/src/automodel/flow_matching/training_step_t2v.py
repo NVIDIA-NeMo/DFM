@@ -19,7 +19,8 @@ import os
 from typing import Dict, Tuple
 
 import torch
-from Automodel.flow_matching.time_shift_utils import (
+
+from dfm.src.automodel.flow_matching.time_shift_utils import (
     compute_density_for_timestep_sampling,
 )
 
@@ -28,8 +29,8 @@ logger = logging.getLogger(__name__)
 
 
 def step_fsdp_transformer_t2v(
-    pipe,
-    model_map: Dict,
+    scheduler,
+    model,
     batch,
     device,
     bf16,
@@ -40,6 +41,8 @@ def step_fsdp_transformer_t2v(
     logit_std: float = 1.0,
     flow_shift: float = 3.0,
     mix_uniform_ratio: float = 0.1,
+    sigma_min: float = 0.0,  # Default: no clamping (pretrain)
+    sigma_max: float = 1.0,  # Default: no clamping (pretrain)
     global_step: int = 0,
 ) -> Tuple[torch.Tensor, Dict]:
     """
@@ -56,25 +59,22 @@ def step_fsdp_transformer_t2v(
     video_latents = batch["video_latents"].to(device, dtype=bf16)
     text_embeddings = batch["text_embeddings"].to(device, dtype=bf16)
 
+    assert video_latents.ndim in (4, 5), "Expected video_latents.ndim to be 4 or 5 "
+    assert text_embeddings.ndim in (2, 3), "Expected text_embeddings.ndim to be 2 or 3 "
     # Handle tensor shapes
-    while video_latents.ndim > 5:
-        video_latents = video_latents.squeeze(0)
     if video_latents.ndim == 4:
         video_latents = video_latents.unsqueeze(0)
 
-    while text_embeddings.ndim > 3:
-        text_embeddings = text_embeddings.squeeze(0)
     if text_embeddings.ndim == 2:
         text_embeddings = text_embeddings.unsqueeze(0)
 
-    batch_size = video_latents.shape[0]
-    _, channels, frames, height, width = video_latents.shape
+    batch_size, channels, frames, height, width = video_latents.shape
 
     # ========================================================================
     # Flow Matching Timestep Sampling
     # ========================================================================
 
-    num_train_timesteps = pipe.scheduler.config.num_train_timesteps
+    num_train_timesteps = scheduler.config.num_train_timesteps
 
     if use_sigma_noise:
         use_uniform = torch.rand(1).item() < mix_uniform_ratio
@@ -96,12 +96,23 @@ def step_fsdp_transformer_t2v(
         # Apply flow shift: σ = shift/(shift + (1/u - 1))
         u_clamped = torch.clamp(u, min=1e-5)  # Avoid division by zero
         sigma = flow_shift / (flow_shift + (1.0 / u_clamped - 1.0))
-        sigma = torch.clamp(sigma, 0.0, 1.0)
+
+        # Clamp sigma (only if not full range [0,1])
+        # Pretrain uses [0, 1], finetune uses [0.02, 0.55]
+        if sigma_min > 0.0 or sigma_max < 1.0:
+            sigma = torch.clamp(sigma, sigma_min, sigma_max)
+        else:
+            sigma = torch.clamp(sigma, 0.0, 1.0)
 
     else:
         # Simple uniform without shift
         u = torch.rand(size=(batch_size,), device=device)
-        sigma = u
+
+        # Clamp sigma (only if not full range [0,1])
+        if sigma_min > 0.0 or sigma_max < 1.0:
+            sigma = torch.clamp(u, sigma_min, sigma_max)
+        else:
+            sigma = u
         sampling_method = "uniform_no_shift"
 
     # ========================================================================
@@ -186,10 +197,8 @@ def step_fsdp_transformer_t2v(
     # Forward Pass
     # ========================================================================
 
-    fsdp_model = model_map["transformer"]["fsdp_transformer"]
-
     try:
-        model_pred = fsdp_model(
+        model_pred = model(
             hidden_states=noisy_latents,
             timestep=timesteps_for_model,
             encoder_hidden_states=text_embeddings,
@@ -243,7 +252,7 @@ def step_fsdp_transformer_t2v(
         logger.info(f"[STEP {global_step}] LOSS DEBUG")
         logger.info("=" * 80)
         logger.info("[TARGET] Flow matching: v = ε - x_0")
-        logger.info(f"[PREDICTION] Scheduler type (inference only): {type(pipe.scheduler).__name__}")
+        logger.info(f"[PREDICTION] Scheduler type (inference only): {type(scheduler).__name__}")
         logger.info("")
         logger.info(f"[RANGES] Model pred: [{model_pred.min():.4f}, {model_pred.max():.4f}]")
         logger.info(f"[RANGES] Target (v): [{target.min():.4f}, {target.max():.4f}]")
