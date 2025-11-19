@@ -220,15 +220,10 @@ class TrainWan21DiffusionRecipe(BaseRecipe):
         self.model = self.pipe.transformer
         self.peft_config = None
 
-        batch_cfg = self.cfg.get("batch", {})
-        training_cfg = self.cfg.get("training", {})
-        logging_cfg = self.cfg.get("logging", {})
         checkpoint_cfg = self.cfg.get("checkpoint", None)
 
-        self.batch_size_per_node = batch_cfg.get("batch_size_per_node", 1)
-        self.num_epochs = training_cfg.get("num_epochs", 1)
-        self.save_every = logging_cfg.get("save_every", 500)
-        self.log_every = logging_cfg.get("log_every", 5)
+        self.num_epochs = self.cfg.step_scheduler.num_epochs
+        self.log_every = self.cfg.get("step_scheduler.log_every", 5)
 
         # Strictly require checkpoint config from YAML (no fallback)
         if checkpoint_cfg is None:
@@ -265,7 +260,9 @@ class TrainWan21DiffusionRecipe(BaseRecipe):
             raise RuntimeError("data.dataloader must be a config node with instantiate()")
 
         self.dataloader, self.sampler = dataloader_cfg.instantiate(
-            dp_rank=self._get_dp_rank(), dp_world_size=self._get_dp_group_size()
+            dp_rank=self._get_dp_rank(),
+            dp_world_size=self._get_dp_group_size(),
+            batch_size=self.cfg.step_scheduler.local_batch_size,
         )
 
         self.raw_steps_per_epoch = len(self.dataloader)
@@ -282,9 +279,9 @@ class TrainWan21DiffusionRecipe(BaseRecipe):
             self.dp_size = max(1, self.world_size // denom)
 
         # Infer local micro-batch size from dataloader if available
-        self.local_batch_size = getattr(self.dataloader, "batch_size", 1)
+        self.local_batch_size = self.cfg.step_scheduler.local_batch_size
         # Desired global effective batch size across all DP ranks and nodes
-        self.global_batch_size = max(1, int(self.batch_size_per_node) * int(self.num_nodes))
+        self.global_batch_size = self.cfg.step_scheduler.global_batch_size
         # Steps per epoch after gradient accumulation
         grad_acc_steps = max(1, self.global_batch_size // max(1, self.local_batch_size * self.dp_size))
         self.steps_per_epoch = ceil(self.raw_steps_per_epoch / grad_acc_steps)
@@ -299,10 +296,10 @@ class TrainWan21DiffusionRecipe(BaseRecipe):
         self.start_epoch = 0
         # Initialize StepScheduler for gradient accumulation and step/epoch bookkeeping
         self.step_scheduler = StepScheduler(
-            global_batch_size=int(self.global_batch_size),
-            local_batch_size=int(self.local_batch_size),
+            global_batch_size=self.cfg.step_scheduler.global_batch_size,
+            local_batch_size=self.cfg.step_scheduler.local_batch_size,
             dp_size=int(self.dp_size),
-            ckpt_every_steps=int(self.save_every) if self.save_every else 1,
+            ckpt_every_steps=self.cfg.step_scheduler.ckpt_every_steps,
             dataloader=self.dataloader,
             val_every_steps=None,
             start_step=int(self.global_step),
@@ -321,8 +318,8 @@ class TrainWan21DiffusionRecipe(BaseRecipe):
 
     def run_train_validation_loop(self):
         logging.info("[INFO] Starting T2V training with Flow Matching")
-        logging.info(f"[INFO] Batch size per node: {self.batch_size_per_node}")
-        logging.info(f"[INFO] Total effective batch size: {self.batch_size_per_node * self.num_nodes}")
+        logging.info(f"[INFO] Global Batch size: {self.global_batch_size}; Local Batch size: {self.local_batch_size}")
+        logging.info(f"[INFO] Num nodes: {self.num_nodes}; DP size: {self.dp_size}")
 
         # Keep global_step synchronized with scheduler
         global_step = int(self.step_scheduler.step)
