@@ -41,7 +41,6 @@ Get NeMo DFM installed and verify your setup with a quick test.
 :::::
 
 :::::{grid-item}
-:gutter: 0
 :margin: 0
 :padding: 0
 

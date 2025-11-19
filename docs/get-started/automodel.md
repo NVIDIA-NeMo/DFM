@@ -226,7 +226,7 @@ checkpoint:
 :::
 
 :::{dropdown} Parallelism settings (`fsdp`)
-:icon: settings
+:icon: gear
 
 - `tp_size=1`: Tensor parallelism disabled (automatic for this model size)
 - `cp_size=1`: Context parallelism disabled

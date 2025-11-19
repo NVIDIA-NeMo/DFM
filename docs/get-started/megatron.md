@@ -276,7 +276,7 @@ ls -lh checkpoints/dit_butterfly/
 Expected: `iter_0001000/`, `iter_0002000/` directories with `model_weights.pt` and `optimizer_states.pt` files.
 
 :::{dropdown} Resume from Checkpoint
-:icon: repeat
+:icon: redo
 
 Resume training from a saved checkpoint:
 

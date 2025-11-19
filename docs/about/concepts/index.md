@@ -62,7 +62,6 @@ Understand how DFM's configuration system works: YAML files, CLI overrides, and 
 :hidden:
 :maxdepth: 2
 
-about/concepts/index.md
 Training Paradigms <training-paradigms.md>
 Diffusion Models for Video <diffusion-models.md>
 Video Data Representation <video-data.md>
