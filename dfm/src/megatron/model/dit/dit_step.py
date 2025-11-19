@@ -26,7 +26,6 @@ from megatron.core import parallel_state
 from megatron.core.models.gpt import GPTModel
 from megatron.core.utils import get_model_config
 
-from dfm.src.common.tokenizers.cosmos.cosmos1.causal_video_tokenizer import CausalVideoTokenizer
 from dfm.src.common.utils.save_video import save_video
 from dfm.src.megatron.model.dit.dit_data_process import dit_data_step
 from dfm.src.megatron.model.dit.edm.edm_pipeline import EDMPipeline
@@ -40,18 +39,18 @@ class DITForwardStep:
         self.diffusion_pipeline = EDMPipeline(sigma_data=0.5)
         self.valid = False
         self.train = True
-        self.validation_step = 0
 
-    def on_validation_start(self, state, batch, model, step):
+    def on_validation_start(self, state, batch, model):
         C, T, H, W = batch["latent_shape"][0]
         latent = self.diffusion_pipeline.generate_samples_from_batch(
             model,
             batch,
-            guidance=7,
+            guidance=model.config.val_generation_guidance,
             state_shape=batch["video"].shape,
-            num_steps=35,
+            num_steps=model.config.val_generation_num_steps,
             is_negative_prompt=True if "neg_context_embeddings" in batch else False,
         )
+        caption = batch["video_metadata"][0]["caption"]
         latent = latent[0, None, : batch["seq_len_q"][0]]
         latent = rearrange(
             latent,
@@ -65,13 +64,13 @@ class DITForwardStep:
             W=W // model.config.patch_spatial,
         )
 
-        vae = CausalVideoTokenizer.from_pretrained("Cosmos-0.1-Tokenizer-CV4x8x8")
-        vae.to("cuda")
+        vae = model.config.configure_vae().to("cuda")
 
         decoded_video = (1.0 + vae.decode(latent / self.diffusion_pipeline.sigma_data)).clamp(0, 2) / 2
         decoded_video = (decoded_video * 255).to(torch.uint8).permute(0, 2, 3, 4, 1).cpu().numpy()
         rank = torch.distributed.get_rank()
-        image_folder = "validation_images"
+
+        image_folder = os.path.join(state.cfg.checkpoint.save, "validation_generation")
         os.makedirs(image_folder, exist_ok=True)
         save_video(
             grid=decoded_video[0],
@@ -79,9 +78,11 @@ class DITForwardStep:
             H=decoded_video.shape[2],
             W=decoded_video.shape[3],
             video_save_quality=5,
-            video_save_path=f"{image_folder}/validation_step={step}_rank={rank}.mp4",
+            video_save_path=f"{image_folder}/step={state.train_state.step}_rank={rank}.mp4",
+            caption=caption,
         )
 
+        # Log the video to Weights & Biases
         is_last_dp_rank = parallel_state.get_data_parallel_rank() == (
             parallel_state.get_data_parallel_world_size() - 1
         )
@@ -97,20 +98,20 @@ class DITForwardStep:
             gather_list = None
 
         torch.distributed.gather_object(
-            obj=decoded_video[0],
+            obj=(decoded_video[0], caption),
             object_gather_list=gather_list,
             dst=wandb_rank,
             group=parallel_state.get_data_parallel_group(),
         )
-        if is_last_dp_rank:
+
+        if is_last_dp_rank and state.wandb_logger is not None:
             if gather_list is not None:
                 videos = []
-                for video_data in gather_list:
+                for video_data, video_caption in gather_list:
                     video_data_transposed = video_data.transpose(0, 3, 1, 2)
-                    videos.append(wandb.Video(video_data_transposed, fps=24, format="mp4"))
+                    videos.append(wandb.Video(video_data_transposed, fps=24, format="mp4", caption=video_caption))
 
-                if state.wandb_logger is not None:
-                    state.wandb_logger.log({"prediction": videos})
+                state.wandb_logger.log({"prediction": videos})
 
     def __call__(
         self, state: GlobalState, data_iterator: Iterable, model: GPTModel, return_schedule_plan: bool = False
@@ -133,8 +134,7 @@ class DITForwardStep:
         elif (not model.training) and self.train:
             self.train = False
             self.valid = True
-            self.validation_step += 1
-            self.on_validation_start(state, batch, model, step=self.validation_step)
+            self.on_validation_start(state, batch, model)
         return self.forward_step(state, batch, model, return_schedule_plan)
 
     def data_process(

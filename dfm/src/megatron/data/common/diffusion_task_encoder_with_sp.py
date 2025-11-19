@@ -41,9 +41,9 @@ def cook(sample: dict) -> dict:
     """
     return dict(
         **basic_sample_keys(sample),
-        json=sample[".json"],
-        pth=sample[".pth"],
-        pickle=sample[".pickle"],
+        json=sample["json"],
+        pth=sample["pth"],
+        pickle=sample["pickle"],
     )
 
 

@@ -16,16 +16,16 @@ import os
 import pickle
 from typing import Callable
 
-import nemo_run as run
+import mediapy as media
 import numpy as np
 import pandas as pd
 import torch
 import torch.distributed as dist
 import webdataset as wds
 from einops import rearrange
-from nemo.collections.common.video_tokenizers.cosmos_tokenizer import CausalVideoTokenizer
-from nemo.collections.common.video_tokenizers.utils import read_image, resize_video
 from transformers import T5EncoderModel, T5TokenizerFast
+
+from dfm.src.common.tokenizers.cosmos.cosmos1.causal_video_tokenizer import CausalVideoTokenizer
 
 
 # examples/megatron/receipes/dit
@@ -49,15 +49,48 @@ def initialize_text_encoder(t5_cache_dir):
     return tokenizer, text_encoder
 
 
-# Load dataset from HuggingFace
-df = pd.read_parquet("hf://datasets/huggan/smithsonian_butterflies_subset/data/train-00000-of-00001.parquet")
-# Load Cosmos tokenizer from HuggingFace
+def read_image(filepath: str) -> np.ndarray:
+    """Reads an image from a filepath.
 
-autoencoder = CausalVideoTokenizer.from_pretrained("Cosmos-0.1-Tokenizer-CV4x8x8")
+    Args:
+        filepath: The filepath to the image.
 
-# Load T5-XXL text encoder
-t5_cache_dir = ""  # Use your own custom cache path
-tokenizer, text_encoder = initialize_text_encoder(t5_cache_dir)
+    Returns:
+        The image as a numpy array, layout HxWxC, range [0..255], uint8 dtype.
+    """
+    image = media.read_image(filepath)
+    # convert the grey scale image to RGB
+    # since our tokenizers always assume 3-channel RGB image
+    if image.ndim == 2:
+        image = np.stack([image] * 3, axis=-1)
+    # convert RGBA to RGB
+    if image.shape[-1] == 4:
+        image = image[..., :3]
+    return image
+
+
+def resize_video(video: np.ndarray, short_size: int = None) -> np.ndarray:
+    """Resizes a video to have the short side of `short_size`.
+
+    Args:
+        video: The video to resize, layout TxHxWxC, of any range.
+        short_size: The size of the short side.
+    Returns:
+        The resized video.
+    """
+    if short_size is None:
+        return video
+    height, width = video.shape[-3:-1]
+    if height <= width:
+        height_new, width_new = short_size, int(width * short_size / height + 0.5)
+        width_new = width_new if width_new % 2 == 0 else width_new + 1
+    else:
+        height_new, width_new = (
+            int(height * short_size / width + 0.5),
+            short_size,
+        )
+        height_new = height_new if height_new % 2 == 0 else height_new + 1
+    return media.resize_video(video, shape=(height_new, width_new))
 
 
 class EncodedSample:
@@ -196,7 +229,7 @@ def get_start_end_idx_for_this_rank(dataset_size, rank, world_size):
     return start_idx, end_idx
 
 
-def butterfly_process_func(index, rank):
+def butterfly_process_func(index, autoencoder, tokenizer, text_encoder):
     """
     Generates a sample dictionary with image latent tensor, caption, and metadata.
 
@@ -218,7 +251,6 @@ def butterfly_process_func(index, rank):
 
     # import pdb; pdb.set_trace()
     video = resize_video(video, short_size=512)
-    import mediapy as media
 
     # Ensure that h and w are divisible by 16
     h, w = video.shape[1:3]
@@ -232,17 +264,18 @@ def butterfly_process_func(index, rank):
     # Run autoencoder to get latents
 
     # import pdb; pdb.set_trace()
-    image_latent = autoencoder.encode(torch.from_numpy(batch_video).to(torch.bfloat16).cuda(device=rank))[0]
+    image_latent = autoencoder.encode(torch.from_numpy(batch_video).to(torch.bfloat16).cuda())[0]
     image_latent = image_latent.cpu()
 
     text_embedding = generate_t5_embed(tokenizer, text_encoder, image_caption)
 
     # Construct sample dictionary
+
     sample = {
         "__key__": f"{index:06}",
-        ".pth": image_latent.to(dtype=torch.bfloat16),
-        ".pickle": pickle.dumps(text_embedding),
-        ".json": {
+        "pth": image_latent.to(dtype=torch.bfloat16),
+        "pickle": pickle.dumps(text_embedding),
+        "json": {
             "image_height": batch_video.shape[2],
             "image_width": batch_video.shape[3],
             # Add additional score as metadata
@@ -252,8 +285,13 @@ def butterfly_process_func(index, rank):
 
 
 @torch.no_grad()
-@run.cli.entrypoint
-def prepare(process_func: Callable, output_dir: str = "output_butterfly"):
+def prepare(
+    process_func: Callable,
+    output_dir: str = "output_butterfly",
+    autoencoder: CausalVideoTokenizer = None,
+    tokenizer: T5TokenizerFast = None,
+    text_encoder: T5EncoderModel = None,
+):
     """
     Prepares a WebDataset using the specified processing function, for distributed settings.
 
@@ -267,7 +305,6 @@ def prepare(process_func: Callable, output_dir: str = "output_butterfly"):
     # rank = 0
     # world_size = 1
     # import pdb; pdb.set_trace()
-    print(f"Rank {rank} of {world_size} processing {len(df)} samples")
     start_idx, end_idx = get_start_end_idx_for_this_rank(len(df), rank, world_size)
     print(f"Rank {rank} of {world_size} processing {end_idx - start_idx} samples, from {start_idx} to {end_idx}")
     os.makedirs(output_dir, exist_ok=True)
@@ -279,25 +316,36 @@ def prepare(process_func: Callable, output_dir: str = "output_butterfly"):
 
         for i in tqdm(range(start_idx, end_idx)):
             # convert to tqdm
-            sample = process_func(i, rank)
+            sample = process_func(i, autoencoder, tokenizer, text_encoder)
             # Write sample to tar file
             sink.write(sample)
 
 
-@run.cli.factory(target=prepare)
-def prepare_butterfly_dataset() -> run.Partial:
-    """
-    Prepares the butterfly dataset for distributed training.
-
-    Returns:
-        run.Partial: Partially configured run for WebDataset preparation.
-    """
-    recipe = run.Partial(prepare, process_func=butterfly_process_func, output_dir="butterfly_webdataset")
-    return recipe
-
-
 if __name__ == "__main__":
+    import argparse
+
+    parser = argparse.ArgumentParser(description="Prepare butterfly dataset for training")
+    parser.add_argument("--output_dir", type=str, default="butterfly_webdataset", help="Output directory for dataset")
+    parser.add_argument(
+        "--tokenizer_cache_dir", type=str, default="tokenizer_cache", help="Cache directory for Cosmos tokenizer"
+    )
+    parser.add_argument("--t5_cache_dir", type=str, default="t5_cache", help="Cache directory for T5 tokenizer")
+    args = parser.parse_args()
+
     dist.init_process_group("nccl")
     local_rank = int(os.environ["LOCAL_RANK"])
     torch.cuda.set_device(local_rank)
-    run.cli.main(prepare, default_factory=prepare_butterfly_dataset)
+
+    df = pd.read_parquet("hf://datasets/huggan/smithsonian_butterflies_subset/data/train-00000-of-00001.parquet")
+    autoencoder = CausalVideoTokenizer.from_pretrained(
+        "Cosmos-0.1-Tokenizer-CV4x8x8", cache_dir=args.tokenizer_cache_dir
+    )
+    autoencoder.to(torch.bfloat16).cuda().eval()
+    tokenizer, text_encoder = initialize_text_encoder(args.t5_cache_dir)
+    prepare(
+        process_func=butterfly_process_func,
+        output_dir=args.output_dir,
+        autoencoder=autoencoder,
+        tokenizer=tokenizer,
+        text_encoder=text_encoder,
+    )

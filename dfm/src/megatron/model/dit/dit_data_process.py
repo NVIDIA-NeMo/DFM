@@ -18,8 +18,7 @@ from megatron.core.packed_seq_params import PackedSeqParams
 
 
 def dit_data_step(qkv_format, dataloader_iter):
-    # import pdb;pdb.set_trace()
-    batch = next(iter(dataloader_iter.iterable))
+    batch = next(dataloader_iter)
     batch["is_preprocessed"] = True  # assume data is preprocessed
     batch = {k: v.to(device="cuda", non_blocking=True) if torch.is_tensor(v) else v for k, v in batch.items()}
     batch = encode_seq_length(batch, format=qkv_format)
@@ -31,17 +30,13 @@ def encode_seq_length(batch, format):
     if ("seq_len_q" in batch) and ("seq_len_kv" in batch):
         zero = torch.zeros([1], dtype=torch.int32, device="cuda")
 
-        cu_seqlens_q = batch["seq_len_q"].cumsum(dim=0).to(torch.int32)
-        cu_seqlens_q = torch.cat((zero, cu_seqlens_q))
+        def cumsum(key):
+            return torch.cat((zero, batch[key].cumsum(dim=0).to(torch.int32)))
 
-        cu_seqlens_kv = batch["seq_len_kv"].cumsum(dim=0).to(torch.int32)
-        cu_seqlens_kv = torch.cat((zero, cu_seqlens_kv))
-
-        cu_seqlens_q_padded = batch["seq_len_q_padded"].cumsum(dim=0).to(torch.int32)
-        cu_seqlens_q_padded = torch.cat((zero, cu_seqlens_q_padded))
-
-        cu_seqlens_kv_padded = batch["seq_len_kv_padded"].cumsum(dim=0).to(torch.int32)
-        cu_seqlens_kv_padded = torch.cat((zero, cu_seqlens_kv_padded))
+        cu_seqlens_q = cumsum("seq_len_q")
+        cu_seqlens_kv = cumsum("seq_len_kv")
+        cu_seqlens_q_padded = cumsum("seq_len_q_padded")
+        cu_seqlens_kv_padded = cumsum("seq_len_kv_padded")
 
         batch["packed_seq_params"] = {
             "self_attention": PackedSeqParams(
