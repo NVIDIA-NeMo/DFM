@@ -59,19 +59,16 @@ def step_fsdp_transformer_t2v(
     video_latents = batch["video_latents"].to(device, dtype=bf16)
     text_embeddings = batch["text_embeddings"].to(device, dtype=bf16)
 
+    assert video_latents.ndim in (4, 5), "Expected video_latents.ndim to be 4 or 5 "
+    assert text_embeddings.ndim in (2, 3), "Expected text_embeddings.ndim to be 2 or 3 "
     # Handle tensor shapes
-    while video_latents.ndim > 5:
-        video_latents = video_latents.squeeze(0)
     if video_latents.ndim == 4:
         video_latents = video_latents.unsqueeze(0)
 
-    while text_embeddings.ndim > 3:
-        text_embeddings = text_embeddings.squeeze(0)
     if text_embeddings.ndim == 2:
         text_embeddings = text_embeddings.unsqueeze(0)
 
-    batch_size = video_latents.shape[0]
-    _, channels, frames, height, width = video_latents.shape
+    batch_size, channels, frames, height, width = video_latents.shape
 
     # ========================================================================
     # Flow Matching Timestep Sampling

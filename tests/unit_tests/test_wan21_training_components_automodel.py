@@ -328,8 +328,8 @@ class TestFlowMatchingTrainingStep:
 
         # Video with extra batch dimension
         batch_extra = {
-            "video_latents": torch.randn(1, 2, 16, 1, 8, 8),  # Extra dim
-            "text_embeddings": torch.randn(1, 2, 77, 4096),
+            "video_latents": torch.randn(2, 16, 1, 8, 8),  # Extra dim
+            "text_embeddings": torch.randn(2, 77, 4096),
         }
 
         loss, metrics = step_fsdp_transformer_t2v(

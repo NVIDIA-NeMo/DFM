@@ -135,8 +135,12 @@ class MetaFilesDataset(Dataset):
 
 
 def collate_fn(batch: List[Dict[str, torch.Tensor]]) -> Dict[str, torch.Tensor]:
-    text_embeddings = torch.stack([item["text_embeddings"] for item in batch])
-    video_latents = torch.stack([item["video_latents"] for item in batch])
+    if len(batch) > 0:
+        assert batch[0]["text_embeddings"].ndim == 3, "Expected text_embeddings.ndim to be 3"
+        assert batch[0]["video_latents"].ndim == 5, "Expected video_latents.ndim to be 5"
+    # use cat to stack the tensors in the batch
+    text_embeddings = torch.cat([item["text_embeddings"] for item in batch], dim=0)
+    video_latents = torch.cat([item["video_latents"] for item in batch], dim=0)
     return {
         "text_embeddings": text_embeddings,
         "video_latents": video_latents,
