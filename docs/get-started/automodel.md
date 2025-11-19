@@ -32,7 +32,7 @@ Complete end-to-end tutorial for fine-tuning and generating videos using NeMo DF
 :::{button-ref} gs-index
 :color: secondary
 :outline:
-:ref-type: doc
+:ref-type: ref
 
 ← Back to Get Started
 :::
@@ -305,7 +305,7 @@ Expected: `iter_1000/`, `iter_2000/`, `latest/` directories with `model_weights.
 ### Troubleshooting
 
 :::{dropdown} Out of Memory Errors
-:icon: warning
+:icon: alert
 
 ```
 RuntimeError: CUDA out of memory
@@ -433,7 +433,7 @@ xdg-open butterfly_garden.mp4  # Linux
 ### Troubleshooting
 
 :::{dropdown} Out of Memory Errors
-:icon: warning
+:icon: alert
 
 ```
 RuntimeError: CUDA out of memory

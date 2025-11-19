@@ -63,13 +63,13 @@ Set up your environment and install NeMo DFM.
 :::
 
 :::{grid-item-card} {octicon}`play;1.5em;sd-mr-1` Training Quickstart
-:link: gs-training
+:link: gs-index
 :link-type: ref
 Run your first video diffusion model training job.
 :::
 
 :::{grid-item-card} {octicon}`image;1.5em;sd-mr-1` Inference Quickstart
-:link: gs-inference
+:link: gs-index
 :link-type: ref
 Generate videos using trained models.
 :::

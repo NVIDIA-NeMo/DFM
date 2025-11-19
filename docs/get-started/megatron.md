@@ -32,7 +32,7 @@ Complete end-to-end tutorial for pretraining a DiT model and generating videos u
 :::{button-ref} gs-index
 :color: secondary
 :outline:
-:ref-type: doc
+:ref-type: ref
 
 ← Back to Get Started
 :::
@@ -131,7 +131,7 @@ Each sample: `.pth` (image latents), `.pickle` (T5 embeddings), `.json` (metadat
 ### Troubleshooting
 
 :::{dropdown} Out of Memory During Preparation
-:icon: warning
+:icon: alert
 
 ```text
 RuntimeError: CUDA out of memory
@@ -293,7 +293,7 @@ Training continues from iteration 5000.
 ### Troubleshooting
 
 :::{dropdown} Out of Memory Errors
-:icon: warning
+:icon: alert
 
 ```text
 RuntimeError: CUDA out of memory
@@ -327,7 +327,7 @@ Generate videos from your trained DiT model checkpoint using Megatron inference.
 The inference script expects a consolidated `model.pth` file. Training saves checkpoints in `checkpoints/dit_butterfly/iter_5000/` with `model.pth` and `extra_state.pt` files.
 
 :::{dropdown} Consolidate Sharded Checkpoint (If Needed)
-:icon: warning
+:icon: alert
 
 If your checkpoint is distributed across multiple files, consolidate:
 
@@ -406,7 +406,7 @@ ls -lh idx=0_rank=0_butterfly_monarch.mp4
 ### Troubleshooting
 
 :::{dropdown} Model Loading Error
-:icon: warning
+:icon: alert
 
 ```text
 FileNotFoundError: model.pth not found
@@ -420,7 +420,7 @@ cp checkpoints/dit_butterfly/iter_5000/model.pth .
 :::
 
 :::{dropdown} Out of Memory Errors
-:icon: warning
+:icon: alert
 
 ```text
 RuntimeError: CUDA out of memory
