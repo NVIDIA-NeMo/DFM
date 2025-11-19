@@ -18,7 +18,6 @@ from megatron.core.packed_seq_params import PackedSeqParams
 
 
 def dit_data_step(qkv_format, dataloader_iter):
-    
     batch = next(dataloader_iter)
     batch["is_preprocessed"] = True  # assume data is preprocessed
     batch = {k: v.to(device="cuda", non_blocking=True) if torch.is_tensor(v) else v for k, v in batch.items()}
