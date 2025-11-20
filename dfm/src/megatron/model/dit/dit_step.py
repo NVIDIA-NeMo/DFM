@@ -50,7 +50,7 @@ class DITForwardStep:
             num_steps=model.config.val_generation_num_steps,
             is_negative_prompt=True if "neg_context_embeddings" in batch else False,
         )
-        caption = batch["video_metadata"][0]["caption"]
+        caption = batch["video_metadata"][0]["caption"] if "caption" in batch["video_metadata"][0] else "no caption"
         latent = latent[0, None, : batch["seq_len_q"][0]]
         latent = rearrange(
             latent,
