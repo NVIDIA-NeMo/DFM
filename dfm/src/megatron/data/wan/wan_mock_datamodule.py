@@ -140,6 +140,7 @@ class WanMockDataModuleConfig(DatasetProvider):
                 prefetch_factor=8,
             )
         )
+        self._train_dl = iter(self._train_dl)
         self.sequence_length = self.seq_length
 
     def build_datasets(self, _context: DatasetBuildContext):
