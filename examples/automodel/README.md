@@ -222,7 +222,7 @@ fsdp:
 - ✅ **Distributed**: FSDP2 + Tensor Parallelism
 - ✅ **Mixed Precision**: BF16 by default
 - ✅ **WandB**: Automatic logging
-- ✅ **Checkpointing**: EMA, consolidated, and sharded formats
+- ✅ **Checkpointing**: consolidated, and sharded formats
 - ✅ **Multi-node**: SLURM and torchrun support
 
 ---
@@ -231,8 +231,8 @@ fsdp:
 
 | Model | Parameters | Parallelization | Status |
 |-------|------------|-----------------|--------|
-| Wan 2.1 T2V 1.3B | 1.3B | TP/CP/DP via FSDP2 | ✅ |
-| Wan 2.1 T2V 14B | 14B | TP/CP/DP via FSDP2 | ✅ |
+| Wan 2.1 T2V 1.3B | 1.3B | FSDP2 via Automodel + DDP | ✅ |
+| Wan 2.1 T2V 14B | 14B | FSDP2 via Automodel + DDP | ✅ |
 | FLUX | TBD | TBD | 🔄 In Progress |
 
 ---
