@@ -66,9 +66,15 @@ class WanAdaLN(MegatronModule):
 
         setattr(self.modulation, "sequence_parallel", config.sequence_parallel)
 
+    @jit_fuser
     def forward(self, timestep_emb):
-        e = (self.modulation + timestep_emb).chunk(6, dim=1)
+        e = (self.modulation + timestep_emb).transpose(0, 1)
+        e = e.chunk(6, dim=0)
         return e
+
+    @jit_fuser
+    def normalize_modulate(self, norm, hidden_states, shift, scale):
+        return self.modulate(norm(hidden_states), shift, scale)
 
     @jit_fuser
     def modulate(self, x, shift, scale):
@@ -108,7 +114,7 @@ class WanLayerWithAdaLN(TransformerLayer):
             config=config, submodules=submodules, layer_number=layer_number, hidden_dropout=hidden_dropout
         )
 
-        # Override Cross Attention to disable CP.
+        # TODO (pmannan): Override Cross Attention to disable CP.
         # Disable TP Comm overlap as well. Not disabling will attempt re-use of buffer size same as
         #   Q and lead to incorrect tensor shapes.
         # if submodules.cross_attention != IdentityOp:
@@ -161,6 +167,10 @@ class WanLayerWithAdaLN(TransformerLayer):
                 if isinstance(param, nn.Parameter) and param.requires_grad:
                     setattr(param, "average_gradients_across_tp_domain", True)
 
+    @jit_fuser
+    def add_residual(self, x: torch.Tensor, residual: torch.Tensor) -> torch.Tensor:
+        return x + residual
+
     def forward(
         self,
         hidden_states,
@@ -182,19 +192,13 @@ class WanLayerWithAdaLN(TransformerLayer):
         rope_emb = rotary_pos_emb
 
         shift_full, scale_full, gate_full, shift_mlp, scale_mlp, gate_mlp = self.adaLN(timestep_emb)
-        # transpose to bring it to [1, b, ...] format
-        shift_full = shift_full.transpose(0, 1)
-        scale_full = scale_full.transpose(0, 1)
-        gate_full = gate_full.transpose(0, 1)
-        shift_mlp = shift_mlp.transpose(0, 1)
-        scale_mlp = scale_mlp.transpose(0, 1)
-        gate_mlp = gate_mlp.transpose(0, 1)
 
         # ******************************************** full self attention *******************************************
 
         # adaLN with scale + shift + gate
-        pre_full_attn_layernorm_output_ada = self.adaLN.modulate(
-            self.norm1(hidden_states),
+        pre_full_attn_layernorm_output_ada = self.adaLN.normalize_modulate(
+            self.norm1,
+            hidden_states,
             shift=shift_full,
             scale=scale_full,
         )
@@ -229,12 +233,13 @@ class WanLayerWithAdaLN(TransformerLayer):
         if bias is not None:
             attention_output = attention_output + bias
 
-        hidden_states = hidden_states + attention_output
+        hidden_states = self.add_residual(hidden_states, attention_output)
 
         # ******************************************** mlp ******************************************************
 
-        pre_mlp_layernorm_output_ada = self.adaLN.modulate(
-            self.norm2(hidden_states),
+        pre_mlp_layernorm_output_ada = self.adaLN.normalize_modulate(
+            self.norm2,
+            hidden_states,
             shift=shift_mlp,
             scale=scale_mlp,
         )
