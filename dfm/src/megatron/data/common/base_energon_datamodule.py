@@ -341,6 +341,7 @@ class EnergonMultiModalDataModule:
 
 class EnergonDataloader:
     """A wrapper to use Megatron Energon dataloader with the Megatron-LM training loop."""
+
     def __init__(self, dataloader):
         self._dataloader = dataloader
         self._iter = iter(cyclic_iter(dataloader))
