@@ -1,7 +1,7 @@
 ## 🚀 Megatron DiT
 
 ### 📋 Overview
-An open-source implementation of [Diffusion Transformers (DiTs)](https://github.com/facebookresearch/DiT) that can be used to train text-to-image/video models using the [EDMPipeline](https://arxiv.org/abs/2206.00364). The implementation is based on [Megatron-Core](https://github.com/NVIDIA/Megatron-LM) and [Megatron-Bridge](https://github.com/NVIDIA-NeMo/Megatron-Bridge) to bring both scalability and efficiency. Various parallelization techniques such as tensor, sequence, and context parallelism are currently supported.
+An open-source implementation of [Diffusion Transformers (DiTs)](https://github.com/facebookresearch/DiT) for training text-to-image/video models with [EDMPipeline](https://arxiv.org/abs/2206.00364). The implementation is based on [Megatron-Core](https://github.com/NVIDIA/Megatron-LM) and [Megatron-Bridge](https://github.com/NVIDIA-NeMo/Megatron-Bridge) to bring both scalability and efficiency. Various parallelization techniques such as tensor, sequence, and context parallelism are currently supported.
 
 ---
 
