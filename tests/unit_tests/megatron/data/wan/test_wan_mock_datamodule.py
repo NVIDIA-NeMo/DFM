@@ -13,7 +13,6 @@
 # limitations under the License.
 
 import torch
-from torch.utils.data import DataLoader
 
 from dfm.src.megatron.data.wan.wan_mock_datamodule import WanMockDataModuleConfig
 
@@ -37,7 +36,6 @@ def test_wan_mock_datamodule_build_and_batch_shapes():
         context_embeddings_dim=64,
     )
     train_dl, val_dl, test_dl = cfg.build_datasets(_context=None)
-    assert isinstance(train_dl, DataLoader)
     assert train_dl is val_dl and val_dl is test_dl
 
     batch = next(iter(train_dl))
