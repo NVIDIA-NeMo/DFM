@@ -11,8 +11,6 @@
 [![Python 3.10+](https://img.shields.io/badge/python-3.10+-blue.svg)](https://www.python.org/downloads/release/python-3100/)
 [![GitHub Stars](https://img.shields.io/github/stars/NVIDIA-NeMo/DFM.svg?style=social&label=Star&cacheSeconds=14400)](https://github.com/NVIDIA-NeMo/DFM/stargazers/)
 
-**State-of-the-art framework for fast, large-scale training and inference of diffusion models**
-
 [Documentation](https://github.com/NVIDIA-NeMo/DFM/tree/main/docs) | [Supported Models](#supported-models) | [Examples](https://github.com/NVIDIA-NeMo/DFM/tree/main/examples) | [Contributing](https://github.com/NVIDIA-NeMo/Megatron-Bridge/tree/main/CONTRIBUTING.md)
 
 </div>
@@ -23,7 +21,7 @@ NeMo DFM (Diffusion Foundation Models) is a comprehensive collection of diffusio
 
 **Dual-Path Architecture**: DFM provides two complementary training paths to maximize flexibility:
 
-- **🌉 Megatron Bridge Path**: Built on [Megatron Bridge](https://github.com/NVIDIA-NeMo/Megatron-Bridge) and [Megatron Core](https://github.com/NVIDIA/Megatron-LM/tree/main/megatron/core) for maximum scalability with tensor, pipeline, and context parallelism
+- **🌉 Megatron Bridge Path**: Built on [Megatron Bridge](https://github.com/NVIDIA-NeMo/Megatron-Bridge) which leverages [Megatron Core](https://github.com/NVIDIA/Megatron-LM/tree/main/megatron/core) for maximum scalability with 6D parallelism
 - **🚀 AutoModel Path**: Built on [NeMo AutoModel](https://github.com/NVIDIA-NeMo/Automodel) for PyTorch DTensor-native SPMD training with seamless 🤗 Hugging Face integration
 
 Choose the path that best fits your workflow—or use both for different stages of development!
