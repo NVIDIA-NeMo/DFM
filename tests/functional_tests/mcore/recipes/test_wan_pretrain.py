@@ -81,8 +81,8 @@ class TestMcoreWanPretrain:
         ]
 
         # Run the command with a timeout
+        result = None
         try:
-            # Stream output in real-time instead of capturing it
             result = subprocess.run(
                 cmd,
                 capture_output=True,
@@ -91,14 +91,16 @@ class TestMcoreWanPretrain:
                 check=True,
             )
 
-            # Print output for debugging if needed
-            print("STDOUT:", result.stdout)
-            print("STDERR:", result.stderr)
-
             # Basic verification that the run completed
             assert result.returncode == 0, f"Command failed with return code {result.returncode}"
 
         except subprocess.TimeoutExpired:
             pytest.fail("WAN pretrain mock run exceeded timeout of 1800 seconds (30 minutes)")
         except subprocess.CalledProcessError as e:
+            result = e
             pytest.fail(f"WAN pretrain mock run failed with return code {e.returncode}")
+        finally:
+            # Always print output for debugging
+            if result is not None:
+                print("STDOUT:", result.stdout)
+                print("STDERR:", result.stderr)
