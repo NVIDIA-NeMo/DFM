@@ -35,7 +35,7 @@ def test_wan_data_step_builds_packed_seq_params_cuda_guarded():
         # include a tensor field to exercise device transfer
         "video_latents": torch.randn(8, 1, 4, dtype=torch.float32),
     }
-    it = iter(_DummyIter(batch))
+    it = iter(_DummyIter(batch).iterable)
     qkv_format = "sbhd"
     out = wan_data_step(qkv_format, it)
 
