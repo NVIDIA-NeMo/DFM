@@ -119,26 +119,24 @@ class WanMockDataModuleConfig(DatasetProvider):
 
     def __post_init__(self):
         mock_ds = _MockDataset(length=1024)
-        self._train_dl = iter(
-            DataLoader(
-                mock_ds,
-                batch_size=self.micro_batch_size,
-                num_workers=self.num_workers,
-                collate_fn=lambda samples: mock_batch(
-                    F_latents=self.F_latents,
-                    H_latents=self.H_latents,
-                    W_latents=self.W_latents,
-                    patch_temporal=self.patch_temporal,
-                    patch_spatial=self.patch_spatial,
-                    number_packed_samples=self.number_packed_samples,
-                    context_seq_len=self.context_seq_len,
-                    context_embeddings_dim=self.context_embeddings_dim,
-                ),
-                shuffle=False,
-                drop_last=False,
-                pin_memory=True,
-                prefetch_factor=8,
-            )
+        self._train_dl = DataLoader(
+            mock_ds,
+            batch_size=self.micro_batch_size,
+            num_workers=self.num_workers,
+            collate_fn=lambda samples: mock_batch(
+                F_latents=self.F_latents,
+                H_latents=self.H_latents,
+                W_latents=self.W_latents,
+                patch_temporal=self.patch_temporal,
+                patch_spatial=self.patch_spatial,
+                number_packed_samples=self.number_packed_samples,
+                context_seq_len=self.context_seq_len,
+                context_embeddings_dim=self.context_embeddings_dim,
+            ),
+            shuffle=False,
+            drop_last=False,
+            pin_memory=True,
+            prefetch_factor=8,
         )
         self._train_dl = iter(self._train_dl)
         self.sequence_length = self.seq_length
