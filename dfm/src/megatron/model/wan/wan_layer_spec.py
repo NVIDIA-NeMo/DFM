@@ -81,8 +81,16 @@ class WanAdaLN(MegatronModule):
         return x * (1 + scale) + shift
 
     @jit_fuser
-    def scale_add(self, residual, x, gate):
-        return residual + gate * x
+    def scale_add_norm(self, residual, x, gate, bias, norm):
+        # Add bias to attention output
+        if bias is not None:
+            x = x + bias
+        # Perform scale and add
+        x = residual + gate * x
+        # Perform normalization if provided
+        if norm is not None:
+            x = norm(x)
+        return x
 
 
 class WanLayerWithAdaLN(TransformerLayer):
@@ -168,8 +176,12 @@ class WanLayerWithAdaLN(TransformerLayer):
                     setattr(param, "average_gradients_across_tp_domain", True)
 
     @jit_fuser
-    def add_residual(self, x: torch.Tensor, residual: torch.Tensor) -> torch.Tensor:
-        return x + residual
+    def add_residual(
+        self, x: torch.Tensor, attention_output: torch.Tensor, bias: Optional[torch.Tensor] = None
+    ) -> torch.Tensor:
+        if bias is not None:
+            attention_output = attention_output + bias
+        return x + attention_output
 
     def forward(
         self,
@@ -211,10 +223,10 @@ class WanLayerWithAdaLN(TransformerLayer):
             rotary_pos_sin=rotary_pos_sin,
             packed_seq_params=packed_seq_params["self_attention"],
         )
-        if bias is not None:
-            attention_output = attention_output + bias
 
-        hidden_states = self.adaLN.scale_add(residual=hidden_states, x=attention_output, gate=gate_full)
+        hidden_states = self.adaLN.scale_add_norm(
+            residual=hidden_states, x=attention_output, gate=gate_full, bias=bias, norm=self.norm3
+        )
 
         # ******************************************** cross attention ******************************************************
 
@@ -225,15 +237,13 @@ class WanLayerWithAdaLN(TransformerLayer):
         #     device=packed_seq_params['cross_attention'].cu_seqlens_kv.device,
         #     dtype=torch.int32)
         attention_output, bias = self.cross_attention(
-            self.norm3(hidden_states),
+            hidden_states,
             attention_mask=context_mask,
             key_value_states=context,
             packed_seq_params=packed_seq_params["cross_attention"],
         )
-        if bias is not None:
-            attention_output = attention_output + bias
 
-        hidden_states = self.add_residual(hidden_states, attention_output)
+        hidden_states = self.add_residual(hidden_states, attention_output, bias=bias)
 
         # ******************************************** mlp ******************************************************
 
@@ -245,10 +255,10 @@ class WanLayerWithAdaLN(TransformerLayer):
         )
 
         mlp_output, bias = self.mlp(pre_mlp_layernorm_output_ada)
-        if bias is not None:
-            mlp_output = mlp_output + bias
 
-        hidden_states = self.adaLN.scale_add(residual=hidden_states, x=mlp_output, gate=gate_mlp)
+        hidden_states = self.adaLN.scale_add_norm(
+            residual=hidden_states, x=mlp_output, gate=gate_mlp, bias=bias, norm=None
+        )
 
         # TODO: Jit compiled function creates 'view' tensor. This tensor
         # potentially gets saved in the MPU checkpoint function context,
