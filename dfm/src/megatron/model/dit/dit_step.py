@@ -157,7 +157,6 @@ class DITForwardStep:
 
         check_for_nan_in_loss = state.cfg.rerun_state_machine.check_for_nan_in_loss
         check_for_spiky_loss = state.cfg.rerun_state_machine.check_for_spiky_loss
-        # import pdb;pdb.set_trace()
         straggler_timer = state.straggler_timer
         with straggler_timer:
             if parallel_state.is_pipeline_last_stage():

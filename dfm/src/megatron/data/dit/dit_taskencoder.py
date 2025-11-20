@@ -31,9 +31,9 @@ class DiTTaskEncoder(DiffusionTaskEncoderWithSequencePacking):
     Attributes:
         cookers (list): A list of Cooker objects used for processing.
         max_frames (int, optional): The maximum number of frames to consider from the video. Defaults to None.
-        text_embedding_padding_size (int): The padding size for text embeddings. Defaults to 512.
+        text_embedding_max_length (int): The maximum length for text embeddings. Defaults to 512.
     Methods:
-        __init__(*args, max_frames=None, text_embedding_padding_size=512, **kwargs):
+        __init__(*args, max_frames=None, text_embedding_max_size=512, **kwargs):
             Initializes the BasicDiffusionTaskEncoder with optional maximum frames and text embedding padding size.
         encode_sample(sample: dict) -> dict:
             Encodes a given sample dictionary containing video and text data.
@@ -71,7 +71,6 @@ class DiTTaskEncoder(DiffusionTaskEncoderWithSequencePacking):
             // self.patch_spatial**2
             // self.patch_temporal
         )
-        is_image = T == 1
 
         if seq_len > self.seq_length:
             print(f"Skipping sample {sample['__key__']} because seq_len {seq_len} > self.seq_length {self.seq_length}")
@@ -100,8 +99,8 @@ class DiTTaskEncoder(DiffusionTaskEncoderWithSequencePacking):
         t5_text_embeddings = torch.from_numpy(sample["pickle"]).to(torch.bfloat16)
         t5_text_embeddings_seq_length = t5_text_embeddings.shape[0]
 
-        if t5_text_embeddings_seq_length > self.text_embedding_padding_size:
-            t5_text_embeddings = t5_text_embeddings[: self.text_embedding_padding_size]
+        if t5_text_embeddings_seq_length > self.text_embedding_max_length:
+            t5_text_embeddings = t5_text_embeddings[: self.text_embedding_max_length]
         t5_text_mask = torch.ones(t5_text_embeddings_seq_length, dtype=torch.bfloat16)
 
         pos_ids = rearrange(

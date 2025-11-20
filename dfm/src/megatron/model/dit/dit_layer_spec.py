@@ -156,7 +156,9 @@ class DiTLayerWithAdaLN(TransformerLayer):
             layer_number=layer_number,
         )
 
-        self.adaLN = AdaLN(config=self.config, n_adaln_chunks=9 if self.cross_attention else 6)
+        self.adaLN = AdaLN(
+            config=self.config, n_adaln_chunks=9 if not isinstance(self.cross_attention, IdentityOp) else 6
+        )
 
     def forward(
         self,
@@ -176,7 +178,7 @@ class DiTLayerWithAdaLN(TransformerLayer):
     ):
         timestep_emb = attention_mask
 
-        if self.cross_attention:
+        if not isinstance(self.cross_attention, IdentityOp):
             shift_full, scale_full, gate_full, shift_ca, scale_ca, gate_ca, shift_mlp, scale_mlp, gate_mlp = (
                 self.adaLN(timestep_emb)
             )
@@ -192,7 +194,7 @@ class DiTLayerWithAdaLN(TransformerLayer):
             packed_seq_params=None if packed_seq_params is None else packed_seq_params["self_attention"],
         )
 
-        if self.cross_attention:
+        if not isinstance(self.cross_attention, IdentityOp):
             hidden_states, pre_cross_attn_layernorm_output_ada = self.adaLN.scaled_modulated_layernorm(
                 residual=hidden_states,
                 x=attention_output,
@@ -210,7 +212,7 @@ class DiTLayerWithAdaLN(TransformerLayer):
         hidden_states, pre_mlp_layernorm_output_ada = self.adaLN.scaled_modulated_layernorm(
             residual=hidden_states,
             x=attention_output,
-            gate=gate_ca if self.cross_attention else gate_full,
+            gate=gate_ca if not isinstance(self.cross_attention, IdentityOp) else gate_full,
             shift=shift_mlp,
             scale=scale_mlp,
         )
