@@ -63,8 +63,8 @@ class TestMcoreDiTPretrain:
         ]
 
         # Run the command with a timeout
+        result = None
         try:
-            # Stream output in real-time instead of capturing it
             result = subprocess.run(
                 cmd,
                 capture_output=True,
@@ -73,16 +73,16 @@ class TestMcoreDiTPretrain:
                 check=True,
             )
 
-            # Print output for debugging if needed
-            print("STDOUT:", result.stdout)
-            print("STDERR:", result.stderr)
-
             # Basic verification that the run completed
             assert result.returncode == 0, f"Command failed with return code {result.returncode}"
 
         except subprocess.TimeoutExpired:
             pytest.fail("DiT pretrain mock run exceeded timeout of 1800 seconds (30 minutes)")
         except subprocess.CalledProcessError as e:
-            print("STDOUT:", e.stdout)
-            print("STDERR:", e.stderr)
+            result = e
             pytest.fail(f"DiT pretrain mock run failed with return code {e.returncode}\nSTDERR: {e.stderr}")
+        finally:
+            # Always print output for debugging
+            if result is not None:
+                print("STDOUT:", result.stdout)
+                print("STDERR:", result.stderr)
