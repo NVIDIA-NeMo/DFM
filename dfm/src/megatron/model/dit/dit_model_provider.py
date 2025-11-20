@@ -63,11 +63,16 @@ class DiTModelProvider(TransformerConfig, ModelProviderMixin[VisionModule]):
 
     bf16: bool = True
     params_dtype: torch.dtype = torch.bfloat16
-    vae_module: str = None
-    vae_path: str = None
+    vae_module: str = "dfm.src.common.tokenizers.cosmos.cosmos1.causal_video_tokenizer.CausalVideoTokenizer"
+    vae_name: str = "Cosmos-0.1-Tokenizer-CV4x8x8"
+    vae_cache_folder: str = None
     sigma_data: float = 0.5
     in_channels: int = 16
     layernorm_across_heads: bool = False
+
+    # Validation parameters
+    val_generation_guidance: float = 7.0
+    val_generation_num_steps: int = 35
 
     replicated_t_embedder = True
     qkv_format: str = "thd"
@@ -75,6 +80,8 @@ class DiTModelProvider(TransformerConfig, ModelProviderMixin[VisionModule]):
     seq_length: int = 2048
     vocab_size: int = None
     make_vocab_size_divisible_by: int = 128
+
+    loss_add_logvar: bool = True
 
     def provide(self, pre_process=None, post_process=None, vp_stage=None) -> DiTCrossAttentionModel:
         vp_size = self.virtual_pipeline_model_parallel_size
@@ -99,7 +106,7 @@ class DiTModelProvider(TransformerConfig, ModelProviderMixin[VisionModule]):
         )
 
     def configure_vae(self):
-        return dynamic_import(self.vae_module)(self.vae_path)
+        return dynamic_import(self.vae_module).from_pretrained(self.vae_name, cache_dir=self.vae_cache_folder)
 
 
 @dataclass
@@ -109,9 +116,9 @@ class DiT7BModelProvider(DiTModelProvider):
     max_img_w: int = 240
     max_frames: int = 128
     num_attention_heads: int = 32
+
     apply_rope_fusion: bool = True  # TODO: do we support this?
     additional_timestamp_channels = None  # TODO: do we support this?
-    bf16: bool = True
     vae_module: str = None
     vae_path: str = None
 
@@ -120,7 +127,6 @@ class DiT7BModelProvider(DiTModelProvider):
 class DiT14BModelProvider(DiTModelProvider):
     num_layers: int = 36
     hidden_size: int = 5120
-    crossattn_emb_size: int = 1024
     max_img_h: int = 240
     max_img_w: int = 240
     max_frames: int = 128
@@ -128,7 +134,6 @@ class DiT14BModelProvider(DiTModelProvider):
     apply_rope_fusion: bool = True
     layernorm_zero_centered_gamma: bool = False
     additional_timestamp_channels = None
-    bf16: bool = True
     vae_module: str = None
     vae_path: str = None
     loss_add_logvar: bool = True

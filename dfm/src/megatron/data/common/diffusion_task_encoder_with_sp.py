@@ -41,9 +41,9 @@ def cook(sample: dict) -> dict:
     """
     return dict(
         **basic_sample_keys(sample),
-        json=sample[".json"],
-        pth=sample[".pth"],
-        pickle=sample[".pickle"],
+        json=sample["json"],
+        pth=sample["pth"],
+        pickle=sample["pickle"],
     )
 
 
@@ -91,7 +91,7 @@ class DiffusionTaskEncoderWithSequencePacking(DefaultTaskEncoder, ABC):
             if hasattr(samples[0], attr) and getattr(samples[0], attr) is not None:
                 return torch.stack([getattr(sample, attr) for sample in samples], dim=0)
             else:
-                return None     
+                return None
 
         def cat(attr):
             if hasattr(samples[0], attr) and getattr(samples[0], attr) is not None:

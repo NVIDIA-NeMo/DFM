@@ -66,6 +66,7 @@ class CausalVideoTokenizer(torch.nn.Module):
         load_full_model=False,
         use_pytorch=False,
         dtype="bfloat16",
+        cache_dir=None,
     ):
         cls._hf_model_name = f"nvidia/{tokenizer_type}"
 
@@ -76,18 +77,21 @@ class CausalVideoTokenizer(torch.nn.Module):
             repo_id=cls._hf_model_name,
             filename="autoencoder.jit",
             token=hf_token,
+            cache_dir=cache_dir,
         )
 
         _ = hf_hub_download(
             repo_id=cls._hf_model_name,
             filename="encoder.jit",
             token=hf_token,
+            cache_dir=cache_dir,
         )
 
         _ = hf_hub_download(
             repo_id=cls._hf_model_name,
             filename="decoder.jit",
             token=hf_token,
+            cache_dir=cache_dir,
         )
 
         # No need to load in encoder and decoder with full model loaded

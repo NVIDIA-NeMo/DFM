@@ -112,8 +112,9 @@ def mock_batch(
         seq_len_q_padded=seq_len_q_padded_packed,
         seq_len_kv=seq_len_kv_packed,
         seq_len_kv_padded=seq_len_kv_padded_packed,
-        latent_shape=torch.tensor([C, T, H, W], dtype=torch.int32),
+        latent_shape=torch.tensor([[C, T, H, W] for _ in range(number_packed_samples)], dtype=torch.int32),
         pos_ids=pos_ids_packed,
+        video_metadata=[{"caption": f"Mock video sample {i}"} for i in range(number_packed_samples)],
     )
 
     return batch
