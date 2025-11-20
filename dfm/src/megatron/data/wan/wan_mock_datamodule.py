@@ -119,6 +119,9 @@ class WanMockDataModuleConfig(DatasetProvider):
 
     def __post_init__(self):
         mock_ds = _MockDataset(length=1024)
+        kwargs = {}
+        if self.num_workers > 0:
+            kwargs["prefetch_factor"] = 8
         self._train_dl = DataLoader(
             mock_ds,
             batch_size=self.micro_batch_size,
@@ -136,7 +139,7 @@ class WanMockDataModuleConfig(DatasetProvider):
             shuffle=False,
             drop_last=False,
             pin_memory=True,
-            prefetch_factor=8,
+            **kwargs,
         )
         self._train_dl = iter(self._train_dl)
         self.sequence_length = self.seq_length
