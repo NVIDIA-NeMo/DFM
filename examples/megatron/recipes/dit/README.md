@@ -1,23 +1,33 @@
-## Megatron DiT
+## 🚀 Megatron DiT
 
-### Overview
-An open source implementation of Diffusion Transformers (DiTs) that can be used to train text-to-image/video models. The implementation is based on [Megatron-Core](https://github.com/NVIDIA/Megatron-LM) and [Megatron-Bridge](https://github.com/NVIDIA-NeMo/Megatron-Bridge) to bring both scalability and efficiency. Various parallelization techniques such as tensor, sequence, and context parallelism are currently supported.
+### 📋 Overview
+An open-source implementation of [Diffusion Transformers (DiTs)](https://github.com/facebookresearch/DiT) that can be used to train text-to-image/video models using the [EDMPipeline](https://arxiv.org/abs/2206.00364). The implementation is based on [Megatron-Core](https://github.com/NVIDIA/Megatron-LM) and [Megatron-Bridge](https://github.com/NVIDIA-NeMo/Megatron-Bridge) to bring both scalability and efficiency. Various parallelization techniques such as tensor, sequence, and context parallelism are currently supported.
+
+---
+
+### 📦 Dataset Preparation
+This recipe uses NVIDIA's [Megatron-Energon](https://github.com/NVIDIA/Megatron-Energon) as an efficient multi-modal data loader. Datasets should be in the WebDataset-compatible format (typically sharded `.tar` archives). Energon efficiently supports large-scale distributed loading, sharding, and sampling for multi-modal pairs (e.g., text-image, text-video). Set `dataset.path` to your WebDataset location or shard pattern. See the Megatron-Energon documentation for format details and advanced options.
+
+#### 🦋 Dataset Preparation Example
+
+As an example, you can use the [butterfly-dataset](https://huggingface.co/datasets/huggan/smithsonian_butterflies_subset) available on Hugging Face.
+
+The script below prepares the dataset to be compatible with Energon.
+```bash
+uv run --group megatron-bridge python -m torch.distributed.run --nproc-per-node $num_gpus \
+       examples/megatron/recipes/dit/prepare_energon_dataset_butterfly.py
+```
+
+In case you already have the T5 model or video tokenizer downloaded, you can point to them with optional arguments `--t5_cache_dir` and `--tokenizer_cache_dir`.
 
 
-### Dataset Preparation
-This recipe uses NVIDIA's [Megatron-Energon](https://github.com/NVIDIA/Megatron-Energon) as an efficient multi-modal data loader. Datasets should be in the WebDataset-compatible format (typically sharded `.tar` archives). Energon efficiently supports large-scale distributed loading, sharding, and sampling for multi-modal pairs (e.g., text-image, text-video). Set `dataset.path` to your WebDataset location or shard pattern (e.g., a directory containing shards). See the Megatron-Energon documentation for format details and advanced options.
-
-#### Dataset Preparation Example
-
-As an example you can use [butterfly-dataset](https://huggingface.co/datasets/huggan/smithsonian_butterflies_subset) available on Hugging Face.
-
-The script below prepares the dataset to be compatible with Energon. t5_folder and tokenizer_cache_dir are optional parameters pointing to a T5 model and Video Tokenizer of your choice, otherwise the code downloads such artifacts.
-``` bash
-uv run --group megatron-bridge python -m torch.distributed.run --nproc-per-node $num_gpus\
-       examples/megatron/recipes/dit/prepare_energon_dataset_butterfly.py\
-       --t5_cache_dir $t5_folder\
+```bash
+uv run --group megatron-bridge python -m torch.distributed.run --nproc-per-node $num_gpus \
+       examples/megatron/recipes/dit/prepare_energon_dataset_butterfly.py \
+       --t5_cache_dir $t5_cache_dir \
        --tokenizer_cache_dir $tokenizer_cache_dir
 ```
+
 Then you need to run `energon prepare $dataset_path` and choose `CrudeWebdataset` as the sample type:
 
 ```bash
@@ -69,87 +79,107 @@ Furthermore, you might want to add `subflavors` in your meta dataset specificati
 Done
 ```
 
-### Pretraining
-These scripts assume you're using the Docker container provided by the repo. Use them to pre-train a DiT model on your own dataset.
+---
 
-**Note:** Set the `WANDB_API_KEY` environment variable if you're using the `wandb_project` and `wandb_exp_name` arguments.
+### 🐳 Build Container
+
+Please follow the instructions in the [container](https://github.com/NVIDIA-NeMo/DFM#-built-your-own-container) section of the main README.
+
+---
+
+### 🏋️ Pretraining
+
+Once you have the dataset and container ready, you can start training the DiT model on your own dataset. This repository leverages [sequence packing](https://docs.nvidia.com/nemo-framework/user-guide/24.09/nemotoolkit/features/optimizations/sequence_packing.html) to maximize training efficiency. Sequence packing stacks multiple samples into a single sequence instead of padding individual samples to a fixed length; therefore, `micro_batch_size` must be set to 1. Additionally, `qkv_format` should be set to `thd` to signal to Transformer Engine that sequence packing is enabled.
+
+For data loading, Energon provides two key hyperparameters related to sequence packing: `task_encoder_seq_length` and `packing_buffer_size`. The `task_encoder_seq_length` parameter controls the maximum sequence length passed to the model, while `packing_buffer_size` determines the number of samples processed to create different buckets. You can look at `select_samples_to_pack` and `pack_selected_samples` methods of [DiffusionTaskEncoderWithSequencePacking](https://github.com/NVIDIA-NeMo/DFM/blob/main/dfm/src/megatron/data/common/diffusion_task_encoder_with_sp.py#L50) to get a better sense of these parameters.
+
+Multiple parallelism techniques including tensor, sequence, and context parallelism are supported and can be configured based on your computational requirements.
+
+The model architecture can be customized through parameters such as `num_layers` and `num_attention_heads`. A comprehensive list of configuration options is available in the [Megatron-Bridge documentation](https://github.com/NVIDIA-NeMo/Megatron-Bridge/blob/main/docs/megatron-lm-to-megatron-bridge.md).
+
+
+**Note:** If using the `wandb_project` and `wandb_exp_name` arguments, ensure the `WANDB_API_KEY` environment variable is set.
+
+
+**Note:** During validation, the model generates one sample per GPU at the start of each validation round. These samples are saved to a `validation_generation` folder within `checkpoint_dir` and are also logged to Wandb if the `WANDB_API_KEY` environment variable is configured. To decode the generated latent samples, the model requires access to the video tokenizer used during dataset preparation. Specify the VAE artifacts location using the `vae_cache_folder` argument, otherwise they will be downloaded in the first validation round.
+
+#### Pretraining script example
+First, copy the example config file and update it with your own settings:
+
+```bash
+cp examples/megatron/recipes/dit/conf/dit_pretrain_example.yaml examples/megatron/recipes/dit/conf/my_config.yaml
+# Edit my_config.yaml to set:
+# - model.vae_cache_folder: Path to VAE cache folder
+# - dataset.path: Path to your dataset folder
+# - checkpoint.save and checkpoint.load: Path to checkpoint folder
+# - train.global_batch_size: Set to match be divisible by NUM_GPUs
+# - logger.wandb_exp_name: Your experiment name
+```
+
+Then run:
 
 ```bash
 uv run --group megatron-bridge python -m torch.distributed.run \
-       --nproc-per-node $NUM_GPUS examples/megatron/recipes/dit/pretrain_dit_model.py\
-        model.tensor_model_parallel_size=1 \
-        model.pipeline_model_parallel_size=1 \
-        model.context_parallel_size=1 \
-        model.qkv_format=thd \
-        model.num_attention_heads=16\
-        model.vae_cache_folder=$CACHE_FOLDER\
-        dataset.path=$DATA_FOLDER \
-        dataset.task_encoder_seq_length=15360\
-        dataset.packing_buffer_size=100\
-        dataset.num_workers=20\
-        checkpoint.save=$CHECKPOINT_FOLDER \
-        checkpoint.load=$CHECKPOINT_FOLDER \
-        checkpoint.load_optim=true \
-        checkpoint.save_interval=1000 \
-        train.eval_interval=1000\
-        train.train_iters=10000\
-        train.eval_iters=32 \
-        train.global_batch_size=$NUM_GPUS\
-        train.micro_batch_size=1\
-        logger.log_interval=10\
-        logger.wandb_project="DiT"\
-        logger.wandb_exp_name=$WANDB_NAME
+       --nproc-per-node $NUM_GPUS examples/megatron/recipes/dit/pretrain_dit_model.py \
+       --config-file examples/megatron/recipes/dit/conf/my_config.yaml
 ```
 
-### Inference
-``` bash
-uv run --group megatron-bridge python -m torch.distributed.run --nproc-per-node $num_gpus examples/megatron/recipes/dit/inference_dit_model.py \
-	--t5_cache_dir $artifact_dir \
-    --tokenizer_cache_dir $tokenizer_cache_dir \
-    --tokenizer_model Cosmos-0.1-Tokenizer-CV4x8x8\
-	--checkpoint_path $checkpoint_dir \
-	--num_video_frames 10 \
-	--height 240 \
-	--width 416 \
-	--video_save_path $save_path \
-	--prompt $prompt
-```
+You can still override any config values from the command line:
 
-### Parallelism Support
-The table below shows current parallelism support.
-
-  | Model | Data Parallel | Tensor Parallel | Sequence Parallel | Pipeline Parallel | Context Parallel | FSDP |
-  |---|---|---|---|---|---|---|
-  | **DiT-XL (700M)** | ✅ | ✅ | ✅ |  | ✅ |  |
-  | **DiT 7B**  | | | | | |  |
-
-
-### Mock Dataset
-
-For performance measurement purposes you can use the mock dataset by passing the `--mock` argument.
-
-``` bash
+```bash
 uv run --group megatron-bridge python -m torch.distributed.run \
-       --nproc-per-node $NUM_GPUS examples/megatron/recipes/dit/pretrain_dit_model.py\
-        model.tensor_model_parallel_size=1 \
-        model.pipeline_model_parallel_size=1 \
-        model.context_parallel_size=1 \
-        model.qkv_format=thd \
-        model.num_attention_heads=16\
-        model.vae_cache_folder=$CACHE_FOLDER\
-        dataset.path=$DATA_FOLDER \
-        dataset.task_encoder_seq_length=15360\
-        dataset.packing_buffer_size=100\
-        dataset.num_workers=20\
-        checkpoint.save=$CHECKPOINT_FOLDER \
-        checkpoint.load=$CHECKPOINT_FOLDER \
-        checkpoint.load_optim=true \
-        checkpoint.save_interval=1000 \
-        train.eval_interval=1000\
-        train.train_iters=10000\
-        train.eval_iters=32 \
-        train.global_batch_size=$NUM_GPUS\
-        train.micro_batch_size=1\
-        logger.log_interval=10\
-        --mock
+       --nproc-per-node $num_gpus examples/megatron/recipes/dit/pretrain_dit_model.py \
+       --config-file examples/megatron/recipes/dit/conf/my_config.yaml \
+       train.train_iters=20000 \
+       model.num_layers=32
 ```
+
+**Note:** If you dedicate 100% of the data to training, you need to pass `dataset.use_train_split_for_val=true` to use a subset of training data for validation purposes.
+
+```bash
+uv run --group megatron-bridge python -m torch.distributed.run \
+       --nproc-per-node $num_gpus examples/megatron/recipes/dit/pretrain_dit_model.py \
+       --config-file examples/megatron/recipes/dit/conf/my_config.yaml \
+       dataset.use_train_split_for_val=true
+```
+
+#### 🧪 Quick Start with Mock Dataset
+
+If you want to run the code without having the dataset ready (for performance measurement purposes, for example), you can pass the `--mock` flag to activate a mock dataset.
+
+```bash
+uv run --group megatron-bridge python -m torch.distributed.run \
+       --nproc-per-node $num_gpus examples/megatron/recipes/dit/pretrain_dit_model.py \
+       --config-file examples/megatron/recipes/dit/conf/dit_pretrain.yaml \
+       --mock
+```
+
+### 🎬 Inference
+
+Once training completes, you can run inference using [inference_dit_model.py](https://github.com/NVIDIA-NeMo/DFM/blob/main/examples/megatron/recipes/dit/inference_dit_model.py). The script requires your trained model checkpoint (`--checkpoint_path`) and a path to save generated videos (`--video_save_path`). You can pass two optional arguments, `--t5_cache_dir` and `--tokenizer_cache_dir`, to avoid re-downloading artifacts if they are already downloaded.
+
+```bash
+uv run --group megatron-bridge python -m torch.distributed.run --nproc-per-node $num_gpus \
+    examples/megatron/recipes/dit/inference_dit_model.py \
+    --t5_cache_dir $artifact_dir \
+    --tokenizer_cache_dir $tokenizer_cache_dir \
+    --tokenizer_model Cosmos-0.1-Tokenizer-CV4x8x8 \
+    --checkpoint_path $checkpoint_dir \
+    --num_video_frames 10 \
+    --height 240 \
+    --width 416 \
+    --video_save_path $save_path \
+    --prompt "$prompt"
+```
+
+---
+
+### ⚡ Parallelism Support
+
+The table below shows current parallelism support for different model sizes:
+
+| Model | Data Parallel | Tensor Parallel | Sequence Parallel | Context Parallel |
+|---|---|---|---|---|
+| **DiT-S (330M)** | TBD | TBD | TBD | TBD |
+| **DiT-L (450M)** | TBD | TBD | TBD| TBD |
+| **DiT-XL (700M)** | ✅ | ✅ | ✅ | ✅ |
