@@ -55,6 +55,8 @@ class TestMcoreDiTPretrain:
             "model.context_parallel_size=1",
             "model.qkv_format=thd",
             "model.num_attention_heads=16",
+            f"checkpoint.save={checkpoint_dir}",
+            f"checkpoint.load={checkpoint_dir}",
             "dataset.task_encoder_seq_length=4608",
             "dataset.seq_length=4608",
             "train.global_batch_size=2",
