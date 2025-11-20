@@ -229,13 +229,11 @@ fsdp:
 
 ## Supported Models
 
-| Model | Parameters | Resolution | Frames | Status |
-|-------|------------|------------|--------|--------|
-| Wan 2.1 T2V 1.3B | 1.3B | 480×832 | 81 | ✅ |
-| Wan 2.1 T2V 14B | 14B | 480×832 | 81 | ✅ |
-| FLUX | TBD | TBD | TBD | 🔄 In Progress |
-
-**Request a model:** Submit an issue on [GitHub](https://github.com/your-org/dfm/issues) with `model-request` label.
+| Model | Parameters | Parallelization | Status |
+|-------|------------|-----------------|--------|
+| Wan 2.1 T2V 1.3B | 1.3B | TP/CP/DP via FSDP2 | ✅ |
+| Wan 2.1 T2V 14B | 14B | TP/CP/DP via FSDP2 | ✅ |
+| FLUX | TBD | TBD | 🔄 In Progress |
 
 ---
 
