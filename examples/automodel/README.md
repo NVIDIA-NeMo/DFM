@@ -147,18 +147,6 @@ uv run --group automodel --with . \
   --num_samples 10
 ```
 
-**With WandB logging:**
-```bash
-uv run --group automodel --with . \
-  python examples/automodel/generate/wan_validate.py \
-  --meta_folder <your_meta_folder> \
-  --guidance_scale 5 \
-  --checkpoint ./checkpoints/step_1000 \
-  --num_samples 10 \
-  --use_wandb \
-  --wandb_project wan_validation
-```
-
 **Note:** You can use `--checkpoint ./checkpoints/LATEST` to automatically use the most recent checkpoint.
 
 ---
