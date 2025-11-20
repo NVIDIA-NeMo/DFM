@@ -21,7 +21,7 @@ NeMo DFM (Diffusion Foundation Models) is a comprehensive collection of diffusio
 
 **Dual-Path Architecture**: DFM provides two complementary training paths to maximize flexibility:
 
-- **🌉 Megatron Bridge Path**: Built on [Megatron Bridge](https://github.com/NVIDIA-NeMo/Megatron-Bridge) which leverages [Megatron Core](https://github.com/NVIDIA/Megatron-LM/tree/main/megatron/core) for maximum scalability with 6D parallelism
+- **🌉 Megatron Bridge Path**: Built on [Megatron Bridge](https://github.com/NVIDIA-NeMo/Megatron-Bridge) which leverages [Megatron Core](https://github.com/NVIDIA/Megatron-LM/tree/main/megatron/core) for maximum scalability with 6D parallelism (TP, PP, CP, EP, VPP, DP)
 - **🚀 AutoModel Path**: Built on [NeMo AutoModel](https://github.com/NVIDIA-NeMo/Automodel) for PyTorch DTensor-native SPMD training with seamless 🤗 Hugging Face integration
 
 Choose the path that best fits your workflow—or use both for different stages of development!
@@ -94,8 +94,8 @@ uv run torchrun --nproc-per-node=8 \
 ### Dual Training Paths
 
 - **Megatron Bridge Path**
-  - 🔄 Bidirectional HuggingFace ↔ Megatron checkpoint conversion
-  - 🎯 Advanced parallelism: Tensor (TP), Pipeline (PP), Context (CP), Expert (EP)
+  -  State-of-the-art performance optimizations (TFLOPs)
+  - 🎯 Advanced parallelism: Tensor (TP), Context (CP) Data (DP), etc
   - 📈 Near-linear scalability to thousands of nodes
   - 🔧 Production-ready recipes with optimized hyperparameters
 
@@ -113,6 +113,7 @@ uv run torchrun --nproc-per-node=8 \
 - **📊 Efficient Data Loading**: Data pipelines with sequence packing
 - **💾 Distributed Checkpointing**: SafeTensors-based sharded checkpoints
 - **🌟 Memory Optimization**: Gradient checkpointing, mixed precision, efficient attention
+- **🤗 HuggingFace Integration**: Seamless integration with the HF ecosystem
 
 ## Supported Models
 
@@ -161,7 +162,7 @@ DFM/
 | Feature | Megatron Bridge | AutoModel |
 |---------|-----------------|-----------|
 | **Best For** | Maximum scale (1000+ GPUs) | Flexibility & fast iteration |
-| **Parallelism** | TP, PP, CP, EP, VPP | FSDP2, TP, SP, CP |
+| **Parallelism** | 6D (TP, CP, DP, etc) | FSDP2, TP, SP, CP |
 | **HF Integration** | Via bridge/conversion | PyTorch-native DTensor |
 | **Checkpoint Format** | Megatron + HF export | SafeTensors DCP |
 | **Learning Curve** | Steeper (more knobs) | Gentler (YAML-driven) |
