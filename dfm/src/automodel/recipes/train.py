@@ -306,9 +306,8 @@ class TrainWan21DiffusionRecipe(BaseRecipe):
             start_epoch=int(self.start_epoch),
             num_epochs=int(self.num_epochs),
         )
-        # Optional resume only through config-defined restore_from
-        if self.restore_from:
-            self.load_checkpoint(restore_from=self.restore_from)
+
+        self.load_checkpoint(self.restore_from)
 
         if is_main_process():
             os.makedirs(self.checkpoint_config.checkpoint_dir, exist_ok=True)
