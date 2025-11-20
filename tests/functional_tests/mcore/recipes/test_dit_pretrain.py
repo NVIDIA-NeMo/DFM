@@ -83,4 +83,6 @@ class TestMcoreDiTPretrain:
         except subprocess.TimeoutExpired:
             pytest.fail("DiT pretrain mock run exceeded timeout of 1800 seconds (30 minutes)")
         except subprocess.CalledProcessError as e:
-            pytest.fail(f"DiT pretrain mock run failed with return code {e.returncode}")
+            print("STDOUT:", e.stdout)
+            print("STDERR:", e.stderr)
+            pytest.fail(f"DiT pretrain mock run failed with return code {e.returncode}\nSTDERR: {e.stderr}")
