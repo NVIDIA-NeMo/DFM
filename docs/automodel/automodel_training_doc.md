@@ -30,7 +30,13 @@ git submodule update --init --recursive 3rdparty/
 
 ### 2. Prepare Data
 
+We provide two ways to prepare your dataset:
+
+- Start with raw videos: Place your `.mp4` files in a folder and use our data-preparation scripts to scan the videos and generate a `meta.json` entry for each sample (which includes `width`, `height`, `start_frame`, `end_frame`, and a caption). If you have captions, you can also include per-video named `<video>.jsonl`; the scripts will pick up the text automatically. The final dataset layout is shown below.
+- Bring your own `meta.json`: If you already have annotations, create `meta.json` yourself following the schema shown below.
+
 **Create video dataset:**
+In the following exaample we use two video files, solely for demonstration purposes. Actual training datasets will have a large number of files.
 ```
 <your_video_folder>/
 ├── video1.mp4
@@ -47,7 +53,15 @@ git submodule update --init --recursive 3rdparty/
     "height": 720,
     "start_frame": 0,
     "end_frame": 121,
-    "vila_caption": "A detailed description of the video content..."
+    "vila_caption": "A detailed description of the video1.mp4 contents..."
+  },
+  {
+    "file_name": "video2.mp4",
+    "width": 1280,
+    "height": 720,
+    "start_frame": 0,
+    "end_frame": 12,
+    "vila_caption": "A detailed description of the video2.mp4 contents..."
   }
 ]
 ```
