@@ -12,7 +12,7 @@ This recipe uses NVIDIA's [Megatron-Energon](https://github.com/NVIDIA/Megatron-
 
 As an example, you can use the [butterfly-dataset](https://huggingface.co/datasets/huggan/smithsonian_butterflies_subset) available on Hugging Face.
 
-The script below prepares the dataset to be compatible with Energon.
+The script below packs the Hugging Face dataset into WebDataset format, which Energon requires.
 ```bash
 uv run --group megatron-bridge python -m torch.distributed.run --nproc-per-node $num_gpus \
        examples/megatron/recipes/dit/prepare_energon_dataset_butterfly.py
@@ -91,7 +91,7 @@ Please follow the instructions in the [container](https://github.com/NVIDIA-NeMo
 
 Once you have the dataset and container ready, you can start training the DiT model on your own dataset. This repository leverages [sequence packing](https://docs.nvidia.com/nemo-framework/user-guide/24.09/nemotoolkit/features/optimizations/sequence_packing.html) to maximize training efficiency. Sequence packing stacks multiple samples into a single sequence instead of padding individual samples to a fixed length; therefore, `micro_batch_size` must be set to 1. Additionally, `qkv_format` should be set to `thd` to signal to Transformer Engine that sequence packing is enabled.
 
-For data loading, Energon provides two key hyperparameters related to sequence packing: `task_encoder_seq_length` and `packing_buffer_size`. The `task_encoder_seq_length` parameter controls the maximum sequence length passed to the model, while `packing_buffer_size` determines the number of samples processed to create different buckets. You can look at `select_samples_to_pack` and `pack_selected_samples` methods of [DiffusionTaskEncoderWithSequencePacking](https://github.com/NVIDIA-NeMo/DFM/blob/main/dfm/src/megatron/data/common/diffusion_task_encoder_with_sp.py#L50) to get a better sense of these parameters.
+For data loading, Energon provides two key hyperparameters related to sequence packing: `task_encoder_seq_length` and `packing_buffer_size`. The `task_encoder_seq_length` parameter controls the maximum sequence length passed to the model, while `packing_buffer_size` determines the number of samples processed to create different buckets. You can look at `select_samples_to_pack` and `pack_selected_samples` methods of [DiffusionTaskEncoderWithSequencePacking](https://github.com/NVIDIA-NeMo/DFM/blob/main/dfm/src/megatron/data/common/diffusion_task_encoder_with_sp.py#L50) to get a better sense of these parameters. For further details you can look at [Energon packing](https://nvidia.github.io/Megatron-Energon/advanced/packing.html) documenation.
 
 Multiple parallelism techniques including tensor, sequence, and context parallelism are supported and can be configured based on your computational requirements.
 
