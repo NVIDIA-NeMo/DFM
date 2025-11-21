@@ -160,6 +160,12 @@ uv run --group automodel --with . \
 
 ### 4. Validate
 
+Use this step to perform a quick qualitative check of a trained checkpoint. The validation script:
+- Reads prompts from `.meta` files in `--meta_folder` (uses `metadata.vila_caption`; latents are ignored).
+- Loads the `WanPipeline` and, if provided, restores weights from `--checkpoint` (prefers `ema_shadow.pt`, then `consolidated_model.bin`, then sharded FSDP `model/*.distcp`).
+- Generates short videos for each prompt with the specified settings (`--guidance_scale`, `--num_inference_steps`, `--height/--width`, `--num_frames`, `--fps`, `--seed`) and writes them to `--output_dir`.
+- Intended for qualitative comparison across checkpoints; it does not compute quantitative metrics.
+
 ```bash
 uv run --group automodel --with . \
   python examples/automodel/generate/wan_validate.py \
@@ -177,42 +183,44 @@ uv run --group automodel --with . \
 
 ### Fine-tuning Config (`wan2_1_t2v_flow.yaml`)
 
+Note: The inline configuration below is provided for quick reference. The canonical, up-to-date files are maintained in the repository: [examples/automodel/](../../examples/automodel/), [examples/automodel/finetune/wan2_1_t2v_flow.yaml](../../examples/automodel/finetune/wan2_1_t2v_flow.yaml), and [examples/automodel/finetune/wan2_1_t2v_flow_multinode.yaml](../../examples/automodel/finetune/wan2_1_t2v_flow_multinode.yaml).
+
 ```yaml
-model:
-  pretrained_model_name_or_path: Wan-AI/Wan2.1-T2V-1.3B-Diffusers
+model:  # Base pretrained model to fine-tune
+  pretrained_model_name_or_path: Wan-AI/Wan2.1-T2V-1.3B-Diffusers  # HF repo or local path
 
-step_scheduler:
-  global_batch_size: 8
-  local_batch_size: 1
-  num_epochs: 10
-  ckpt_every_steps: 100
+step_scheduler:  # Global training schedule
+  global_batch_size: 8  # Effective batch size across all GPUs
+  local_batch_size: 1  # Per-GPU batch size
+  num_epochs: 10  # Number of passes over the dataset
+  ckpt_every_steps: 100  # Save a checkpoint every N steps
 
-data:
-  dataloader:
-    meta_folder: "<your_processed_meta_folder>"
-    num_workers: 2
+data:  # Data input configuration
+  dataloader:  # DataLoader parameters
+    meta_folder: "<your_processed_meta_folder>"  # Folder containing .meta files
+    num_workers: 2  # Worker processes per rank
 
-optim:
-  learning_rate: 5e-6
+optim:  # Optimizer/training hyperparameters
+  learning_rate: 5e-6  # Base learning rate
 
-flow_matching:
-  timestep_sampling: "uniform"
-  flow_shift: 3.0
+flow_matching:  # Flow-matching training settings
+  timestep_sampling: "uniform"  # Strategy for sampling timesteps
+  flow_shift: 3.0  # Scalar shift applied to the target flow
 
-fsdp:
-  dp_size: 8  # Single node: 8 GPUs
+fsdp:  # Distributed training (e.g., FSDP) configuration
+  dp_size: 8  # Total data-parallel replicas (single node: 8 GPUs)
 
-checkpoint:
-  enabled: true
-  checkpoint_dir: "./checkpoints"
+checkpoint:  # Checkpointing behavior
+  enabled: true  # Enable periodic checkpoint saving
+  checkpoint_dir: "./checkpoints"  # Output directory for checkpoints
 ```
 
 ### Multi-node Config Differences
 
 ```yaml
-fsdp:
-  dp_size: 16           # 2 nodes × 8 GPUs
-  dp_replicate_size: 2  # Replicate across 2 nodes
+fsdp:  # Overrides for multi-node runs
+  dp_size: 16           # Total data-parallel replicas (2 nodes × 8 GPUs)
+  dp_replicate_size: 2  # Number of replicated groups across nodes
 ```
 
 ### Pretraining vs Fine-tuning
