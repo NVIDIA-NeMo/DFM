@@ -1,22 +1,19 @@
 ## 🚀 Megatron WAN
 
 ### 📋 Overview
-An open-source implementation of [WAN 2.1](https://github.com/Wan-Video/Wan2.1) (large-scale text-to-video/image generative models) built on top of [Megatron-Core](https://github.com/NVIDIA/Megatron-LM) and [Megatron-Bridge](https://github.com/NVIDIA-NeMo/Megatron-Bridge)for scalable and efficient training. It supports advanced parallelism strategies (data, tensor, sequence, and context parallelism) and optimized kernels (e.g., Transformer Engine fused attention).
+An open-source implementation of [WAN 2.1](https://github.com/Wan-Video/Wan2.1) (large-scale text-to-video/image generative models) built on top of [Megatron-Core](https://github.com/NVIDIA/Megatron-LM) and [Megatron-Bridge](https://github.com/NVIDIA-NeMo/Megatron-Bridge) for scalable and efficient training. It supports advanced parallelism strategies (data, tensor, sequence, and context parallelism) and optimized kernels (e.g., Transformer Engine fused attention).
 
 ---
 
 ### 📦 Dataset Preparation
-This recipe uses NVIDIA's Megatron-Energon as an efficient multi-modal data loader. Datasets should be in the WebDataset-compatible format (typically sharded `.tar` archives). Energon supports large-scale distributed loading, sharding, and sampling for video-text and image-text pairs.
-
-- Set `dataset.path` to your WebDataset directory or shard pattern.
-- See Megatron-Energon docs for format details, subflavors, and advanced options.
+This recipe uses NVIDIA's [Megatron-Energon](https://github.com/NVIDIA/Megatron-Energon) as an efficient multi-modal data loader. Datasets should be in the WebDataset-compatible format (typically sharded `.tar` archives). Energon supports large-scale distributed loading, sharding, and sampling for video-text and image-text pairs. Set `dataset.path` to your WebDataset directory or shard pattern. See Megatron-Energon docs for format details, subflavors, and advanced options.
 
 If you do not have a dataset yet or only need to validate performance/plumbing, see the "Quick Start with Mock Dataset" section below.
 
 ---
 
 #### 🗂️ Dataset Preparation Example
-Starting with a directory containing raw .mp4 videos and their corresponding metadata .json files containing captions, we’ll turn the data into WAN-ready WebDataset shards using our helper script, and then ask Energon to process those shards and create its metadata. After this, you can point `dataset.path` at the output folder and start training.
+Starting with a directory containing raw .mp4 videos and their corresponding .json metadata files containing captions, you can turn the data into WAN-ready WebDataset shards using our helper script. We then use Energon to process those shards and create its metadata. After this, you can set training script's `dataset.path` argument to the output processed data folder and start training.
 
 ```bash
 # 1) Define your input (raw videos) and output (WebDataset shards) folders. For example:
@@ -27,18 +24,18 @@ DATASET_PATH=/opt/wan_webdataset      # output WebDataset shards
 export HF_TOKEN=<your_huggingface_token>
 
 # 3) Create WAN shards with latents + text embeddings
-# Wan's VAE encoder and T5 encoder is used to extract videos' latents and caption embeddings
-#    --height/--width: arguments control resize target (832x480 is one supported option for 1.3B and 14B model)
-#    --center-crop: arguments for center crop to exact target size after resize
-uv run --group megatron-bridge python -m torch.distributed.run --nproc-per-node $num_gpus \
+# Wan's VAE encoder and T5 encoder is used to extract videos' latents and caption embeddings offline before training, using the following core arugments:
+#    --height/--width: control resize target (832x480 is supported for both 1.3B and 14B model)
+#    --center-crop: run center crop to exact target size after resize
+uv run --group megatron-bridge python -m torch.distributed.run --nproc-per-node 1 \
   examples/megatron/recipes/wan/prepare_energon_dataset_wan.py \
   --video_folder "${DATASET_SRC}" \
   --output_dir "${DATASET_PATH}" \
-  --model "Wan-AI/Wan2.1-T2V-1.3B-Diffusers"" \
+  --model "Wan-AI/Wan2.1-T2V-1.3B-Diffusers" \
   --height 480 --width 832 \
   --center-crop
 
-# 4) Ask Energon to process shards and create its metadata/spec
+# 4) Use Energon to process shards and create its metadata/spec
 energon prepare "${DATASET_PATH}"
 # In the interactive prompts:
 # - Enter a train/val/test split, e.g., "8,1,1"
@@ -52,9 +49,7 @@ What gets produced:
   - json: contain useful side-info (text caption, sizes, processing choices, etc.)
 - Energon writes a `.nv-meta` directory with dataset info and a `dataset.yaml` you can version/control.
 
-Next steps:
-- Point your WAN config (or CLI overrides) at `dataset.path=${DATASET_PATH}`
-- You’re ready to launch pretraining
+You’re ready to launch training. In the training config, we will point the WAN config (or CLI overrides) to the processed data output direcotry as `dataset.path=${DATASET_PATH}`.
 
 ---
 
@@ -76,15 +71,14 @@ Multiple parallelism techniques including tensor, sequence, and context parallel
 
 WAN training is driven by `examples/megatron/recipes/wan/pretrain_wan.py`, which supports both a YAML config file and CLI overrides. 
 
-The script exposes a `--training-mode` with `pretrain` and `finetune` presets for flow-matching hyperparameters. As a starting point for experiments, this presets specify that pretraining uses noisier, biased sampling (e.g., logit-normal, higher logit_std, lower flow_shift) for stability and broad learning, while finetuning uses uniform, lower-noise settings (e.g., uniform sampling, lower logit_std, higher flow_shift) to refine details and improve quality.
+The script exposes a `--training-mode` with `pretrain` and `finetune` presets for flow-matching hyperparameters as a starting point for experiments. This presets specify that pretraining uses noisier, biased sampling (e.g., logit-normal, higher logit_std, lower flow_shift) for stability and broad learning, while finetuning uses uniform, lower-noise settings (e.g., uniform sampling, lower logit_std, higher flow_shift) to refine details and improve quality.
 
-Notes:
-- If you use `logger.wandb_project` and `logger.wandb_exp_name`, export `WANDB_API_KEY`.
-- Checkpointing is controlled via the `checkpoint.*` section. Use the same path for `save` and `load` to resume training.
+**Notes**: If you use `logger.wandb_project` and `logger.wandb_exp_name`, export `WANDB_API_KEY`.
 
 #### Pretraining script example
 
-We provide example scripts for running 1.3B and 14B model sizes on mock dataset (see `wan_1_3B.yaml` and `wan_14B.yaml` under `examples/megatron/recipes/wan/conf`). From these starting points, users can set their own configuration by copy one of the example override configs and update it with your settings (e.g., with actual processed data, and specific configurations based on available hardware):
+We provide example scripts for running 1.3B and 14B model sizes on mock dataset (see `wan_1_3B.yaml` and `wan_14B.yaml` under `examples/megatron/recipes/wan/conf`). From these starting points, users can set their own configuration by copy one of the example override configs and update it with your settings (e.g., with actual processed data path, and specific configurations based on available hardware, etc.). Users can learn more about arugments detail at [Megatron-Bridge docs](https://github.com/NVIDIA-NeMo/Megatron-Bridge/blob/main/docs/megatron-lm-to-megatron-bridge.md).
+
 
 ```bash
 cp examples/megatron/recipes/wan/conf/wan_1_3B.yaml examples/megatron/recipes/wan/conf/my_wan.yaml
@@ -98,7 +92,7 @@ cp examples/megatron/recipes/wan/conf/wan_1_3B.yaml examples/megatron/recipes/wa
 Then run:
 
 ```bash
-NVTE_FUSED_ATTN=1 uv run --group megatron-bridge python -m torch.distributed.run --nproc-per-node $num_gpus \
+uv run --group megatron-bridge python -m torch.distributed.run --nproc-per-node $num_gpus \
   examples/megatron/recipes/wan/pretrain_wan.py \
   --training-mode pretrain \
   --config-file examples/megatron/recipes/wan/conf/my_wan.yaml
@@ -107,7 +101,7 @@ NVTE_FUSED_ATTN=1 uv run --group megatron-bridge python -m torch.distributed.run
 You can also override any config values from the command line. For example:
 
 ```bash
-NVTE_FUSED_ATTN=1 uv run --group megatron-bridge python -m torch.distributed.run --nproc-per-node $num_gpus \
+uv run --group megatron-bridge python -m torch.distributed.run --nproc-per-node $num_gpus \
   examples/megatron/recipes/wan/pretrain_wan.py \
   --config-file examples/megatron/recipes/wan/conf/my_wan.yaml \
   --training-mode pretrain \
@@ -116,15 +110,15 @@ NVTE_FUSED_ATTN=1 uv run --group megatron-bridge python -m torch.distributed.run
   train.micro_batch_size=1 \
   model.tensor_model_parallel_size=2 \
   model.context_parallel_size=4 \
-  checkpoint.save=/opt/pretrained_checkpoint \
-  checkpoint.load=/opt/pretrained_checkpoint
+  checkpoint.save=/opt/pretrained_checkpoints \
+  checkpoint.load=/opt/pretrained_checkpoints
 ```
 
 #### 🧪 Quick Start with Mock Dataset
 If you want to run without a real dataset (for debugging or performance measurement), pass `--mock`:
 
 ```bash
-NVTE_FUSED_ATTN=1 uv run --group megatron-bridge python -m torch.distributed.run --nproc-per-node $num_gpus \
+uv run --group megatron-bridge python -m torch.distributed.run --nproc-per-node $num_gpus \
   examples/megatron/recipes/wan/pretrain_wan.py \
   --config-file examples/megatron/recipes/wan/conf/wan_1_3B.yaml \
   --training-mode pretrain \
@@ -140,18 +134,18 @@ You may adjust mock shapes (`F_latents`, `H_latents`, `W_latents`) and packing b
 After training, users can run inferencing with `examples/megatron/recipes/wan/inference_wan.py`. Set `--checkpoint_step` to use specific checkpoint for inference. Set `--sizes` and `--frame_nums` to specify video shape (frames, height, width). Set `--sample_steps` (default to 50) for number of noise diffusion steps.
 
 ```bash
-NVTE_FUSED_ATTN=1 uv run --group megatron-bridge python -m torch.distributed.run --nproc-per-node 1 \
+uv run --group megatron-bridge python -m torch.distributed.run --nproc-per-node 1 \
   examples/megatron/recipes/wan/inference_wan.py  \
   --task t2v-1.3B \
-  --sizes 480*832 \
-  --checkpoint_dir /path/to/checkpoint \
-  --checkpoint_step 0 \
   --frame_nums 81 \
+  --sizes 480*832 \
+  --checkpoint_dir /opt/pretrained_checkpoints \
+  --checkpoint_step 10000 \
   --prompts "Two anthropomorphic cats in comfy boxing gear and bright gloves fight intensely on a spotlighted stage." \
   --sample_steps 50
 ```
 
-Note: Current inference path is single-GPU. Parallel inference is not yet supported.
+**Note**: Current inference path is single-GPU. Parallel inference is not yet supported.
 
 ---
 
@@ -159,19 +153,11 @@ Note: Current inference path is single-GPU. Parallel inference is not yet suppor
 
 The table below shows current parallelism support for different model sizes:
 
-| Model | Data Parallel | Tensor Parallel | Sequence Parallel | Context Parallel |
-|---|---|---|---|---|
-| 1.3B | ✅ | ✅ | ✅ | ✅ |
-| 14B  | ✅ | ✅ | ✅ | ✅ |
+| Model | Data Parallel | Tensor Parallel | Sequence Parallel | Context Parallel | FSDP |
+|---|---|---|---|---|---|
+| 1.3B | ✅ | ✅ | ✅ | ✅ |Coming Soon|
+| 14B  | ✅ | ✅ | ✅ | ✅ |Coming Soon|
 
 
-### Citation
-```bibtex
-@article{wan2.1,
-  title   = {Wan: Open and Advanced Large‐Scale Video Generative Models},
-  author  = {Wan Team},
-  year    = {2025},
-  note    = {Open­source video foundation model series (Wan 2.1), https://github.com/Wan-Video/Wan2.1/}
-}
-```
-
+### References
+Wan Team. (2025). Wan: Open and advanced large-scale video generative models (Wan 2.1). GitHub. https://github.com/Wan-Video/Wan2.1/
