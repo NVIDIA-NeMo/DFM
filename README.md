@@ -74,7 +74,6 @@ Train with PyTorch-native DTensor parallelism and direct 🤗 HF integration:
 
 <!-- @Linnan, @Alex please add this thanks a ton-->
 ```bash
-# TODO
 # Fine-tune a video diffusion model with FSDP2
 uv run torchrun --nproc-per-node=8 \
   dfm/src/automodel/recipes/finetune.py \
