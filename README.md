@@ -78,15 +78,12 @@ Train with PyTorch-native DTensor parallelism and direct 🤗 HF integration:
 # Fine-tune a video diffusion model with FSDP2
 uv run torchrun --nproc-per-node=8 \
   dfm/src/automodel/recipes/finetune.py \
-  --config examples/automodel/wan21_finetune.yaml
+  -c examples/automodel/wan21_finetune.yaml
 
-# Override parameters via CLI
-# TODO
+# Pre-train a video diffusion model with FSDP2
 uv run torchrun --nproc-per-node=8 \
-  dfm/src/automodel/recipes/finetune.py \
-  --config examples/automodel/wan21_finetune.yaml \
-  --step_scheduler.local_batch_size 4 \
-  --model.pretrained_model_name_or_path "your-model-id"
+examples/automodel/pretrain/pretrain.py  \
+-c examples/automodel/pretrain/wan2_1_t2v_flow.yaml
 ```
 
 ## 🚀 Key Features
@@ -122,7 +119,7 @@ DFM provides out-of-the-box support for state-of-the-art diffusion architectures
 | Model | Type | Megatron Bridge | AutoModel | Description |
 |-------|------|-----------------|-----------|-------------|
 | **DiT** | Image/Video | [pretrain](https://github.com/NVIDIA-NeMo/DFM/blob/main/examples/megatron/recipes/dit/pretrain_dit_model.py), [inference](https://github.com/NVIDIA-NeMo/DFM/blob/main/examples/megatron/recipes/dit/inference_dit_model.py)  | 🔜 | Diffusion Transformers with scalable architecture |
-| **WAN 2.1** | Video | [inference](https://github.com/NVIDIA-NeMo/DFM/blob/main/examples/megatron/recipes/wan/inference_wan.py), [pretrain, finetune](https://github.com/NVIDIA-NeMo/DFM/blob/main/examples/megatron/recipes/wan/pretrain_wan.py), conversion(@Huy) | @Linnan, @Alex | World Action Networks for video generation |
+| **WAN 2.1** | Video | [inference](https://github.com/NVIDIA-NeMo/DFM/blob/main/examples/megatron/recipes/wan/inference_wan.py), [pretrain, finetune](https://github.com/NVIDIA-NeMo/DFM/blob/main/examples/megatron/recipes/wan/pretrain_wan.py), conversion(@Huy) | [pretrain](https://github.com/NVIDIA-NeMo/DFM/tree/main/examples/automodel/pretrain), [finetune](https://github.com/NVIDIA-NeMo/DFM/tree/main/examples/automodel/finetune),[inference](https://github.com/NVIDIA-NeMo/DFM/blob/main/examples/automodel/generate/wan_validate.py) | World Action Networks for video generation |
 
 ## Performance Benchmarking
 
@@ -144,7 +141,7 @@ DFM/
 │       │   │   ├── <model_name>/  # model-specific implementations
 │       │   └── recipes/           # Training recipes
 │       │       ├── <model_name>/  # model-specific training configs
-│       ├── automodel (@linnan, @alex)/             # AutoModel path (DTensor-native)
+│       ├── automodel              # AutoModel path (DTensor-native)
 │       │   ├── _diffusers/        # Diffusion pipeline integrations
 │       │   ├── datasets/          # Dataset implementations
 │       │   ├── distributed/       # Parallelization strategies
