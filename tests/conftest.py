@@ -68,3 +68,7 @@ def pytest_configure(config):
         "markers",
         "pleasefixme: marks test as needing fixes (will be skipped in CI)",
     )
+    config.addinivalue_line(
+        "markers",
+        "run_only_on: marks test to run only on specific hardware (CPU/GPU)",
+    )
