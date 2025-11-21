@@ -2,13 +2,13 @@
 
 High-level API examples for training, fine-tuning, and generating with DFM models.
 
-## Directory Structure
+## Supported Tasks
 
-| Directory | Description |
-|-----------|-------------|
-| **[finetune](finetune/)** | Scripts and configs for fine-tuning models |
-| **[generate](generate/)** | Inference and validation scripts |
-| **[pretrain](pretrain/)** | Pre-training workflows |
+| Task | Directory | Available Examples |
+|------|-----------|-------------------|
+| **Fine-tuning** | **[finetune](finetune/)** | • **[Wan 2.1 T2V](finetune/finetune.py)**: Fine-tuning with Flow Matching <br> • **[Multi-node](finetune/wan2_1_t2v_flow_multinode.yaml)**: Distributed training config |
+| **Generation** | **[generate](generate/)** | • **[Generate](generate/wan_generate.py)**: Run inference with Wan 2.1 <br> • **[Validate](generate/wan_validate.py)**: Run validation loop |
+| **Pre-training** | **[pretrain](pretrain/)** | • **[Wan 2.1 T2V](pretrain/pretrain.py)**: Pre-training from scratch |
 
 ---
 
