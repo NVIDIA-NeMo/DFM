@@ -12,11 +12,16 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+import pytest
 import torch
 
 from dfm.src.megatron.model.wan.rope_utils import Wan3DRopeEmbeddings
 
 
+@pytest.mark.skipif(
+    not torch.cuda.is_available(),
+    reason="CUDA not available",
+)
 def test_wan3d_rope_embeddings_shapes_and_padding():
     # Small, CPU-friendly config
     n_head = 2

@@ -170,7 +170,7 @@ def pretrain_config(
             context_embeddings_dim=4096,
             micro_batch_size=micro_batch_size,
             global_batch_size=global_batch_size,
-            num_workers=10,
+            num_workers=16,
             packing_buffer_size=None,
         )
     else:

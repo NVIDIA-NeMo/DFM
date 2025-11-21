@@ -14,6 +14,7 @@
 
 # pylint: disable=C0115,C0116,C0301
 
+import copy
 from dataclasses import dataclass
 from typing import Optional, Union
 
@@ -65,9 +66,15 @@ class WanAdaLN(MegatronModule):
 
         setattr(self.modulation, "sequence_parallel", config.sequence_parallel)
 
+    @jit_fuser
     def forward(self, timestep_emb):
-        e = (self.modulation + timestep_emb).chunk(6, dim=1)
+        e = (self.modulation + timestep_emb).transpose(0, 1)
+        e = e.chunk(6, dim=0)
         return e
+
+    @jit_fuser
+    def normalize_modulate(self, norm, hidden_states, shift, scale):
+        return self.modulate(norm(hidden_states), shift, scale)
 
     @jit_fuser
     def modulate(self, x, shift, scale):
@@ -96,19 +103,31 @@ class WanLayerWithAdaLN(TransformerLayer):
         pg_collection: Optional[ProcessGroupCollection] = None,
         vp_stage: Optional[int] = None,
     ):
+        def _replace_no_cp_submodules(submodules):
+            modified_submods = copy.deepcopy(submodules)
+            modified_submods.cross_attention = IdentityOp
+            return modified_submods
+
+        # Replace any submodules that will have CP disabled and build them manually later after TransformerLayer init.
+        # modified_submods = _replace_no_cp_submodules(submodules)
         super().__init__(
             config=config, submodules=submodules, layer_number=layer_number, hidden_dropout=hidden_dropout
         )
 
-        # # TODO: Override Cross Attention to disable TP Comm overlap as well. ???
-        # # Not disabling will attempt re-use of buffer size same as Q and lead to incorrect tensor shapes.
-        # cp_override_config = copy.deepcopy(config)
-        # cp_override_config.tp_comm_overlap = False
-        # self.cross_attention = build_module(
-        #     submodules.cross_attention,
-        #     config=cp_override_config,
-        #     layer_number=layer_number,
-        # )
+        # TODO (pmannan): Override Cross Attention to disable CP.
+        # Disable TP Comm overlap as well. Not disabling will attempt re-use of buffer size same as
+        #   Q and lead to incorrect tensor shapes.
+        # if submodules.cross_attention != IdentityOp:
+        #     cp_override_config = copy.deepcopy(config)
+        #     cp_override_config.context_parallel_size = 1
+        #     cp_override_config.tp_comm_overlap = False
+        #     self.cross_attention = build_module(
+        #         submodules.cross_attention,
+        #         config=cp_override_config,
+        #         layer_number=layer_number,
+        #     )
+        # else:
+        #     self.cross_attention = None
 
         self.full_self_attention = build_module(
             submodules.full_self_attention,
@@ -148,6 +167,10 @@ class WanLayerWithAdaLN(TransformerLayer):
                 if isinstance(param, nn.Parameter) and param.requires_grad:
                     setattr(param, "average_gradients_across_tp_domain", True)
 
+    @jit_fuser
+    def add_residual(self, x: torch.Tensor, residual: torch.Tensor) -> torch.Tensor:
+        return x + residual
+
     def forward(
         self,
         hidden_states,
@@ -169,19 +192,13 @@ class WanLayerWithAdaLN(TransformerLayer):
         rope_emb = rotary_pos_emb
 
         shift_full, scale_full, gate_full, shift_mlp, scale_mlp, gate_mlp = self.adaLN(timestep_emb)
-        # transpose to bring it to [1, b, ...] format
-        shift_full = shift_full.transpose(0, 1)
-        scale_full = scale_full.transpose(0, 1)
-        gate_full = gate_full.transpose(0, 1)
-        shift_mlp = shift_mlp.transpose(0, 1)
-        scale_mlp = scale_mlp.transpose(0, 1)
-        gate_mlp = gate_mlp.transpose(0, 1)
 
         # ******************************************** full self attention *******************************************
 
         # adaLN with scale + shift + gate
-        pre_full_attn_layernorm_output_ada = self.adaLN.modulate(
-            self.norm1(hidden_states),
+        pre_full_attn_layernorm_output_ada = self.adaLN.normalize_modulate(
+            self.norm1,
+            hidden_states,
             shift=shift_full,
             scale=scale_full,
         )
@@ -201,6 +218,12 @@ class WanLayerWithAdaLN(TransformerLayer):
 
         # ******************************************** cross attention ******************************************************
 
+        # TODO (pmannan): Disable CP for CrossAttention as KV context is small.
+        # But needs better support for packed sequences and padding to ensure correct calculations
+        # packed_seq_params['cross_attention'].cu_seqlens_q = torch.tensor(
+        #     [0, hidden_states.shape[0]],
+        #     device=packed_seq_params['cross_attention'].cu_seqlens_kv.device,
+        #     dtype=torch.int32)
         attention_output, bias = self.cross_attention(
             self.norm3(hidden_states),
             attention_mask=context_mask,
@@ -210,12 +233,13 @@ class WanLayerWithAdaLN(TransformerLayer):
         if bias is not None:
             attention_output = attention_output + bias
 
-        hidden_states = hidden_states + attention_output
+        hidden_states = self.add_residual(hidden_states, attention_output)
 
         # ******************************************** mlp ******************************************************
 
-        pre_mlp_layernorm_output_ada = self.adaLN.modulate(
-            self.norm2(hidden_states),
+        pre_mlp_layernorm_output_ada = self.adaLN.normalize_modulate(
+            self.norm2,
+            hidden_states,
             shift=shift_mlp,
             scale=scale_mlp,
         )
