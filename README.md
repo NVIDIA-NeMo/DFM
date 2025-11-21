@@ -73,17 +73,26 @@ uv run --group megatron-bridge python -m torch.distributed.run --nproc-per-node 
 
 Train with PyTorch-native DTensor parallelism and direct 🤗 HF integration:
 
-<!-- @Linnan, @Alex please add this thanks a ton-->
-```bash
-# Fine-tune a video diffusion model with FSDP2
-uv run torchrun --nproc-per-node=8 \
-  dfm/src/automodel/recipes/finetune.py \
-  -c examples/automodel/wan21_finetune.yaml
+#### Run a Recipe
 
-# Pre-train a video diffusion model with FSDP2
-uv run torchrun --nproc-per-node=8 \
-examples/automodel/pretrain/pretrain.py  \
--c examples/automodel/pretrain/wan2_1_t2v_flow.yaml
+You can find pre-configured recipes under [automodel/finetune](https://github.com/NVIDIA-NeMo/DFM/tree/main/examples/automodel/finetune) and [automodel/pretrain](https://github.com/NVIDIA-NeMo/DFM/tree/main/examples/automodel/pretrain) directories.
+
+> Note: AutoModel examples live under `dfm/examples/automodel`. Use [uv](https://docs.astral.sh/uv/) with `--group automodel`. Configs are YAML-driven; pass `-c <path>` to override the default.
+
+The fine-tune recipe sets up WAN 2.1 Text-to-Video training with Flow Matching using FSDP2 Hybrid Sharding.
+It parallelizes heavy transformer blocks while keeping lightweight modules (e.g., VAE) unsharded for efficiency.
+Adjust batch sizes, LR, and parallel sizes in `dfm/examples/automodel/finetune/wan2_1_t2v_flow.yaml`.
+The generation script demonstrates distributed inference with AutoModel DTensor managers, producing an MP4 on rank 0. You can tweak frame size, frames, steps, and CFG in flags.
+
+```bash
+# Fine-tune WAN 2.1 T2V with FSDP2 (single node, 8 GPUs)
+uv run --group automodel torchrun --nproc-per-node=8 \
+  dfm/examples/automodel/finetune/finetune.py \
+  -c dfm/examples/automodel/finetune/wan2_1_t2v_flow.yaml
+
+# Generate videos with FSDP2 (distributed inference)
+uv run --group automodel torchrun --nproc-per-node=8 \
+  dfm/examples/automodel/generate/wan_generate.py
 ```
 
 ## 🚀 Key Features
