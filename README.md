@@ -56,7 +56,7 @@ docker run --rm -it --gpus all \
 
 ### Megatron Bridge Path
 
-#### Run a Receipe
+#### Run a Recipe
 You can find all predefined recipes under [recipes](https://github.com/NVIDIA-NeMo/DFM/tree/main/examples/megatron/recipes) directory.
 
 > **Note:** You will have to use [uv](https://docs.astral.sh/uv/) to run the recipes. Please use `--group` as `megatron-bridge`.
