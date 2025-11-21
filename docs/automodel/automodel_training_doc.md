@@ -68,7 +68,15 @@ In the following exaample we use two video files, solely for demonstration purpo
 
 **Preprocess videos to .meta files:**
 
-There are two preprocessing modes:
+There are two preprocessing modes. Use this guide to choose the right mode:
+
+- **Full Video (`--mode video`)**
+  - **What it is**: Converts each source video into a single `.meta` that preserves the full temporal sequence as latents. Training can sample temporal windows/clips from the sequence on the fly.
+  - **When to use**: Fine-tuning text-to-video models where motion and temporal consistency matter. This is the recommended default for most training runs.
+
+- **Extract frames (`--mode frames`)**
+  - **What it is**: Uniformly samples `N` frames per video and writes each as its own one-frame `.meta` sample (no temporal continuity).
+  - **When to use**: Image/frame-level training objectives, quick smoke tests, or ablations where learning motion is not required.
 
 **Mode 1: Full video (recommended for training)**
 ```bash
