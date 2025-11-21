@@ -41,9 +41,9 @@ def cook(sample: dict) -> dict:
     """
     return dict(
         **basic_sample_keys(sample),
-        json=sample[".json"],
-        pth=sample[".pth"],
-        pickle=sample[".pickle"],
+        json=sample["json"],
+        pth=sample["pth"],
+        pickle=sample["pickle"],
     )
 
 
@@ -88,10 +88,16 @@ class DiffusionTaskEncoderWithSequencePacking(DefaultTaskEncoder, ABC):
         """Construct a new Diffusion sample by concatenating the sequences."""
 
         def stack(attr):
-            return torch.stack([getattr(sample, attr) for sample in samples], dim=0)
+            if hasattr(samples[0], attr) and getattr(samples[0], attr) is not None:
+                return torch.stack([getattr(sample, attr) for sample in samples], dim=0)
+            else:
+                return None
 
         def cat(attr):
-            return torch.cat([getattr(sample, attr) for sample in samples], dim=0)
+            if hasattr(samples[0], attr) and getattr(samples[0], attr) is not None:
+                return torch.cat([getattr(sample, attr) for sample in samples], dim=0)
+            else:
+                return None
 
         return DiffusionSample(
             __key__=",".join([s.__key__ for s in samples]),
@@ -100,6 +106,7 @@ class DiffusionTaskEncoderWithSequencePacking(DefaultTaskEncoder, ABC):
             __subflavors__=samples[0].__subflavors__,
             video=cat("video"),
             context_embeddings=cat("context_embeddings"),
+            context_mask=cat("context_mask"),
             loss_mask=cat("loss_mask"),
             seq_len_q=cat("seq_len_q"),
             seq_len_q_padded=cat("seq_len_q_padded"),

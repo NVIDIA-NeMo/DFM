@@ -55,6 +55,7 @@ classifiers = [
     "Topic :: Utilities",
 ]
 dependencies = [
+    "accelerate",
     "diffusers==0.35.1",
     "easydict",
     "ftfy",
@@ -95,6 +96,11 @@ automodel = [
     "nemo-automodel",
 ]
 megatron-bridge = ["megatron-bridge"]
+torch-cu124 = [
+    "torch",
+    "torchvision",
+    "torchaudio",
+]
 
 [tool.setuptools]
 packages = ["dfm"]
@@ -104,6 +110,7 @@ version = {attr = "dfm.__version__"}
 readme = {file = "README.md", content-type = "text/markdown"}
 
 [tool.uv]
+managed = true
 prerelease = "allow"
 # These packages require torch during build, so disable build isolation
 no-build-isolation-package = [
@@ -124,6 +131,11 @@ override-dependencies = [
 ]
 
 [[tool.uv.index]]
+name = "pytorch-cu124"
+url = "https://download.pytorch.org/whl/cu124"
+explicit = true
+
+[[tool.uv.index]]
 name = "pypi"
 url = "https://pypi.org/simple"
 explicit = true
@@ -131,6 +143,7 @@ explicit = true
 [tool.uv.sources]
 nemo-automodel = { path = "3rdparty/Automodel" }
 megatron-bridge = { path = "3rdparty/Megatron-Bridge" }
+megatron-core = { path = "3rdparty/Megatron-Bridge/3rdparty/Megatron-LM/" }
 transformer-engine = { git = "https://github.com/NVIDIA/TransformerEngine.git", rev = "release_v2.9" }
 nvidia-resiliency-ext = { index = "pypi" }
 

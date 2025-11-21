@@ -12,7 +12,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-from Automodel.datasets.wan21 import (
+from dfm.src.automodel.datasets.wan21 import (
     MetaFilesDataset,
     build_node_parallel_sampler,
     build_wan21_dataloader,

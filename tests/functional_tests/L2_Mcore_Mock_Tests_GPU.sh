@@ -1,4 +1,4 @@
-# Copyright (c) 2025, NVIDIA CORPORATION. All rights reserved.
+# Copyright (c) 2025, NVIDIA CORPORATION.  All rights reserved.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -11,19 +11,4 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
-
-from __future__ import annotations
-
-from Automodel.recipes.finetune import TrainWan21DiffusionRecipe
-from nemo_automodel.components.config._arg_parser import parse_args_and_load_config
-
-
-def main(default_config_path="/opt/DFM/dfm/examples/Automodel/finetune/wan2_1_t2v_flow.yaml"):
-    cfg = parse_args_and_load_config(default_config_path)
-    recipe = TrainWan21DiffusionRecipe(cfg)
-    recipe.setup()
-    recipe.run_train_validation_loop()
-
-
-if __name__ == "__main__":
-    main()
+CUDA_VISIBLE_DEVICES="0,1" uv run --group megatron-bridge coverage run -a --data-file=/opt/DFM/.coverage --source=/opt/DFM/ -m pytest tests/functional_tests/mcore/recipes -m "not pleasefixme" --with_downloads -v
