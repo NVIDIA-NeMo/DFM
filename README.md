@@ -107,6 +107,7 @@ uv run --group automodel torchrun --nproc-per-node=8 \
 
 - **AutoModel Path**
   - 🌐 PyTorch DTensor-native SPMD training
+  - 🚀 Advanced parallelisms (TP, PP, etc.) coming soon!
   - 🔀 FSDP2-based Hybrid Sharding Data Parallelism (HSDP)
   - 📦 Sequence packing for efficient training
   - 🎨 Minimal ceremony with YAML-driven configs
