@@ -31,7 +31,9 @@ class Wan3DRopeEmbeddings(torch.nn.Module):
                 self.rope_params(max_position_len, 2 * (dim_head // 6)),
             ],
             dim=1,
-        ).cuda()
+        )
+        if torch.cuda.is_available():
+            self.freqs = self.freqs.cuda()
 
     def rope_params(self, max_position_len, dim_head, theta=10000):
         assert dim_head % 2 == 0
