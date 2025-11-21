@@ -160,7 +160,7 @@ DFM/
 | **Best For** | Maximum scale (1000+ GPUs) | Flexibility & fast iteration |
 | **Parallelism** | 6D (TP, CP, DP, etc) | FSDP2, TP, SP, CP |
 | **HF Integration** | Via bridge/conversion | PyTorch-native DTensor |
-| **Checkpoint Format** | Megatron + HF export | SafeTensors DCP |
+| **Checkpoint Format** | Megatron + HF export | HF-native (SafeTensors with DCP) |
 | **Learning Curve** | Steeper (more knobs) | Gentler (YAML-driven) |
 | **Performance** | Highest at scale | Excellent, pytorch-native |
 
