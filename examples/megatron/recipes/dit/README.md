@@ -32,7 +32,6 @@ Then you need to run `energon prepare $dataset_path` and choose `CrudeWebdataset
 
 ```bash
 energon prepare ./
-/usr/local/lib/python3.12/dist-packages/torch/cuda/__init__.py:63: FutureWarning: The pynvml package is deprecated. Please install nvidia-ml-py instead. If you did not install pynvml directly, please report this to the maintainers of the package that installed pynvml for you.
   import pynvml  # type: ignore[import]
 Found 8 tar files in total. The first and last ones are:
 - rank0-000000.tar
