@@ -1,3 +1,17 @@
+# Automodel Examples
+
+High-level API examples for training, fine-tuning, and generating with DFM models.
+
+## Directory Structure
+
+| Directory | Description |
+|-----------|-------------|
+| **[finetune](finetune/)** | Scripts and configs for fine-tuning models |
+| **[generate](generate/)** | Inference and validation scripts |
+| **[pretrain](pretrain/)** | Pre-training workflows |
+
+---
+
 # Diffusion Model Fine-tuning with Automodel Backend
 
 Train diffusion models with distributed training support using NeMo Automodel and flow matching.
@@ -219,7 +233,7 @@ fsdp:
 ## Features
 
 - ✅ **Flow Matching**: Pure flow matching training
-- ✅ **Distributed**: FSDP2 + Tensor Parallelism
+- **Distributed**: FSDP2 + Tensor Parallelism
 - ✅ **Mixed Precision**: BF16 by default
 - ✅ **WandB**: Automatic logging
 - ✅ **Checkpointing**: consolidated, and sharded formats
