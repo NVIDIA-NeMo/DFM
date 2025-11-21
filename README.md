@@ -61,11 +61,12 @@ You can find all predefined recipes under [recipes](https://github.com/NVIDIA-Ne
 
 > **Note:** You will have to use [uv](https://docs.astral.sh/uv/) to run the recipes. Please use `--group` as `megatron-bridge`.
 
-
-<!-- @Huy please update the below command after you change defaults-->
-
 ```bash
-uv run --group megatron-bridge python -m torch.distributed.run --nproc_per_node=2 examples/megatron/recipes/wan/pretrain_wan.py model.qkv_format=thd --mock
+uv run --group megatron-bridge python -m torch.distributed.run --nproc-per-node $num_gpus \
+  examples/megatron/recipes/wan/pretrain_wan.py \
+  --config-file examples/megatron/recipes/wan/conf/wan_1_3B.yaml \
+  --training-mode pretrain \
+  --mock
 ```
 
 ### AutoModel Path
@@ -91,7 +92,7 @@ examples/automodel/pretrain/pretrain.py  \
 
 - **Megatron Bridge Path**
   -  State-of-the-art performance optimizations (TFLOPs)
-  - 🎯 Advanced parallelism: Tensor (TP), Context (CP) Data (DP), etc
+  - 🎯 Advanced parallelism: Tensor (TP), Context (CP), Data (DP), etc.
   - 📈 Near-linear scalability to thousands of nodes
   - 🔧 Production-ready recipes with optimized hyperparameters
 
@@ -118,7 +119,7 @@ DFM provides out-of-the-box support for state-of-the-art diffusion architectures
 | Model | Type | Megatron Bridge | AutoModel | Description |
 |-------|------|-----------------|-----------|-------------|
 | **DiT** | Image/Video | [pretrain](https://github.com/NVIDIA-NeMo/DFM/blob/main/examples/megatron/recipes/dit/pretrain_dit_model.py), [inference](https://github.com/NVIDIA-NeMo/DFM/blob/main/examples/megatron/recipes/dit/inference_dit_model.py)  | 🔜 | Diffusion Transformers with scalable architecture |
-| **WAN 2.1** | Video | [inference](https://github.com/NVIDIA-NeMo/DFM/blob/main/examples/megatron/recipes/wan/inference_wan.py), [pretrain, finetune](https://github.com/NVIDIA-NeMo/DFM/blob/main/examples/megatron/recipes/wan/pretrain_wan.py), conversion(@Huy) | [pretrain](https://github.com/NVIDIA-NeMo/DFM/tree/main/examples/automodel/pretrain), [finetune](https://github.com/NVIDIA-NeMo/DFM/tree/main/examples/automodel/finetune),[inference](https://github.com/NVIDIA-NeMo/DFM/blob/main/examples/automodel/generate/wan_validate.py) | World Action Networks for video generation |
+| **WAN 2.1** | Video | [inference](https://github.com/NVIDIA-NeMo/DFM/blob/main/examples/megatron/recipes/wan/inference_wan.py), [pretrain, finetune](https://github.com/NVIDIA-NeMo/DFM/blob/main/examples/megatron/recipes/wan/pretrain_wan.py) | [pretrain](https://github.com/NVIDIA-NeMo/DFM/tree/main/examples/automodel/pretrain), [finetune](https://github.com/NVIDIA-NeMo/DFM/tree/main/examples/automodel/finetune),[inference](https://github.com/NVIDIA-NeMo/DFM/blob/main/examples/automodel/generate/wan_validate.py) | World Action Networks for video generation |
 
 ## Performance Benchmarking
 
@@ -158,7 +159,7 @@ DFM/
 | Feature | Megatron Bridge | AutoModel |
 |---------|-----------------|-----------|
 | **Best For** | Maximum scale (1000+ GPUs) | Flexibility & fast iteration |
-| **Parallelism** | 6D (TP, CP, DP, etc) | FSDP2; (TP, SP, CP available soon) |
+| **Parallelism** | 6D (TP, CP, DP, etc.) | FSDP2; (TP, SP, CP available soon) |
 | **HF Integration** | Via bridge/conversion | HF-native (via DTensor) |
 | **Checkpoint Format** | Megatron + HF export | HF-native (SafeTensors with DCP) |
 | **Learning Curve** | Steeper (more knobs) | Gentler (YAML-driven) |
