@@ -23,12 +23,24 @@ def save_video(
     W: int,
     video_save_quality: int,
     video_save_path: str,
+    caption: str = None,
 ):
+    ffmpeg_params = ["-s", f"{W}x{H}"]
+
+    # Add caption as metadata if provided
+    if caption is not None:
+        ffmpeg_params.extend(
+            [
+                "-metadata",
+                f"description={caption}",
+            ]
+        )
+
     kwargs = {
         "fps": fps,
         "quality": video_save_quality,
         "macro_block_size": 1,
-        "ffmpeg_params": ["-s", f"{W}x{H}"],
+        "ffmpeg_params": ffmpeg_params,
         "output_params": ["-f", "mp4"],
     }
 

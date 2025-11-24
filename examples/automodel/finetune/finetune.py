@@ -19,7 +19,7 @@ from nemo_automodel.components.config._arg_parser import parse_args_and_load_con
 from dfm.src.automodel.recipes.train import TrainWan21DiffusionRecipe
 
 
-def main(default_config_path="/opt/DFM/dfm/examples/Automodel/finetune/wan2_1_t2v_flow.yaml"):
+def main(default_config_path="examples/automodel/finetune/wan2_1_t2v_flow.yaml"):
     cfg = parse_args_and_load_config(default_config_path)
     recipe = TrainWan21DiffusionRecipe(cfg)
     recipe.setup()

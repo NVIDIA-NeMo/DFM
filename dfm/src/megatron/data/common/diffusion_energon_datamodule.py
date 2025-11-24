@@ -37,6 +37,7 @@ class DiffusionDataModuleConfig(DatasetProvider):
     global_batch_size: int
     num_workers: int_repr
     dataloader_type: str = "external"
+    use_train_split_for_val: bool = False
 
     def __post_init__(self):
         self.dataset = DiffusionDataModule(
@@ -49,12 +50,12 @@ class DiffusionDataModuleConfig(DatasetProvider):
             packing_buffer_size=self.packing_buffer_size,
             global_batch_size=self.global_batch_size,
             num_workers=self.num_workers,
+            use_train_split_for_val=self.use_train_split_for_val,
         )
         self.sequence_length = self.dataset.seq_length
 
     def build_datasets(self, context: DatasetBuildContext):
-        # TODO: add validation and test datasets
-        return self.dataset.train_dataloader(), self.dataset.train_dataloader(), self.dataset.train_dataloader()
+        return self.dataset.train_dataloader(), self.dataset.val_dataloader(), self.dataset.test_dataloader()
 
 
 class DiffusionDataModule(EnergonMultiModalDataModule):

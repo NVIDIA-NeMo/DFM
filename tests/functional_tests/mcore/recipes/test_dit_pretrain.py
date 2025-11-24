@@ -55,6 +55,8 @@ class TestMcoreDiTPretrain:
             "model.context_parallel_size=1",
             "model.qkv_format=thd",
             "model.num_attention_heads=16",
+            f"checkpoint.save={checkpoint_dir}",
+            f"checkpoint.load={checkpoint_dir}",
             "dataset.task_encoder_seq_length=4608",
             "dataset.seq_length=4608",
             "train.global_batch_size=2",
@@ -63,8 +65,8 @@ class TestMcoreDiTPretrain:
         ]
 
         # Run the command with a timeout
+        result = None
         try:
-            # Stream output in real-time instead of capturing it
             result = subprocess.run(
                 cmd,
                 capture_output=True,
@@ -73,14 +75,16 @@ class TestMcoreDiTPretrain:
                 check=True,
             )
 
-            # Print output for debugging if needed
-            print("STDOUT:", result.stdout)
-            print("STDERR:", result.stderr)
-
             # Basic verification that the run completed
             assert result.returncode == 0, f"Command failed with return code {result.returncode}"
 
         except subprocess.TimeoutExpired:
             pytest.fail("DiT pretrain mock run exceeded timeout of 1800 seconds (30 minutes)")
         except subprocess.CalledProcessError as e:
+            result = e
             pytest.fail(f"DiT pretrain mock run failed with return code {e.returncode}")
+        finally:
+            # Always print output for debugging
+            if result is not None:
+                print("STDOUT:", result.stdout)
+                print("STDERR:", result.stderr)

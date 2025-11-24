@@ -97,10 +97,7 @@ class DiTTaskEncoder(DiffusionTaskEncoderWithSequencePacking):
         sample["pickle"] = sample["pickle"].cpu().float().numpy()
         if sample["pickle"].shape[0] == 1:
             sample["pickle"] = sample["pickle"][0]
-        if is_image:
-            t5_text_embeddings = torch.from_numpy(sample["pickle"]).to(torch.bfloat16)
-        else:
-            t5_text_embeddings = torch.from_numpy(sample["pickle"][0]).to(torch.bfloat16)
+        t5_text_embeddings = torch.from_numpy(sample["pickle"]).to(torch.bfloat16)
         t5_text_embeddings_seq_length = t5_text_embeddings.shape[0]
 
         if t5_text_embeddings_seq_length > self.text_embedding_padding_size:
@@ -145,6 +142,7 @@ class DiTTaskEncoder(DiffusionTaskEncoderWithSequencePacking):
             seq_len_kv_padded=torch.tensor([seq_len_kv_padded], dtype=torch.int32),
             pos_ids=pos_ids,
             latent_shape=torch.tensor([C, T, H, W], dtype=torch.int32),
+            video_metadata=info,
         )
 
     @stateless
@@ -167,6 +165,7 @@ class DiTTaskEncoder(DiffusionTaskEncoderWithSequencePacking):
             seq_len_kv_padded=sample.seq_len_kv_padded,
             pos_ids=sample.pos_ids.unsqueeze_(0) if sample.pos_ids is not None else None,
             latent_shape=sample.latent_shape,
+            video_metadata=sample.video_metadata,
         )
 
 
@@ -197,35 +196,3 @@ class PosID3D:
 
 
 pos_id_3d = PosID3D()
-
-
-# def cook_raw_iamges(sample: dict) -> dict:
-#     """
-#     Processes a raw sample dictionary from energon dataset and returns a new dictionary with specific keys.
-
-#     Args:
-#         sample (dict): The input dictionary containing the raw sample data.
-
-#     Returns:
-#         dict: A new dictionary containing the processed sample data with the following keys:
-#             - All keys from the result of `basic_sample_keys(sample)`
-#             - 'jpg': original images
-#             - 'png': contains control images
-#             - 'txt': contains raw text
-#     """
-#     return dict(
-#         **basic_sample_keys(sample),
-#         images=sample["jpg"],
-#         hint=sample["png"],
-#         txt=sample["txt"],
-#     )
-
-
-# class RawImageDiffusionTaskEncoder(DefaultTaskEncoder):
-#     """
-#     Dummy task encoder takes raw image input on CrudeDataset.
-#     """
-
-#     cookers = [
-#         Cooker(cook_raw_iamges),
-#     ]
