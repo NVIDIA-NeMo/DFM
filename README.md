@@ -7,11 +7,11 @@
 
 <!-- Not includeing codecov for now since we have not worked on it extensively-->
 
-[![CICD NeMo](https://github.com/NVIDIA-NeMo/Megatron-Bridge/actions/workflows/cicd-main.yml/badge.svg)](https://github.com/NVIDIA-NeMo/Megatron-Bridge/actions/workflows/cicd-main.yml)
+[![CICD NeMo](https://github.com/NVIDIA-NeMo/DFM/actions/workflows/cicd-main.yml/badge.svg)](https://github.com/NVIDIA-NeMo/DFM/actions/workflows/cicd-main.yml)
 [![Python 3.10+](https://img.shields.io/badge/python-3.10+-blue.svg)](https://www.python.org/downloads/release/python-3100/)
 [![GitHub Stars](https://img.shields.io/github/stars/NVIDIA-NeMo/DFM.svg?style=social&label=Star&cacheSeconds=14400)](https://github.com/NVIDIA-NeMo/DFM/stargazers/)
 
-[Documentation](https://github.com/NVIDIA-NeMo/DFM/tree/main/docs) | [Supported Models](#supported-models) | [Examples](https://github.com/NVIDIA-NeMo/DFM/tree/main/examples) | [Contributing](https://github.com/NVIDIA-NeMo/Megatron-Bridge/tree/main/CONTRIBUTING.md)
+[Documentation](https://github.com/NVIDIA-NeMo/DFM/tree/main/docs) | [Supported Models](#supported-models) | [Examples](https://github.com/NVIDIA-NeMo/DFM/tree/main/examples) | [Contributing](https://github.com/NVIDIA-NeMo/DFM/tree/main/CONTRIBUTING.md)
 
 </div>
 
