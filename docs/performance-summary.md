@@ -69,7 +69,7 @@ The following table summarizes the performance leveraging the NeMo Automodel bac
 
 | Model | #-GPUs | GBS | MBS | Sequence Length | FSDP | DP | TP | SP | PP | CP | VP | EP | Model TFLOP / sec / GPU |
 |-------|--------|-----|-----|-----------------|------|----|----|----|----|----|----|----|-------------------------|
-|Wan 2.1 14B|8|8|1|37440|8|1|1|1|1|1|0|0|175.88|
-|Wan 2.1 14B|64|64|1|37440|64|1|1|1|1|1|0|0|228.85|
+|Wan 2.1 14B|8|8|1|37440|1|8|1|1|1|1|1|0|0|175.88|
+|Wan 2.1 14B|64|64|1|37440|1|64|1|1|1|1|1|0|0|228.85|
 
 
