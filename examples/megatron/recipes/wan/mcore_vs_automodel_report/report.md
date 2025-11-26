@@ -50,10 +50,10 @@
 
 ## 4. Results
 #### Stage 1 — Loss vs. Steps
-  ![Stage 1 Training Loss](./medias/training_curves/lm_loss_text2image_3kvids.png)
-#### Stage 2 — Loss vs. Steps
-  ![Stage 2 Training Loss](./medias/training_curves/lm_loss_text2video_3kvids.png)
+<img src="./medias/training_curves/lm_loss_text2image_3kvids.png" width="700">
 
+#### Stage 2 — Loss vs. Steps
+<img src="./medias/training_curves/lm_loss_text2video_3kvids.png" width="700">
 **Note**: Training loss is smoothened with 50 steps averaging.
 
 
