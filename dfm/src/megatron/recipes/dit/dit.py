@@ -168,10 +168,10 @@ def pretrain_config(
             task_encoder_seq_length=8000,
             packing_buffer_size=40,
             num_workers=10,
-            # mock arguments
+            number_packed_samples=1,
             F_latents=1,
-            H_latents=96,
-            W_latents=64,
+            H_latents=256,
+            W_latents=512,
             context_seq_len=512,
             context_embeddings_dim=1024,
         )

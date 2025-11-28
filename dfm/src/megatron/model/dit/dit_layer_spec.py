@@ -20,8 +20,8 @@ from typing import Literal, Optional, Union
 
 import torch
 import torch.nn as nn
+from megatron.core.jit import jit_fuser
 from megatron.core.transformer.attention import (
-    SelfAttention,
     SelfAttentionSubmodules,
 )
 from megatron.core.transformer.custom_layers.transformer_engine import (
@@ -41,7 +41,11 @@ from megatron.core.transformer.transformer_layer import TransformerLayer, Transf
 from megatron.core.utils import make_viewless_tensor
 
 # to be imported from common
-from dfm.src.megatron.model.common.dit_attention import DiTCrossAttention, DiTCrossAttentionSubmodules
+from dfm.src.megatron.model.common.dit_attention import (
+    DiTCrossAttention,
+    DiTCrossAttentionSubmodules,
+    DiTSelfAttention,
+)
 
 
 @dataclass
@@ -91,19 +95,24 @@ class AdaLN(MegatronModule):
 
         setattr(self.adaLN_modulation[-1].weight, "sequence_parallel", config.sequence_parallel)
 
+    @jit_fuser
     def forward(self, timestep_emb):
         return self.adaLN_modulation(timestep_emb).chunk(self.n_adaln_chunks, dim=-1)
 
+    @jit_fuser
     def modulate(self, x, shift, scale):
         return x * (1 + scale) + shift
 
+    @jit_fuser
     def scale_add(self, residual, x, gate):
         return residual + gate * x
 
+    @jit_fuser
     def modulated_layernorm(self, x, shift, scale):
         input_layernorm_output = self.ln(x).type_as(x)
         return self.modulate(input_layernorm_output, shift, scale)
 
+    @jit_fuser
     def scaled_modulated_layernorm(self, residual, x, gate, shift, scale):
         hidden_states = self.scale_add(residual, x, gate)
         shifted_pre_mlp_layernorm_output = self.modulated_layernorm(hidden_states, shift, scale)
@@ -236,7 +245,7 @@ def get_dit_adaln_block_with_transformer_engine_spec() -> ModuleSpec:
         module=DiTLayerWithAdaLN,
         submodules=DiTWithAdaLNSubmodules(
             full_self_attention=ModuleSpec(
-                module=SelfAttention,
+                module=DiTSelfAttention,
                 params=params,
                 submodules=SelfAttentionSubmodules(
                     linear_qkv=TEColumnParallelLinear,
