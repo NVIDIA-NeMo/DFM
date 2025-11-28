@@ -32,7 +32,7 @@ from megatron.core.distributed import DistributedDataParallelConfig
 
 from dfm.src.megatron.data.common.diffusion_energon_datamodule import DiffusionDataModuleConfig
 from dfm.src.megatron.data.dit.dit_mock_datamodule import DiTMockDataModuleConfig
-from dfm.src.megatron.model.dit.dit_model_provider import DiTModelProvider
+from dfm.src.megatron.model.dit.dit_model_provider import DiTModelProvider, DiTXLModelProvider
 
 
 def model_config(
@@ -57,7 +57,7 @@ def model_config(
     Returns:
         DiTModelProvider: Configuration for the DiT-S model.
     """
-    return DiTModelProvider(
+    return DiTXLModelProvider(
         tensor_model_parallel_size=tensor_parallelism,
         pipeline_model_parallel_size=pipeline_parallelism,
         pipeline_dtype=pipeline_parallelism_dtype,

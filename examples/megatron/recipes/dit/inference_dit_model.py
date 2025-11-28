@@ -19,12 +19,12 @@ from pathlib import Path
 
 import numpy as np
 import torch
+import wandb
 from einops import rearrange
 from megatron.core import parallel_state as ps
 from megatron.core.tensor_parallel.random import model_parallel_cuda_manual_seed
 from transformers import T5EncoderModel, T5TokenizerFast
 
-import wandb
 from dfm.src.common.tokenizers.cosmos.cosmos1.causal_video_tokenizer import CausalVideoTokenizer
 from dfm.src.common.utils.save_video import save_video
 from dfm.src.megatron.model.dit.edm.edm_pipeline import EDMPipeline
