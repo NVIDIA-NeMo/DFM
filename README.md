@@ -17,7 +17,7 @@
 
 ## Overview
 
-NeMo DFM (Diffusion Foundation Models) is a comprehensive collection of diffusion models for **Video**, **Image**, and **Text** generation. It unifies cutting-edge diffusion-based architectures and training techniques, prioritizing efficiency and performance from research prototyping to production deployment.
+NeMo DFM (Diffusion Foundation Models) is a library under [NeMo Framework](https://github.com/NVIDIA-NeMo), focusing on diffusion models for **Video**, **Image**, and **Text** generation. It unifies cutting-edge diffusion-based architectures and training techniques, prioritizing efficiency and performance from research prototyping to production deployment.
 
 **Dual-Path Architecture**: DFM provides two complementary training paths to maximize flexibility:
 
