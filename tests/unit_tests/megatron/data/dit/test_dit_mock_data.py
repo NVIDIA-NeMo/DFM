@@ -99,7 +99,7 @@ def test_mock_batch():
         assert torch.all(batch["latent_shape"][i] == expected_latent_shape)
 
     # Check pos_ids shape
-    assert batch["pos_ids"].shape == (total_seq_len_q, 3)  # 3D position encoding
+    assert batch["pos_ids"].shape == (1, total_seq_len_q, 3)  # 3D position encoding
 
     # Check video metadata
     assert len(batch["video_metadata"]) == number_packed_samples

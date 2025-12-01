@@ -153,7 +153,7 @@ class TestEDMPipeline:
 
         # Call compute_loss_with_epsilon_and_sigma
         output_batch, pred_mse, edm_loss = self.pipeline.compute_loss_with_epsilon_and_sigma(
-            data_batch, x0_from_data_batch, self.x0, self.condition, self.epsilon, self.sigma
+            self.x0, self.condition, self.epsilon, self.sigma
         )
 
         # Verify output_batch contains expected keys
@@ -283,16 +283,13 @@ class TestEDMPipeline:
         data_batch = {"video": video_data.clone(), "context_embeddings": context_embeddings.clone()}
 
         # Test Case 1: With default dropout_rate (0.2)
-        raw_state, latent_state, condition = self.pipeline.get_data_and_condition(data_batch.copy(), dropout_rate=0.2)
+        latent_state, condition = self.pipeline.get_data_and_condition(data_batch.copy(), dropout_rate=0.2)
 
         # Verify raw_state is video * sigma_data
         expected_raw_state = video_data * self.sigma_data
-        assert torch.allclose(raw_state, expected_raw_state, rtol=1e-3, atol=1e-5), (
+        assert torch.allclose(latent_state, expected_raw_state, rtol=1e-3, atol=1e-5), (
             "raw_state doesn't match expected value (video * sigma_data)"
         )
-
-        # Verify latent_state equals raw_state
-        assert torch.equal(latent_state, raw_state), "latent_state should equal raw_state"
 
         # Verify condition contains crossattn_emb
         assert "crossattn_emb" in condition, "condition should contain 'crossattn_emb' key"
@@ -306,7 +303,7 @@ class TestEDMPipeline:
 
         # Test Case 2: With dropout_rate=0.0 (no dropout, should keep all values)
         data_batch_no_dropout = {"video": video_data.clone(), "context_embeddings": context_embeddings.clone()}
-        raw_state_no_dropout, latent_state_no_dropout, condition_no_dropout = self.pipeline.get_data_and_condition(
+        latent_state_no_dropout, condition_no_dropout = self.pipeline.get_data_and_condition(
             data_batch_no_dropout, dropout_rate=0.0
         )
 
@@ -317,8 +314,8 @@ class TestEDMPipeline:
 
         # Test Case 3: With dropout_rate=1.0 (complete dropout, should zero out all values)
         data_batch_full_dropout = {"video": video_data.clone(), "context_embeddings": context_embeddings.clone()}
-        raw_state_full_dropout, latent_state_full_dropout, condition_full_dropout = (
-            self.pipeline.get_data_and_condition(data_batch_full_dropout, dropout_rate=1.0)
+        latent_state_full_dropout, condition_full_dropout = self.pipeline.get_data_and_condition(
+            data_batch_full_dropout, dropout_rate=1.0
         )
 
         # With dropout_rate=1.0, crossattn_emb should be all zeros
@@ -327,9 +324,13 @@ class TestEDMPipeline:
             "With dropout_rate=1.0, crossattn_emb should be all zeros"
         )
 
-        # Verify raw_state is consistent across all dropout rates
-        assert torch.equal(raw_state, raw_state_no_dropout), "raw_state should be consistent regardless of dropout"
-        assert torch.equal(raw_state, raw_state_full_dropout), "raw_state should be consistent regardless of dropout"
+        # test latent_state_full_dropout and latent_state_no_dropout are equal to each other
+        assert torch.allclose(latent_state_full_dropout, latent_state_no_dropout, rtol=1e-3, atol=1e-5), (
+            "latent_state_full_dropout and latent_state_no_dropout should be equal to each other"
+        )
+        assert torch.allclose(latent_state_no_dropout, video_data * self.sigma_data, rtol=1e-3, atol=1e-5), (
+            "latent_state with dropout=0 should equal video data * sigma_data"
+        )
 
     def test_get_x0_fn_from_batch(self, monkeypatch):
         """Test the get_x0_fn_from_batch method returns a callable with correct guidance behavior."""
