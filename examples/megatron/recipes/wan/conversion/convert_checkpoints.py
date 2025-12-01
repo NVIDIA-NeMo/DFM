@@ -28,7 +28,7 @@ Usage examples:
   # Import a HuggingFace model to Megatron format
   python examples/megatron/recipes/wan/conversion/convert_checkpoints.py import \
   --hf-model /root/.cache/huggingface/wan2.1 \
-  --megatron-path /workspace/checkpoints/megatron_checkpoints/wan_1_3b  
+  --megatron-path /workspace/checkpoints/megatron_checkpoints/wan_1_3b
 
   # Export a Megatron checkpoint to HuggingFace format
   python examples/megatron/recipes/wan/conversion/convert_checkpoints.py export \
@@ -36,10 +36,10 @@ Usage examples:
   --megatron-path /workspace/checkpoints/megatron_checkpoints/wan_1_3b/iter_0000000 \
   --hf-path /workspace/checkpoints/hf_checkpoints/wan_1_3b_hf
 
-  NOTE: The converted checkpoint /workspace/checkpoints/hf_checkpoints/wan_1_3b_hf 
+  NOTE: The converted checkpoint /workspace/checkpoints/hf_checkpoints/wan_1_3b_hf
   only contains the DiT model transformer weights. You still need other components in
   the diffusion pipeline (VAE, text encoders, etc.) to run inference. To do so, you can
-  duplicate the original HF checkpoint directory /root/.cache/huggingface/wan2.1 (which 
+  duplicate the original HF checkpoint directory /root/.cache/huggingface/wan2.1 (which
   contains VAE, text encoders, etc.), and replace ./transformer with 
   /workspace/checkpoints/hf_checkpoints/wan_1_3b_hf/transformer.
 
@@ -142,9 +142,7 @@ def import_hf_to_megatron(
             bridge = WanBridge()
             provider = bridge.provider_bridge(hf)
             provider.perform_initialization = False
-            megatron_models = provider.provide_distributed_model(
-                wrap_with_ddp=False, use_cpu_initialization=True
-            )
+            megatron_models = provider.provide_distributed_model(wrap_with_ddp=False, use_cpu_initialization=True)
             bridge.load_weights_hf_to_megatron(hf, megatron_models)
             save_megatron_model(megatron_models, megatron_path, hf_tokenizer_path=None)
         else:
