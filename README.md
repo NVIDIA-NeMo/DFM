@@ -22,7 +22,7 @@ NeMo DFM (Diffusion Foundation Models) is a library under [NeMo Framework](https
 **Dual-Path Architecture**: DFM provides two complementary training paths to maximize flexibility:
 
 - **🌉 Megatron Bridge Path**: Built on [NeMo Megatron Bridge](https://github.com/NVIDIA-NeMo/Megatron-Bridge) which leverages [Megatron Core](https://github.com/NVIDIA/Megatron-LM/tree/main/megatron/core) for maximum scalability with n-D parallelism (TP, PP, CP, EP, VPP, DP)
-- **🚀 AutoModel Path**: Built on [NeMo AutoModel](https://github.com/NVIDIA-NeMo/Automodel) for PyTorch DTensor-native SPMD training with seamless 🤗 Hugging Face integration
+- **🚀 AutoModel Path**: Built on [NeMo AutoModel](https://github.com/NVIDIA-NeMo/Automodel) for PyTorch DTensor-native SPMD training, for easy experimentation and also Day-0 support on 🤗 Hugging Face models.
 
 Choose the path that best fits your workflow—or use both for different stages of development!
 
