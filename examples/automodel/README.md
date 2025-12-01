@@ -233,7 +233,7 @@ fsdp:
 ## Features
 
 - ✅ **Flow Matching**: Pure flow matching training
-- **Distributed**: FSDP2 + Tensor Parallelism
+- ✅ **Distributed**: FSDP2 + Tensor Parallelism
 - ✅ **Mixed Precision**: BF16 by default
 - ✅ **WandB**: Automatic logging
 - ✅ **Checkpointing**: consolidated, and sharded formats
