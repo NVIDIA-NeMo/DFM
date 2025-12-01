@@ -29,7 +29,7 @@ Choose the path that best fits your workflow—or use both for different stages 
 <!-- Once we have updated images of how DFM fits into NeMo journey. Put them here. @Eliiot can help.-->
 ## 🔧 Installation
 
-### 🐳 Built your own Container
+### 🐳 Build your own Container
 
 #### 1. Build the container
 ```bash
