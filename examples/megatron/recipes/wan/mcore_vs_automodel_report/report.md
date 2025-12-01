@@ -1,10 +1,10 @@
-# Wan 2.1 – Partial Convergence Comparison  
-### Diffusers (Automodel path) vs. Megatron-Core (Megatron-Bridge path)  
+# Wan 2.1 – Partial Convergence Comparison
+### Diffusers (Automodel path) vs. Megatron-Core (Megatron-Bridge path)
 
 ---
 
 ## 1. Experiment Overview
-- Goal: Compare two training paths for Wan 2.1:  
+- Goal: Compare two training paths for Wan 2.1:
   **(1) [Diffusers](https://huggingface.co/docs/diffusers/en/index) implementaion + [Automodel](https://github.com/NVIDIA-NeMo/Automodel/tree/diffusion) training path** vs. **(2) [Megatron-Core](https://github.com/NVIDIA/Megatron-LM) implementaion + [Megatron-Bridge](https://github.com/NVIDIA-NeMo/Megatron-Bridge) training path**
 - Two-stage training:
   - **Stage 1:** Text → Image - Learn to connect textual embeddings with visual concepts.
