@@ -196,7 +196,7 @@ For questions or discussions, please open an issue on GitHub.
 
 NeMo DFM builds upon the excellent work of:
 
-- [Megatron-LM](https://github.com/NVIDIA/Megatron-LM) - Advanced model parallelism
+- [Megatron-core](https://github.com/NVIDIA/Megatron-LM/tree/main/megatron/core) - Advanced model parallelism
 - [Megatron Bridge](https://github.com/NVIDIA-NeMo/Megatron-Bridge) - HuggingFace ↔ Megatron bridge
 - [NeMo AutoModel](https://github.com/NVIDIA-NeMo/Automodel) - PyTorch-native SPMD training
 - [PyTorch Distributed](https://pytorch.org/docs/stable/distributed.html) - Foundation for distributed training
