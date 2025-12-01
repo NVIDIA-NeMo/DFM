@@ -19,53 +19,48 @@ Megatron-HuggingFace Checkpoint Conversion Example
 This script demonstrates how to convert models between HuggingFace and Megatron formats
 using the AutoBridge import_ckpt and export_ckpt methods.
 
-Features:
-- Import HuggingFace models to Megatron checkpoint format
-- Export Megatron checkpoints to HuggingFace format
-- Support for various model architectures (GPT, Llama, etc.)
-- Configurable model and conversion settings
-
 Usage examples:
+  # Download the HF checkpoint locally
+  huggingface-cli download Wan-AI/Wan2.1-T2V-1.3B-Diffusers \
+  --local-dir /root/.cache/huggingface/wan2.1 \
+  --local-dir-use-symlinks False
+
   # Import a HuggingFace model to Megatron format
-  python examples/conversion/convert_checkpoints.py import \
-    --hf-model meta-llama/Llama-3.2-1B \
-    --megatron-path ./checkpoints/llama3_2_1b
+  python examples/megatron/recipes/wan/conversion/convert_checkpoints.py import \
+  --hf-model /root/.cache/huggingface/wan2.1 \
+  --megatron-path /workspace/checkpoints/megatron_checkpoints/wan_1_3b  
 
   # Export a Megatron checkpoint to HuggingFace format
-  python examples/conversion/convert_checkpoints.py export \
-    --hf-model meta-llama/Llama-3.2-1B \
-    --megatron-path ./checkpoints/llama3_2_1b \
-    --hf-path ./exports/llama3_2_1b_hf
+  python examples/megatron/recipes/wan/conversion/convert_checkpoints.py export \
+  --hf-model /root/.cache/huggingface/wan2.1 \
+  --megatron-path /workspace/checkpoints/megatron_checkpoints/wan_1_3b/iter_0000000 \
+  --hf-path /workspace/checkpoints/hf_checkpoints/wan_1_3b_hf
 
-  # Import with custom settings
-  python examples/conversion/convert_checkpoints.py import \
-    --hf-model ./local_model \
-    --megatron-path ./checkpoints/custom_model \
-    --torch-dtype bfloat16 \
-    --device-map auto
+  NOTE: The converted checkpoint /workspace/checkpoints/hf_checkpoints/wan_1_3b_hf 
+  only contains the DiT model transformer weights. You still need other components in
+  the diffusion pipeline (VAE, text encoders, etc.) to run inference. To do so, you can
+  duplicate the original HF checkpoint directory /root/.cache/huggingface/wan2.1 (which 
+  contains VAE, text encoders, etc.), and replace ./transformer with 
+  /workspace/checkpoints/hf_checkpoints/wan_1_3b_hf/transformer.
 
-  # Export without progress bar (useful for scripting)
-  python examples/conversion/convert_checkpoints.py export \
-    --hf-model ./local_model \
-    --megatron-path ./checkpoints/custom_model \
-    --hf-path ./exports/custom_model_hf \
-    --no-progress
 """
 
 import argparse
+import os
+import random
 import sys
 from pathlib import Path
 from typing import Optional
 
 import torch
-
 from megatron.bridge import AutoBridge
 from megatron.bridge.models.hf_pretrained.wan import PreTrainedWAN
 from megatron.bridge.models.wan.wan_bridge import WanBridge
-from megatron.bridge.training.model_load_save import save_megatron_model
-from megatron.bridge.training.model_load_save import load_megatron_model, temporary_distributed_context
-import os
-import random
+from megatron.bridge.training.model_load_save import (
+    load_megatron_model,
+    save_megatron_model,
+    temporary_distributed_context,
+)
 
 
 def validate_path(path: str, must_exist: bool = False) -> Path:
