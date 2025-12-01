@@ -99,18 +99,7 @@ uv run --group automodel torchrun --nproc-per-node=8 \
 
 ### Dual Training Paths
 
-- **Megatron Bridge Path**
-  -  State-of-the-art performance optimizations (TFLOPs)
-  - 🎯 Advanced parallelism: Tensor (TP), Context (CP), Data (DP), etc.
-  - 📈 Near-linear scalability to thousands of nodes
-  - 🔧 Production-ready recipes with optimized hyperparameters
-
-- **AutoModel Path**
-  - 🌐 PyTorch DTensor-native SPMD training
-  - 🚀 Advanced parallelisms (TP, PP, etc.) coming soon!
-  - 🔀 FSDP2-based Hybrid Sharding Data Parallelism (HSDP)
-  - 📦 Sequence packing for efficient training
-  - 🎨 Minimal ceremony with YAML-driven configs
+**Megatron Bridge** delivers maximum throughput and scalability with near-linear performance to thousands of nodes. **AutoModel** provides an easy on-ramp for experimentation and research with PyTorch-native SPMD training.
 
 ### Shared Capabilities
 
@@ -163,23 +152,6 @@ DFM/
 │           └── utils/             # Batch ops, video utils, etc.
 ├── examples/                      # Example scripts and configs
 ```
-
-## 🎯 Choosing Your Path
-
-| Feature | Megatron Bridge | AutoModel |
-|---------|-----------------|-----------|
-| **Best For** | Maximum scale (1000+ GPUs) | Flexibility & fast iteration |
-| **Parallelism** | 6D (TP, CP, DP, etc.) | FSDP2; (TP, SP, CP available soon) |
-| **HF Integration** | Via bridge/conversion | HF-native (via DTensor) |
-| **Checkpoint Format** | Megatron + HF export | HF-native (SafeTensors with DCP) |
-| **Learning Curve** | Steeper (more knobs) | Gentler (YAML-driven) |
-| **Performance** | Highest at scale | Excellent, pytorch-native |
-
-**Recommendation**:
-- Start with **AutoModel** for quick prototyping and HF model compatibility
-- Move to **Megatron Bridge** when scaling to 100+ GPUs or need advanced parallelism
-- Use **both**: prototype with AutoModel, scale with Megatron Bridge!
-
 
 ## 🤝 Contributing
 
