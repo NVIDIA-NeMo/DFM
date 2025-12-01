@@ -40,7 +40,7 @@ Usage examples:
   only contains the DiT model transformer weights. You still need other components in
   the diffusion pipeline (VAE, text encoders, etc.) to run inference. To do so, you can
   duplicate the original HF checkpoint directory /root/.cache/huggingface/wan2.1 (which
-  contains VAE, text encoders, etc.), and replace ./transformer with 
+  contains VAE, text encoders, etc.), and replace ./transformer with
   /workspace/checkpoints/hf_checkpoints/wan_1_3b_hf/transformer.
 
 """
