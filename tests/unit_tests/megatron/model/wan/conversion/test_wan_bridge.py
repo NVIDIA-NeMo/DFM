@@ -93,9 +93,7 @@ def test_mapping_registry_registers_module_types_and_builds_mappings(monkeypatch
         def __init__(self, *mappings):
             constructed_registry_args["mappings"] = mappings
 
-    monkeypatch.setattr(
-        wan_bridge_module.AutoMapping, "register_module_type", staticmethod(fake_register_module_type)
-    )
+    monkeypatch.setattr(wan_bridge_module.AutoMapping, "register_module_type", staticmethod(fake_register_module_type))
     monkeypatch.setattr(wan_bridge_module, "MegatronMappingRegistry", FakeRegistry)
 
     registry = wan_bridge_module.WanBridge().mapping_registry()
