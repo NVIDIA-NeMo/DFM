@@ -54,13 +54,14 @@ from typing import Optional
 
 import torch
 from megatron.bridge import AutoBridge
-from megatron.bridge.models.hf_pretrained.wan import PreTrainedWAN
-from megatron.bridge.models.wan.wan_bridge import WanBridge
 from megatron.bridge.training.model_load_save import (
     load_megatron_model,
     save_megatron_model,
     temporary_distributed_context,
 )
+
+from dfm.src.megatron.model.wan.conversion.wan_bridge import WanBridge
+from dfm.src.megatron.model.wan.conversion.wan_hf_pretrained import PreTrainedWAN
 
 
 def validate_path(path: str, must_exist: bool = False) -> Path:
