@@ -41,12 +41,12 @@ class PreTrainedWAN(PreTrainedBase):
     Provides access to WAN config and state through the common PreTrainedBase API
     so bridges can consume `.config` and `.state` uniformly.
 
-    NOTE: Due to Wan uses HF's Diffusers library, which has different checkpoint directory structure,
-          we need a wrapper to load the model and config from the correct directory (e.g., ./transformer).
-          This structure includes all components in the diffusion pipeline (VAE, text encoders, etc.).
-          The actual transformer weights are stored in the ./transformer directory. Hence, we adjust the
-          input and output path directory to accordingly.
-          We also need to override the save_artifacts method to save relevant correct configs files to the corresponding directory.
+    NOTE: Due to Wan uses HF's Diffusers library, which has different checkpoint directory structure to HF's Transformer library,
+          we need a wrapper to load the model weights and config from the correct directory (e.g., ./transformer).
+          The diffusers's structure includes all components in the diffusion pipeline (VAE, text encoders, etc.).
+          The actual transformer weights are stored in the ./transformer directory. Hence, we adjust the input and output
+          path directory accordingly. We also need to override the save_artifacts method to save relevant correct configs
+          files to the corresponding directory.
     """
 
     def __init__(self, model_name_or_path: Union[str, Path], **kwargs):
