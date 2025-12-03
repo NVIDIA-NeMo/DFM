@@ -15,8 +15,10 @@
 
 import logging
 from dataclasses import dataclass
+from typing import Callable
 
 import torch
+import torch.nn.functional as F
 from megatron.bridge.models.model_provider import ModelProviderMixin
 from megatron.bridge.models.transformer_config import TransformerConfig
 from megatron.core import parallel_state
@@ -44,6 +46,7 @@ class WanModelProvider(TransformerConfig, ModelProviderMixin[VisionModule]):
     layernorm_across_heads: bool = True
     add_qkv_bias: bool = True
     rotary_interleaved: bool = True
+    activation_func: Callable = F.gelu
     hidden_dropout: float = 0
     attention_dropout: float = 0
     fp16_lm_cross_entropy: bool = False
