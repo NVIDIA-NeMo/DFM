@@ -50,7 +50,7 @@ class DITForwardStep:
             num_steps=model.config.val_generation_num_steps,
             is_negative_prompt=True if "neg_context_embeddings" in batch else False,
         )
-        caption = batch["video_metadata"][0]["caption"]
+        caption = batch["video_metadata"][0]["caption"] if "caption" in batch["video_metadata"][0] else "no caption"
         latent = latent[0, None, : batch["seq_len_q"][0]]
         latent = rearrange(
             latent,
@@ -157,7 +157,6 @@ class DITForwardStep:
 
         check_for_nan_in_loss = state.cfg.rerun_state_machine.check_for_nan_in_loss
         check_for_spiky_loss = state.cfg.rerun_state_machine.check_for_spiky_loss
-        # import pdb;pdb.set_trace()
         straggler_timer = state.straggler_timer
         with straggler_timer:
             if parallel_state.is_pipeline_last_stage():

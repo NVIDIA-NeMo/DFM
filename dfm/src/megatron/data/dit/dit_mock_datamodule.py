@@ -113,7 +113,7 @@ def mock_batch(
         seq_len_kv=seq_len_kv_packed,
         seq_len_kv_padded=seq_len_kv_padded_packed,
         latent_shape=torch.tensor([[C, T, H, W] for _ in range(number_packed_samples)], dtype=torch.int32),
-        pos_ids=pos_ids_packed,
+        pos_ids=pos_ids_packed.unsqueeze(0),
         video_metadata=[{"caption": f"Mock video sample {i}"} for i in range(number_packed_samples)],
     )
 
@@ -131,16 +131,19 @@ class DiTMockDataModuleConfig(DatasetProvider):
     dataloader_type: str = "external"
     task_encoder_seq_length: int = None
     F_latents: int = 1
-    H_latents: int = 64
-    W_latents: int = 96
+    H_latents: int = 256
+    W_latents: int = 512
     patch_spatial: int = 2
     patch_temporal: int = 1
-    number_packed_samples: int = 3
+    number_packed_samples: int = 1
     context_seq_len: int = 512
     context_embeddings_dim: int = 1024
 
     def __post_init__(self):
         mock_ds = _MockDataset(length=1024)
+        kwargs = {}
+        if self.num_workers > 0:
+            kwargs["prefetch_factor"] = 8
         self._train_dl = DataLoader(
             mock_ds,
             batch_size=self.micro_batch_size,
@@ -157,6 +160,8 @@ class DiTMockDataModuleConfig(DatasetProvider):
             ),
             shuffle=False,
             drop_last=False,
+            pin_memory=True,
+            **kwargs,
         )
         self._train_dl = iter(self._train_dl)
         self.sequence_length = self.seq_length

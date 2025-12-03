@@ -179,21 +179,17 @@ class EDMPipeline:
         # import pdb; pdb.set_trace()
         # Get the input data to noise and denoise~(image, video) and the corresponding conditioner.
         self.net = model
-        x0_from_data_batch, x0, condition = self.get_data_and_condition(data_batch)
+        x0, condition = self.get_data_and_condition(data_batch)
 
         # Sample pertubation noise levels and N(0, 1) noises
         sigma, epsilon = self.draw_training_sigma_and_epsilon(x0.size(), condition)
 
         if parallel_state.is_pipeline_last_stage():
-            output_batch, pred_mse, edm_loss = self.compute_loss_with_epsilon_and_sigma(
-                data_batch, x0_from_data_batch, x0, condition, epsilon, sigma
-            )
+            output_batch, pred_mse, edm_loss = self.compute_loss_with_epsilon_and_sigma(x0, condition, epsilon, sigma)
 
             return output_batch, edm_loss
         else:
-            net_output = self.compute_loss_with_epsilon_and_sigma(
-                data_batch, x0_from_data_batch, x0, condition, epsilon, sigma
-            )
+            net_output = self.compute_loss_with_epsilon_and_sigma(x0, condition, epsilon, sigma)
             return net_output
 
     def denoise(self, xt: torch.Tensor, sigma: torch.Tensor, condition: dict[str, torch.Tensor]):
@@ -232,8 +228,6 @@ class EDMPipeline:
 
     def compute_loss_with_epsilon_and_sigma(
         self,
-        data_batch: dict[str, torch.Tensor],
-        x0_from_data_batch: torch.Tensor,
         x0: torch.Tensor,
         condition: dict[str, torch.Tensor],
         epsilon: torch.Tensor,
@@ -294,14 +288,14 @@ class EDMPipeline:
 
     def get_condition_uncondition(self, data_batch: Dict):
         """Returns conditioning and unconditioning for classifier-free guidance."""
-        _, _, condition = self.get_data_and_condition(data_batch, dropout_rate=0.0)
+        _, condition = self.get_data_and_condition(data_batch, dropout_rate=0.0)
 
         if "neg_context_embeddings" in data_batch:
             data_batch["context_embeddings"] = data_batch["neg_context_embeddings"]
             data_batch["context_mask"] = data_batch["context_mask"]
-            _, _, uncondition = self.get_data_and_condition(data_batch, dropout_rate=1.0)
+            _, uncondition = self.get_data_and_condition(data_batch, dropout_rate=1.0)
         else:
-            _, _, uncondition = self.get_data_and_condition(data_batch, dropout_rate=1.0)
+            _, uncondition = self.get_data_and_condition(data_batch, dropout_rate=1.0)
 
         return condition, uncondition
 
@@ -419,13 +413,14 @@ class EDMPipeline:
             Raw data, latent data, and conditioning information.
         """
         # Latent state
-        raw_state = data_batch["video"] * self.sigma_data
-        # assume data is already encoded
-        latent_state = raw_state
+        latent_state = data_batch["video"] * self.sigma_data
+        condition = {}  # Create a new dictionary for condition
+        # Copy all keys from data_batch except 'video'
+        for key, value in data_batch.items():
+            if key not in ["video", "context_embeddings"]:
+                condition[key] = value
 
-        # Condition
-        data_batch["crossattn_emb"] = self.random_dropout_input(
+        condition["crossattn_emb"] = self.random_dropout_input(
             data_batch["context_embeddings"], dropout_rate=dropout_rate
         )
-
-        return raw_state, latent_state, data_batch
+        return latent_state, condition
