@@ -44,7 +44,7 @@ Get NeMo DFM installed and verify your setup with a quick test.
 :margin: 0
 :padding: 0
 
-::::{grid} 1 2 2 2
+::::{grid} 1 3 3 3
 :margin: 3 1 0 0
 :gutter: 3
 :padding: 3
@@ -58,13 +58,22 @@ Fine-tune pretrained models with automatic parallelism. Best for quick prototypi
 {bdg-secondary}`automodel` {bdg-success}`Fast start` {bdg-primary}`Data scientists`
 :::
 
-:::{grid-item-card} {octicon}`server;1.5em;sd-mr-1` 2b. Megatron Tutorial
+:::{grid-item-card} {octicon}`server;1.5em;sd-mr-1` 2b. Megatron DiT Tutorial
 :link: megatron
 :link-type: doc
 
-Train from scratch with full distributed control. Best for large-scale training.
+Train DiT models from scratch with full distributed control. Best for large-scale training.
 +++
-{bdg-secondary}`megatron` {bdg-info}`Full control` {bdg-primary}`MLEs`
+{bdg-secondary}`megatron` {bdg-secondary}`dit` {bdg-info}`Full control` {bdg-primary}`MLEs`
+:::
+
+:::{grid-item-card} {octicon}`video;1.5em;sd-mr-1` 2c. Megatron WAN Tutorial
+:link: megatron-wan
+:link-type: doc
+
+Train WAN models for video generation with Megatron. Best for video-specific workflows.
++++
+{bdg-secondary}`megatron` {bdg-secondary}`wan` {bdg-info}`Video models` {bdg-primary}`MLEs`
 :::
 
 ::::
@@ -76,15 +85,15 @@ Train from scratch with full distributed control. Best for large-scale training.
 
 Not sure which path to choose? Compare the approaches:
 
-| Feature | Automodel | Megatron |
-|---------|-----------|----------|
-| **Best for** | Fine-tuning pretrained models | Pretraining from scratch |
-| **Configuration** | Single YAML file | Recipe + YAML + CLI overrides |
-| **Parallelism** | Automatic (FSDP2) | Manual (TP+CP+PP+DP) |
-| **Model source** | Hugging Face models | Custom checkpoints |
-| **Data format** | Energon or custom dataloader | Webdataset |
-| **Setup time** | Fast (~10 mins) | Moderate (~30 mins) |
-| **Complexity** | ⭐⭐☆☆☆ | ⭐⭐⭐☆☆ |
-| **Control** | Less (automatic) | More (manual) |
+| Feature | Automodel | Megatron DiT | Megatron WAN |
+|---------|-----------|--------------|--------------|
+| **Best for** | Fine-tuning pretrained models | Pretraining DiT from scratch | Pretraining WAN from scratch |
+| **Configuration** | Single YAML file | Recipe + YAML + CLI overrides | Recipe + YAML + CLI overrides |
+| **Parallelism** | Automatic (FSDP2) | Manual (TP+CP+PP+DP) | Manual (TP+CP+PP+DP) |
+| **Model source** | Hugging Face models | Custom checkpoints | Custom checkpoints |
+| **Data format** | Energon or custom dataloader | Webdataset | Webdataset |
+| **Setup time** | Fast (~10 mins) | Moderate (~30 mins) | Moderate (~30 mins) |
+| **Complexity** | ⭐⭐☆☆☆ | ⭐⭐⭐☆☆ | ⭐⭐⭐☆☆ |
+| **Control** | Less (automatic) | More (manual) | More (manual) |
 
 **Still unsure?** Start with [Automodel](automodel.md)—it's faster to learn and you can always switch to Megatron later.

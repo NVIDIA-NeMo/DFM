@@ -51,5 +51,15 @@ Common utilities and shared components.
 {bdg-secondary}`preprocessing`
 :::
 
+:::{grid-item-card} {octicon}`graph;1.5em;sd-mr-1` Performance Benchmarks
+:link: performance
+:link-type: doc
+Training throughput and performance metrics across GPU systems.
++++
+{bdg-secondary}`benchmarks`
+{bdg-secondary}`performance`
+{bdg-secondary}`throughput`
+:::
+
 ::::
 

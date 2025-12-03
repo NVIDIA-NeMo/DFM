@@ -68,7 +68,7 @@ Get NeMo DFM installed and verify your setup with a quick test.
 :margin: 0
 :padding: 0
 
-::::{grid} 1 2 2 2
+::::{grid} 1 3 3 3
 :margin: 3 1 0 0
 :gutter: 3
 :padding: 3
@@ -82,13 +82,22 @@ Fine-tune pretrained models with automatic parallelism. Best for quick prototypi
 {bdg-secondary}`automodel` {bdg-success}`Fast start` {bdg-primary}`Data scientists`
 :::
 
-:::{grid-item-card} {octicon}`server;1.5em;sd-mr-1` 2b. Megatron Tutorial
+:::{grid-item-card} {octicon}`server;1.5em;sd-mr-1` 2b. Megatron DiT Tutorial
 :link: gs-megatron
 :link-type: ref
 
-Train from scratch with full distributed control. Best for large-scale training.
+Train DiT models from scratch with full distributed control. Best for large-scale training.
 +++
-{bdg-secondary}`megatron` {bdg-info}`Full control` {bdg-primary}`MLEs`
+{bdg-secondary}`megatron` {bdg-secondary}`dit` {bdg-info}`Full control` {bdg-primary}`MLEs`
+:::
+
+:::{grid-item-card} {octicon}`video;1.5em;sd-mr-1` 2c. Megatron WAN Tutorial
+:link: gs-megatron-wan
+:link-type: ref
+
+Train WAN models for video generation with Megatron. Best for video-specific workflows.
++++
+{bdg-secondary}`megatron` {bdg-secondary}`wan` {bdg-info}`Video models` {bdg-primary}`MLEs`
 :::
 
 ::::
@@ -109,6 +118,7 @@ Home <self>
 :maxdepth: 1
 about/index.md
 about/concepts/index.md
+Paradigm Comparison <about/comparison>
 ::::
 
 ::::{toctree}
@@ -119,7 +129,8 @@ about/concepts/index.md
 get-started/index.md
 Installation <get-started/installation>
 Automodel <get-started/automodel>
-Megatron <get-started/megatron>
+Megatron DiT <get-started/megatron>
+Megatron WAN <get-started/megatron-wan>
 ::::
 
 ::::{toctree}
@@ -128,5 +139,6 @@ Megatron <get-started/megatron>
 :maxdepth: 2
 
 About References <reference/index.md>
+Performance Benchmarks <reference/performance>
 apidocs/index.rst
 ::::

@@ -67,51 +67,128 @@ Fine-tune the WAN2.1 text-to-video model using Automodel's recipe-based training
 
 (gs-automodel-data-requirements)=
 
-:::: {tab-set}
+You can prepare your dataset in two ways:
 
-::: {tab-item} Dataset Format
+- **Start with raw videos**: Place your `.mp4` files in a folder and use data-preparation scripts to scan videos and generate a `meta.json` entry for each sample
+- **Bring your own `meta.json`**: If you already have annotations, create `meta.json` yourself following the schema below
 
-Create a custom dataloader or use the WAN2.1 format. Example structure:
+#### Dataset Structure
 
 ```text
-/path/to/dataset/
-  meta/
-    ├── 00000.json    # {"caption": "...", "video_path": "..."}
-    ├── 00001.json
-    └── ...
-  videos/
-    ├── 00000.mp4
-    ├── 00001.mp4
-    └── ...
+<your_video_folder>/
+├── video1.mp4
+├── video2.mp4
+└── meta.json
 ```
+
+:::{note}
+If you have captions, you can also include per-video named `<video>.jsonl` files; the scripts will pick up the text automatically.
+:::
+
+#### meta.json Format
+
+:::{dropdown} Complete meta.json Schema
+:icon: info
+
+Each entry in `meta.json` should include:
+
+```json
+[
+  {
+    "file_name": "video1.mp4",
+    "width": 1280,
+    "height": 720,
+    "start_frame": 0,
+    "end_frame": 121,
+    "vila_caption": "A detailed description of the video1.mp4 contents..."
+  },
+  {
+    "file_name": "video2.mp4",
+    "width": 1280,
+    "height": 720,
+    "start_frame": 0,
+    "end_frame": 12,
+    "vila_caption": "A detailed description of the video2.mp4 contents..."
+  }
+]
+```
+
+**Fields**:
+- `file_name`: Name of the video file
+- `width`: Video width in pixels
+- `height`: Video height in pixels
+- `start_frame`: Starting frame index (usually 0)
+- `end_frame`: Ending frame index
+- `vila_caption`: Text description/caption for the video
+:::
+
+#### Preprocess Videos to .meta Files
+
+There are two preprocessing modes. Choose the right mode for your use case:
+
+:::: {tab-set}
+
+::: {tab-item} Full Video Mode (Recommended)
+
+**What it is**: Converts each source video into a single `.meta` file that preserves the full temporal sequence as latents. Training can sample temporal windows/clips from the sequence on the fly.
+
+**When to use**: Fine-tuning text-to-video models where motion and temporal consistency matter. This is the recommended default for most training runs.
+
+**Output**: Creates one `.meta` file per video
+
+```bash
+python dfm/src/automodel/utils/data/preprocess_resize.py \
+  --mode video \
+  --video_folder <your_video_folder> \
+  --output_folder ./processed_meta \
+  --model Wan-AI/Wan2.1-T2V-1.3B-Diffusers \
+  --height 480 \
+  --width 720 \
+  --center-crop
+```
+
+**Key arguments**:
+- `--mode video`: Process full videos
+- `--height/--width`: Target resolution
+- `--center-crop`: Crop to exact size after aspect-preserving resize
 
 :::
 
-::: {tab-item} Data Requirements
+::: {tab-item} Extract Frames Mode
 
-Automodel expects a dataset with:
-- **Video files**: MP4, WebM, or similar
-- **Text captions**: Descriptions for each video
-- **Metadata**: Frame count, resolution, FPS
+**What it is**: Uniformly samples `N` frames per video and writes each as its own one-frame `.meta` sample (no temporal continuity).
 
-:::
+**When to use**: Image/frame-level training objectives, quick smoke tests, or ablations where learning motion is not required.
 
-::: {tab-item} Dataloader Config
+**Output**: Creates one `.meta` file per frame (treated as 1-frame videos)
 
-The training script uses a custom dataloader specified in the config:
-
-```yaml
-data:
-  dataloader:
-    _target_: Automodel.datasets.build_wan21_dataloader
-    meta_folder: /path/to/your/dataset/meta/
-    batch_size: 1
-    num_workers: 2
+```bash
+python dfm/src/automodel/utils/data/preprocess_resize.py \
+  --mode frames \
+  --num-frames 40 \
+  --video_folder <your_video_folder> \
+  --output_folder ./processed_frames \
+  --model Wan-AI/Wan2.1-T2V-1.3B-Diffusers \
+  --height 240 \
+  --width 416 \
+  --center-crop
 ```
+
+**Key arguments**:
+- `--mode frames`: Extract evenly-spaced frames
+- `--num-frames`: Number of frames to extract
+- `--height/--width`: Target resolution
+- `--center-crop`: Crop to exact size after aspect-preserving resize
 
 :::
 
 ::::
+
+**Output**: Both modes create `.meta` files containing:
+- Encoded video latents (normalized)
+- Text embeddings (from UMT5)
+- First frame as JPEG (video mode only)
+- Metadata
 
 ### 2. Create Training Configuration
 
@@ -238,17 +315,55 @@ checkpoint:
 
 Execute the training script:
 
-:::: {tab-set}
+::::: {tab-set}
 
-::: {tab-item} Custom Configuration
+:::: {tab-item} Custom Configuration
 
 ```bash
 python dfm/examples/automodel/finetune/finetune.py /path/to/wan2_1_finetune.yaml
 ```
 
+:::{dropdown} Multi-Node with SLURM
+:icon: server
+
+For multi-node training with SLURM, use this script:
+
+```bash
+#!/bin/bash
+#SBATCH -N 2
+#SBATCH --ntasks-per-node 1
+#SBATCH --gpus-per-node=8
+#SBATCH --exclusive
+
+export MASTER_ADDR=$(scontrol show hostnames $SLURM_JOB_NODELIST | head -n 1)
+export MASTER_PORT=29500
+export NUM_GPUS=8
+
+# Per-rank UV cache to avoid conflicts
+unset UV_PROJECT_ENVIRONMENT
+mkdir -p /opt/uv_cache/${SLURM_JOB_ID}_${SLURM_PROCID}
+export UV_CACHE_DIR=/opt/uv_cache/${SLURM_JOB_ID}_${SLURM_PROCID}
+
+uv run --group automodel --with . \
+  torchrun \
+  --nnodes=$SLURM_NNODES \
+  --nproc-per-node=$NUM_GPUS \
+  --rdzv_backend=c10d \
+  --rdzv_endpoint=$MASTER_ADDR:$MASTER_PORT \
+  examples/automodel/finetune/finetune.py \
+  -c examples/automodel/finetune/wan2_1_t2v_flow_multinode.yaml
+```
+
+**Key differences for multi-node**:
+- Uses `wan2_1_t2v_flow_multinode.yaml` config
+- Sets `MASTER_ADDR` and `MASTER_PORT` for distributed coordination
+- Configures per-rank UV cache to avoid conflicts
+- Uses `--nnodes` and `--rdzv_backend=c10d` for multi-node setup
 :::
 
-::: {tab-item} Default Configuration
+::::
+
+::::{tab-item} Default Configuration
 
 ```bash
 python dfm/examples/automodel/finetune/finetune.py
@@ -256,9 +371,9 @@ python dfm/examples/automodel/finetune/finetune.py
 
 This uses the default config at `dfm/examples/automodel/finetune/wan2_1_t2v_flow.yaml` (relative to the DFM installation directory).
 
-:::
-
 ::::
+
+:::::
 
 :::{dropdown} What happens during training
 :icon: info
@@ -290,7 +405,36 @@ This uses the default config at `dfm/examples/automodel/finetune/wan2_1_t2v_flow
 [INFO] Checkpoint saved: /path/to/checkpoints/wan2_1_finetuning/iter_1000/
 ```
 
-### 4. Monitor Training
+### 4. Validate Training
+
+Use the validation script to perform a quick qualitative check of a trained checkpoint.
+
+:::{dropdown} Validation Script Details
+:icon: info
+
+The validation script (`wan_validate.py`):
+- Reads prompts from `.meta` files in `--meta_folder` (uses `metadata.vila_caption`; latents are ignored)
+- Loads the `WanPipeline` and, if provided, restores weights from `--checkpoint`
+- Checkpoint loading priority: `ema_shadow.pt` → `consolidated_model.bin` → sharded FSDP `model/*.distcp`
+- Generates short videos for each prompt with specified settings (`--guidance_scale`, `--num_inference_steps`, `--height/--width`, `--num_frames`, `--fps`, `--seed`)
+- Writes videos to `--output_dir`
+- Intended for qualitative comparison across checkpoints; does not compute quantitative metrics
+:::
+
+```bash
+uv run --group automodel --with . \
+  python examples/automodel/generate/wan_validate.py \
+  --meta_folder <your_meta_folder> \
+  --guidance_scale 5 \
+  --checkpoint ./checkpoints/step_1000 \
+  --num_samples 10
+```
+
+:::{note}
+You can use `--checkpoint ./checkpoints/LATEST` to automatically use the most recent checkpoint.
+:::
+
+### 5. Monitor Training
 
 Monitor console output for decreasing loss values and checkpoint saves. If `wandb.mode: online`, view metrics in the WandB dashboard.
 
@@ -301,6 +445,69 @@ ls -lh /path/to/checkpoints/wan2_1_finetuning/
 ```
 
 Expected: `iter_1000/`, `iter_2000/`, `latest/` directories with `model_weights.pt` and `optimizer_states.pt` files.
+
+### Hardware Requirements
+
+:::{dropdown} System Requirements
+:icon: server
+
+| Component | Minimum | Recommended |
+|-----------|---------|-------------|
+| GPU | A100 40GB | A100 80GB / H100 |
+| GPUs | 4 | 8+ |
+| RAM | 128 GB | 256 GB+ |
+| Storage | 500 GB SSD | 2 TB NVMe |
+:::
+
+### Supported Models
+
+| Model | Parameters | Parallelization | Status |
+|-------|------------|-----------------|--------|
+| WAN 2.1 T2V 1.3B | 1.3B | FSDP2 via Automodel + DDP | ✅ |
+| WAN 2.1 T2V 14B | 14B | FSDP2 via Automodel + DDP | ✅ |
+| FLUX | TBD | TBD | 🔄 In Progress |
+
+### Advanced Topics
+
+:::{dropdown} Pretraining vs Fine-tuning
+:icon: gear
+
+| Setting | Fine-tuning | Pretraining |
+|---------|-------------|-------------|
+| `learning_rate` | 5e-6 | 5e-5 |
+| `weight_decay` | 0.01 | 0.1 |
+| `flow_shift` | 3.0 | 2.5 |
+| `logit_std` | 1.0 | 1.5 |
+| Dataset size | 100s-1000s | 10K+ |
+:::
+
+:::{dropdown} Custom Parallelization
+:icon: gear
+
+You can customize parallelism settings in your config:
+
+```yaml
+fsdp:
+  tp_size: 2  # Tensor parallel
+  dp_size: 4  # Data parallel
+```
+:::
+
+:::{dropdown} Checkpoint Management
+:icon: gear
+
+Clean up old checkpoints to save storage:
+
+```python
+from pathlib import Path
+import shutil
+
+def cleanup_old_checkpoints(checkpoint_dir, keep_last_n=3):
+    checkpoints = sorted(Path(checkpoint_dir).glob("step_*"))
+    for old_ckpt in checkpoints[:-keep_last_n]:
+        shutil.rmtree(old_ckpt)
+```
+:::
 
 ### Troubleshooting
 
@@ -449,5 +656,19 @@ python dfm/examples/automodel/generate/wan_generate.py \
     --num-frames 51 \
     --output output.mp4
 ```
+
 :::
+
+---
+
+## Related Tutorials
+
+- [Megatron DiT Tutorial](megatron.md) - Train DiT models from scratch
+- [Megatron WAN Tutorial](megatron-wan.md) - Train WAN models with Megatron
+
+## Related Documentation
+
+- [Training Paradigms](../about/concepts/training-paradigms.md) - Understand AutoModel vs Megatron differences
+- [Performance Benchmarks](../reference/performance.md) - Training throughput metrics
+- [AutoModel vs Megatron Comparison](../about/comparison.md) - Experimental comparison
 

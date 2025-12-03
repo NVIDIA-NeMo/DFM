@@ -265,3 +265,15 @@ Model checkpoints from one paradigm can often be loaded in the other, but traini
 Plan to use one paradigm consistently throughout your project. Converting training infrastructure between paradigms requires rewriting configuration and data loading code.
 
 **Inference**: Both paradigms can export models to standard formats for inference deployment.
+
+---
+
+## Experimental Comparison
+
+For a detailed experimental comparison of Automodel vs Megatron training paths, including training curves and performance analysis, see [Automodel vs Megatron Comparison](../comparison.md).
+
+The comparison includes:
+- Two-stage training experiment (Text→Image, Text→Video)
+- Training loss curves for both paths
+- Important caveats about implementation differences
+- Performance characteristics analysis
