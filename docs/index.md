@@ -107,6 +107,44 @@ Train WAN models for video generation with Megatron. Best for video-specific wor
 
 ---
 
+## Tutorials
+
+Comprehensive training recipes with detailed configurations and advanced topics for production workflows.
+
+::::{grid} 1 3 3 3
+:gutter: 1 1 1 2
+
+:::{grid-item-card} {octicon}`zap;1.5em;sd-mr-1` Fine-Tuning Pretrained Models
+:link: tutorial-fine-tuning-pretrained-models
+:link-type: ref
+
+Fine-tune pretrained models with automatic parallelism. Advanced configuration options.
++++
+{bdg-secondary}`automodel` {bdg-success}`Quick start` {bdg-info}`Advanced`
+:::
+
+:::{grid-item-card} {octicon}`server;1.5em;sd-mr-1` Training from Scratch
+:link: tutorial-training-from-scratch
+:link-type: ref
+
+Train DiT models from scratch with full distributed control. Sequence packing and Energon format details.
++++
+{bdg-secondary}`megatron` {bdg-info}`Full control` {bdg-info}`Advanced`
+:::
+
+:::{grid-item-card} {octicon}`video;1.5em;sd-mr-1` Text-to-Video Training
+:link: tutorial-text-to-video-training
+:link-type: ref
+
+Train production-scale text-to-video models. WebDataset preparation and inference workflows.
++++
+{bdg-secondary}`megatron` {bdg-info}`Video models` {bdg-info}`Advanced`
+:::
+
+::::
+
+---
+
 ::::{toctree}
 :hidden:
 Home <self>
@@ -131,6 +169,17 @@ Installation <get-started/installation>
 Automodel <get-started/automodel>
 Megatron DiT <get-started/megatron>
 Megatron WAN <get-started/megatron-wan>
+::::
+
+::::{toctree}
+:hidden:
+:caption: Tutorials
+:maxdepth: 2
+
+tutorials/index.md
+Fine-Tuning Pretrained Models <tutorials/fine-tuning-pretrained-models>
+Training from Scratch <tutorials/training-from-scratch>
+Text-to-Video Training <tutorials/text-to-video-training>
 ::::
 
 ::::{toctree}

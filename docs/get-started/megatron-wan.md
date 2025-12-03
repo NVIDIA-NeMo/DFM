@@ -287,6 +287,7 @@ The table below shows current parallelism support for different WAN model sizes:
 
 ## Related Documentation
 
+- [Text-to-Video Training](../tutorials/text-to-video-training.md) - Comprehensive recipe with detailed configuration options
 - [Training Paradigms](../about/concepts/training-paradigms.md) - Understand Megatron approach
 - [Distributed Training](../about/concepts/distributed-training.md) - Parallelism strategies
 - [Performance Benchmarks](../reference/performance.md) - Training throughput metrics

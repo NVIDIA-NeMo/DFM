@@ -651,6 +651,7 @@ python dfm/examples/automodel/generate/wan_generate.py \
 
 ## Related Documentation
 
+- [Fine-Tuning Pretrained Models](../tutorials/fine-tuning-pretrained-models.md) - Comprehensive recipe with detailed configuration options
 - [Training Paradigms](../about/concepts/training-paradigms.md) - Understand AutoModel vs Megatron differences
 - [Performance Benchmarks](../reference/performance.md) - Training throughput metrics
 - [AutoModel vs Megatron Comparison](../about/comparison.md) - Experimental comparison

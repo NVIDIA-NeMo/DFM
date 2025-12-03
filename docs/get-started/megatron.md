@@ -581,3 +581,10 @@ The table below shows current parallelism support for different DiT model sizes:
 
 - [Megatron WAN Tutorial](megatron-wan.md) - Train WAN models for video generation
 - [AutoModel Tutorial](automodel.md) - Fine-tune models with automatic parallelism
+
+## Related Documentation
+
+- [Training from Scratch](../tutorials/training-from-scratch.md) - Comprehensive recipe with detailed configuration options
+- [Training Paradigms](../about/concepts/training-paradigms.md) - Understand Megatron approach
+- [Distributed Training](../about/concepts/distributed-training.md) - Parallelism strategies
+- [Performance Benchmarks](../reference/performance.md) - Training throughput metrics
