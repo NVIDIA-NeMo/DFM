@@ -102,7 +102,7 @@ python dfm/src/automodel/utils/data/preprocess_resize.py \
 - `--height/--width`: Target resolution (both must be specified together)
 - `--center-crop`: Crop to exact size after aspect-preserving resize
 - `--device`: Device to use (`cuda` or `cpu`, default: `cuda` if available)
-- `--stochastic`: Use stochastic encoding instead of deterministic (may cause flares)
+- `--stochastic`: Use stochastic encoding instead of deterministic (can cause flares)
 - `--no-memory-optimization`: Disable Wan's built-in memory optimization
 
 **Output:** Creates `.meta` files containing:
@@ -199,7 +199,7 @@ flow_matching:  # Flow-matching training settings
   timestep_sampling: "uniform"  # Strategy for sampling timesteps
   flow_shift: 3.0  # Scalar shift applied to the target flow
 
-fsdp:  # Distributed training (e.g., FSDP) configuration
+fsdp:  # Distributed training (for example, FSDP) configuration
   dp_size: 8  # Total data-parallel replicas (single node: 8 GPUs)
 
 checkpoint:  # Checkpointing behavior
@@ -253,8 +253,8 @@ fsdp:  # Overrides for multi-node runs
 
 | Model | Parameters | Parallelization | Status |
 |-------|------------|-----------------|--------|
-| Wan 2.1 T2V 1.3B | 1.3B | FSDP2 via Automodel + DDP | ✅ |
-| Wan 2.1 T2V 14B | 14B | FSDP2 via Automodel + DDP | ✅ |
+| Wan 2.1 T2V 1.3B | 1.3B | FSDP2 using Automodel + DDP | ✅ |
+| Wan 2.1 T2V 14B | 14B | FSDP2 using Automodel + DDP | ✅ |
 | FLUX | TBD | TBD | 🔄 In Progress |
 
 ---

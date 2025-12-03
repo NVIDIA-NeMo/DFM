@@ -23,7 +23,7 @@ For a quick start guide, see [Megatron Workflow](../get-started/megatron.md). Th
 
 ## Dataset Preparation
 
-This recipe uses NVIDIA's [Megatron-Energon](https://github.com/NVIDIA/Megatron-Energon) as an efficient multi-modal data loader. Datasets should be in the WebDataset-compatible format (typically sharded `.tar` archives). Energon efficiently supports large-scale distributed loading, sharding, and sampling for multi-modal pairs (e.g., text-image, text-video). Set `dataset.path` to your WebDataset location or shard pattern. See the Megatron-Energon documentation for format details and advanced options.
+This recipe uses NVIDIA's [Megatron-Energon](https://github.com/NVIDIA/Megatron-Energon) as an efficient multi-modal data loader. Datasets should be in the WebDataset-compatible format (typically sharded `.tar` archives). Energon efficiently supports large-scale distributed loading, sharding, and sampling for multi-modal pairs (for example, text-image, text-video). Set `dataset.path` to your WebDataset location or shard pattern. See the Megatron-Energon documentation for format details and advanced options.
 
 ### Dataset Preparation Example
 
@@ -98,13 +98,13 @@ Done
 
 ## Build Container
 
-Please follow the instructions in the [container](https://github.com/NVIDIA-NeMo/DFM#-built-your-own-container) section of the main README.
+Follow the instructions in the [container](https://github.com/NVIDIA-NeMo/DFM#-built-your-own-container) section of the main README.
 
 ---
 
 ## Pretraining
 
-Once you have the dataset and container ready, you can start training the DiT model on your own dataset. This repository leverages [sequence packing](https://docs.nvidia.com/nemo-framework/user-guide/24.09/nemotoolkit/features/optimizations/sequence_packing.html) to maximize training efficiency. Sequence packing stacks multiple samples into a single sequence instead of padding individual samples to a fixed length; therefore, `micro_batch_size` must be set to 1. Additionally, `qkv_format` should be set to `thd` to signal to Transformer Engine that sequence packing is enabled.
+After you have the dataset and container ready, you can start training the DiT model on your own dataset. This repository leverages [sequence packing](https://docs.nvidia.com/nemo-framework/user-guide/24.09/nemotoolkit/features/optimizations/sequence_packing.html) to maximize training efficiency. Sequence packing stacks multiple samples into a single sequence instead of padding individual samples to a fixed length; therefore, `micro_batch_size` must be set to 1. Additionally, `qkv_format` should be set to `thd` to signal to Transformer Engine that sequence packing is enabled.
 
 For data loading, Energon provides two key hyperparameters related to sequence packing: `task_encoder_seq_length` and `packing_buffer_size`. The `task_encoder_seq_length` parameter controls the maximum sequence length passed to the model, while `packing_buffer_size` determines the number of samples processed to create different buckets. You can look at `select_samples_to_pack` and `pack_selected_samples` methods of [DiffusionTaskEncoderWithSequencePacking](https://github.com/NVIDIA-NeMo/DFM/blob/main/dfm/src/megatron/data/common/diffusion_task_encoder_with_sp.py#L50) to get a better sense of these parameters. For further details you can look at [Energon packing](https://nvidia.github.io/Megatron-Energon/advanced/packing.html) documentation.
 
@@ -172,7 +172,7 @@ uv run --group megatron-bridge python -m torch.distributed.run \
 
 ## Inference
 
-Once training completes, you can run inference using [inference_dit_model.py](https://github.com/NVIDIA-NeMo/DFM/blob/main/examples/megatron/recipes/dit/inference_dit_model.py). The script requires your trained model checkpoint (`--checkpoint_path`) and a path to save generated videos (`--video_save_path`). You can pass two optional arguments, `--t5_cache_dir` and `--tokenizer_cache_dir`, to avoid re-downloading artifacts if they are already downloaded.
+After training completes, you can run inference using [inference_dit_model.py](https://github.com/NVIDIA-NeMo/DFM/blob/main/examples/megatron/recipes/dit/inference_dit_model.py). The script requires your trained model checkpoint (`--checkpoint_path`) and a path to save generated videos (`--video_save_path`). You can pass two optional arguments, `--t5_cache_dir` and `--tokenizer_cache_dir`, to avoid re-downloading artifacts if they are already downloaded.
 
 ```bash
 uv run --group megatron-bridge python -m torch.distributed.run --nproc-per-node $num_gpus \

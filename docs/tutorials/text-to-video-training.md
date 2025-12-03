@@ -11,7 +11,7 @@ content_type: "tutorial"
 
 # Text-to-Video Training
 
-Comprehensive guide for training large-scale text-to-video generation models using WAN 2.1 architecture. This approach uses Megatron-Core and Megatron-Bridge for scalable training with advanced parallelism strategies (data, tensor, sequence, and context parallelism) and optimized kernels (e.g., Transformer Engine fused attention).
+Comprehensive guide for training large-scale text-to-video generation models using WAN 2.1 architecture. This approach uses Megatron-Core and Megatron-Bridge for scalable training with advanced parallelism strategies (data, tensor, sequence, and context parallelism) and optimized kernels (for example, Transformer Engine fused attention).
 
 **Use case**: Train production-scale text-to-video models with full control over distributed training parallelism.
 
@@ -54,7 +54,7 @@ uv run --group megatron-bridge python -m torch.distributed.run --nproc-per-node 
 # 4) Use Energon to process shards and create its metadata/spec
 energon prepare "${DATASET_PATH}"
 # In the interactive prompts:
-# - Enter a train/val/test split, e.g., "8,1,1"
+# - Enter a train/val/test split, for example, "8,1,1"
 # - When asked for the sample type, choose: "Crude sample (plain dict for cooking)"
 ```
 
@@ -62,7 +62,7 @@ What gets produced:
 - Each shard contains:
   - pth: contain WAN video latents
   - pickle: contain text embeddings
-  - json: contain useful side-info (text caption, sizes, processing choices, etc.)
+  - json: contain useful side-info (text caption, sizes, processing choices, and so on)
 - Energon writes a `.nv-meta` directory with dataset info and a `dataset.yaml` you can version/control.
 
 You're ready to launch training. In the training config, we will point the WAN config (or CLI overrides) to the processed data output directory as `dataset.path=${DATASET_PATH}`.
@@ -71,9 +71,7 @@ You're ready to launch training. In the training config, we will point the WAN c
 
 ## Build Container
 
-Please follow the instructions in the container section of the main README:
-
-- DFM container guide: https://github.com/NVIDIA-NeMo/DFM#-built-your-own-container
+Follow the instructions in the [container section](https://github.com/NVIDIA-NeMo/DFM#-built-your-own-container) of the main README.
 
 ---
 
@@ -87,13 +85,13 @@ Multiple parallelism techniques including tensor, sequence, and context parallel
 
 Wan training is driven by `examples/megatron/recipes/wan/pretrain_wan.py`, which supports both a YAML config file and CLI overrides.
 
-The script exposes a `--training-mode` with `pretrain` and `finetune` presets for flow-matching hyperparameters as a starting point for experiments. This presets specify that pretraining uses noisier, biased sampling (e.g., logit-normal, higher logit_std, lower flow_shift) for stability and broad learning, while finetuning uses uniform, lower-noise settings (e.g., uniform sampling, lower logit_std, higher flow_shift) to refine details and improve quality.
+The script exposes a `--training-mode` with `pretrain` and `finetune` presets for flow-matching hyperparameters as a starting point for experiments. This presets specify that pretraining uses noisier, biased sampling (for example, logit-normal, higher logit_std, lower flow_shift) for stability and broad learning, while finetuning uses uniform, lower-noise settings (for example, uniform sampling, lower logit_std, higher flow_shift) to refine details and improve quality.
 
 **Notes**: If you use `logger.wandb_project` and `logger.wandb_exp_name`, export `WANDB_API_KEY`.
 
 ### Pretraining Script Example
 
-We provide example scripts for running 1.3B and 14B model sizes on mock dataset (see `wan_1_3B.yaml` and `wan_14B.yaml` under `examples/megatron/recipes/wan/conf`). From these starting points, users can set their own configuration by copy one of the example override configs and update it with your settings (e.g., with actual processed data path, and specific configurations based on available hardware, etc.). Users can learn more about arguments detail at [Megatron-Bridge docs](https://github.com/NVIDIA-NeMo/Megatron-Bridge/blob/main/docs/megatron-lm-to-megatron-bridge.md).
+We provide example scripts for running 1.3B and 14B model sizes on mock dataset (see `wan_1_3B.yaml` and `wan_14B.yaml` under `examples/megatron/recipes/wan/conf`). From these starting points, users can set their own configuration by copy one of the example override configs and update it with your settings (for example, with actual processed data path, and specific configurations based on available hardware, and so on). Users can learn more about arguments detail at [Megatron-Bridge docs](https://github.com/NVIDIA-NeMo/Megatron-Bridge/blob/main/docs/megatron-lm-to-megatron-bridge.md).
 
 ```bash
 cp examples/megatron/recipes/wan/conf/wan_1_3B.yaml examples/megatron/recipes/wan/conf/my_wan.yaml
@@ -141,7 +139,7 @@ uv run --group megatron-bridge python -m torch.distributed.run --nproc-per-node 
   --mock
 ```
 
-You may adjust mock shapes (`F_latents`, `H_latents`, `W_latents`) and packing behavior (`number_packed_samples`) in `WanMockDataModuleConfig` (see `dfm/src/megatron/recipes/wan/wan.py`) to simulate different data scenarios.
+You can adjust mock shapes (`F_latents`, `H_latents`, `W_latents`) and packing behavior (`number_packed_samples`) in `WanMockDataModuleConfig` (see `dfm/src/megatron/recipes/wan/wan.py`) to simulate different data scenarios.
 
 ---
 
@@ -178,7 +176,7 @@ The table below shows current parallelism support for different model sizes:
 
 ## References
 
-Wan Team. (2025). Wan: Open and advanced large-scale video generative models (WAN 2.1). GitHub. https://github.com/Wan-Video/Wan2.1/
+Wan Team. (2025). [Wan: Open and advanced large-scale video generative models (WAN 2.1)](https://github.com/Wan-Video/Wan2.1/). GitHub.
 
 ---
 
