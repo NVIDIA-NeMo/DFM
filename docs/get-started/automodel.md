@@ -124,21 +124,10 @@ Each entry in `meta.json` should include:
 
 #### Preprocess Videos to .meta Files
 
-There are two preprocessing modes. Choose the right mode for your use case:
-
-:::: {tab-set}
-
-::: {tab-item} Full Video Mode (Recommended)
-
-**What it is**: Converts each source video into a single `.meta` file that preserves the full temporal sequence as latents. Training can sample temporal windows/clips from the sequence on the fly.
-
-**When to use**: Fine-tuning text-to-video models where motion and temporal consistency matter. This is the recommended default for most training runs.
-
-**Output**: Creates one `.meta` file per video
+The preprocessing script converts each source video into a single `.meta` file that preserves the full temporal sequence as latents. Training can sample temporal windows/clips from the sequence on the fly.
 
 ```bash
 python dfm/src/automodel/utils/data/preprocess_resize.py \
-  --mode video \
   --video_folder <your_video_folder> \
   --output_folder ./processed_meta \
   --model Wan-AI/Wan2.1-T2V-1.3B-Diffusers \
@@ -148,46 +137,19 @@ python dfm/src/automodel/utils/data/preprocess_resize.py \
 ```
 
 **Key arguments**:
-- `--mode video`: Process full videos
-- `--height/--width`: Target resolution
+- `--video_folder`: Path to folder containing videos and `meta.json`
+- `--output_folder`: Path where `.meta` files will be saved
+- `--model`: Wan2.1 model ID (default: `Wan-AI/Wan2.1-T2V-14B-Diffusers`)
+- `--height/--width`: Target resolution (both must be specified together)
 - `--center-crop`: Crop to exact size after aspect-preserving resize
+- `--device`: Device to use (`cuda` or `cpu`, default: `cuda` if available)
+- `--stochastic`: Use stochastic encoding instead of deterministic (may cause flares)
+- `--no-memory-optimization`: Disable Wan's built-in memory optimization
 
-:::
-
-::: {tab-item} Extract Frames Mode
-
-**What it is**: Uniformly samples `N` frames per video and writes each as its own one-frame `.meta` sample (no temporal continuity).
-
-**When to use**: Image/frame-level training objectives, quick smoke tests, or ablations where learning motion is not required.
-
-**Output**: Creates one `.meta` file per frame (treated as 1-frame videos)
-
-```bash
-python dfm/src/automodel/utils/data/preprocess_resize.py \
-  --mode frames \
-  --num-frames 40 \
-  --video_folder <your_video_folder> \
-  --output_folder ./processed_frames \
-  --model Wan-AI/Wan2.1-T2V-1.3B-Diffusers \
-  --height 240 \
-  --width 416 \
-  --center-crop
-```
-
-**Key arguments**:
-- `--mode frames`: Extract evenly-spaced frames
-- `--num-frames`: Number of frames to extract
-- `--height/--width`: Target resolution
-- `--center-crop`: Crop to exact size after aspect-preserving resize
-
-:::
-
-::::
-
-**Output**: Both modes create `.meta` files containing:
+**Output**: Creates `.meta` files containing:
 - Encoded video latents (normalized)
 - Text embeddings (from UMT5)
-- First frame as JPEG (video mode only)
+- First frame as JPEG
 - Metadata
 
 ### 2. Create Training Configuration
@@ -211,19 +173,19 @@ dist_env:
 model:
   pretrained_model_name_or_path: Wan-AI/Wan2.1-T2V-1.3B-Diffusers
 
+step_scheduler:
+  global_batch_size: 8
+  local_batch_size: 1
+  num_epochs: 100
+  ckpt_every_steps: 1000
+  log_every: 2
+
 data:
   dataloader:
-    _target_: Automodel.datasets.build_wan21_dataloader
+    _target_: dfm.src.automodel.datasets.build_wan21_dataloader
     meta_folder: /path/to/your/dataset/meta/
-    batch_size: 1
     num_workers: 2
     device: cpu
-
-batch:
-  batch_size_per_node: 8
-
-training:
-  num_epochs: 100
 
 optim:
   learning_rate: 5e-6
@@ -245,10 +207,6 @@ fsdp:
   pp_size: 1
   dp_replicate_size: 1
   dp_size: 8
-
-logging:
-  save_every: 1000
-  log_every: 2
 
 checkpoint:
   enabled: true
@@ -276,14 +234,26 @@ checkpoint:
   - Dataset metadata location
   - Required
   - Your dataset path
-* - `batch.batch_size_per_node`
-  - Batch size per node
+* - `step_scheduler.global_batch_size`
+  - Effective batch size across all GPUs
   - `8`
   - 4-8 (depends on GPU memory)
-* - `training.num_epochs`
+* - `step_scheduler.local_batch_size`
+  - Per-GPU batch size
+  - `1`
+  - Usually 1
+* - `step_scheduler.num_epochs`
   - Training epochs
   - `100`
   - Adjust based on dataset size
+* - `step_scheduler.ckpt_every_steps`
+  - Checkpoint interval (steps)
+  - `1000`
+  - 500-2000
+* - `step_scheduler.log_every`
+  - Logging interval (steps)
+  - `2`
+  - 1-10
 * - `optim.learning_rate`
   - Learning rate
   - `5e-6`
@@ -296,10 +266,6 @@ checkpoint:
   - Where to save checkpoints
   - Required
   - Path with enough storage
-* - `logging.save_every`
-  - Checkpoint interval (iterations)
-  - `1000`
-  - 500-2000
 :::
 
 :::{dropdown} Parallelism settings (`fsdp`)
@@ -320,7 +286,18 @@ Execute the training script:
 :::: {tab-item} Custom Configuration
 
 ```bash
-python dfm/examples/automodel/finetune/finetune.py /path/to/wan2_1_finetune.yaml
+python dfm/examples/automodel/finetune/finetune.py -c /path/to/wan2_1_finetune.yaml
+```
+
+Or using `uv` and `torchrun` for distributed training:
+
+```bash
+export UV_PROJECT_ENVIRONMENT=
+
+uv run --group automodel --with . \
+  torchrun --nproc-per-node=8 \
+  examples/automodel/finetune/finetune.py \
+  -c /path/to/wan2_1_finetune.yaml
 ```
 
 :::{dropdown} Multi-Node with SLURM
@@ -369,7 +346,13 @@ uv run --group automodel --with . \
 python dfm/examples/automodel/finetune/finetune.py
 ```
 
-This uses the default config at `dfm/examples/automodel/finetune/wan2_1_t2v_flow.yaml` (relative to the DFM installation directory).
+This uses the default config at `examples/automodel/finetune/wan2_1_t2v_flow.yaml` (relative to the DFM installation directory).
+
+You can also explicitly specify the config file:
+
+```bash
+python dfm/examples/automodel/finetune/finetune.py -c examples/automodel/finetune/wan2_1_t2v_flow.yaml
+```
 
 ::::
 
@@ -385,8 +368,8 @@ This uses the default config at `dfm/examples/automodel/finetune/wan2_1_t2v_flow
 
 2. **Training loop**:
    - Processes batches across distributed GPUs
-   - Logs loss every `log_every` iterations
-   - Saves checkpoints every `save_every` iterations
+   - Logs loss every `step_scheduler.log_every` iterations
+   - Saves checkpoints every `step_scheduler.ckpt_every_steps` iterations
 
 3. **Checkpoint saves**:
    - Checkpoints save to `checkpoint.checkpoint_dir`
@@ -402,7 +385,7 @@ This uses the default config at `dfm/examples/automodel/finetune/wan2_1_t2v_flow
 [INFO] Epoch 1/100, Iter 1/5000, Loss: 0.234
 [INFO] Epoch 1/100, Iter 2/5000, Loss: 0.221
 ...
-[INFO] Checkpoint saved: /path/to/checkpoints/wan2_1_finetuning/iter_1000/
+[INFO] Checkpoint saved: /path/to/checkpoints/wan2_1_finetuning/step_1000/
 ```
 
 ### 4. Validate Training
@@ -444,7 +427,7 @@ Verify checkpoints are being saved:
 ls -lh /path/to/checkpoints/wan2_1_finetuning/
 ```
 
-Expected: `iter_1000/`, `iter_2000/`, `latest/` directories with `model_weights.pt` and `optimizer_states.pt` files.
+Expected: `step_1000/`, `step_2000/`, `latest/` directories with checkpoint files.
 
 ### Hardware Requirements
 
@@ -518,11 +501,11 @@ def cleanup_old_checkpoints(checkpoint_dir, keep_last_n=3):
 RuntimeError: CUDA out of memory
 ```
 
-**Solution**: Reduce `batch.batch_size_per_node`:
+**Solution**: Reduce `step_scheduler.global_batch_size`:
 
 ```yaml
-batch:
-  batch_size_per_node: 4  # or 2
+step_scheduler:
+  global_batch_size: 4  # or 2
 ```
 :::
 
