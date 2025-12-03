@@ -297,7 +297,6 @@ def get_wan_block_with_transformer_engine_spec() -> ModuleSpec:
                 module=MLP,
                 submodules=MLPSubmodules(
                     linear_fc1=TEColumnParallelLinear,
-                    # by default, activation_func is openai_gelu, which is equivalent to nn.GELU(approximate='tanh')
                     linear_fc2=TERowParallelLinear,
                 ),
             ),
