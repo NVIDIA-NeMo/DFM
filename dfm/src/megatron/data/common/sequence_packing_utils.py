@@ -71,35 +71,3 @@ def first_fit_decreasing(seqlens: List[int], pack_size: int) -> List[List[int]]:
     """
     sorted_seqlens = sorted(seqlens, reverse=True)
     return first_fit(sorted_seqlens, pack_size)
-
-
-def concat_pad(tensor_list, max_seq_length):
-    """
-    Efficiently concatenates a list of tensors along the first dimension and pads with zeros
-    to reach max_seq_length.
-
-    Args:
-        tensor_list (list of torch.Tensor): List of tensors to concatenate and pad.
-        max_seq_length (int): The desired size of the first dimension of the output tensor.
-
-    Returns:
-        torch.Tensor: A tensor of shape [max_seq_length, ...], where ... represents the remaining dimensions.
-    """
-    import torch
-
-    # Get common properties from the first tensor
-    other_shape = tensor_list[0].shape[1:]
-    dtype = tensor_list[0].dtype
-    device = tensor_list[0].device
-
-    # Initialize the result tensor with zeros
-    result = torch.zeros((max_seq_length, *other_shape), dtype=dtype, device=device)
-
-    current_index = 0
-    for tensor in tensor_list:
-        length = tensor.shape[0]
-        # Directly assign the tensor to the result tensor without checks
-        result[current_index : current_index + length] = tensor
-        current_index += length
-
-    return result

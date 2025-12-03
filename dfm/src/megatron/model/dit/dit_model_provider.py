@@ -14,7 +14,6 @@
 
 import logging
 from dataclasses import dataclass
-from typing import Callable
 
 import torch
 from megatron.bridge.models.model_provider import ModelProviderMixin
@@ -39,14 +38,14 @@ class DiTModelProvider(TransformerConfig, ModelProviderMixin[VisionModule]):
     add_bias_linear: bool = False
     gated_linear_unit: bool = False
 
-    num_layers: int = 28
-    hidden_size: int = 1152
+    num_layers: int = 12
+    hidden_size: int = 384
     max_img_h: int = 80
     max_img_w: int = 80
     max_frames: int = 34
     patch_spatial: int = 2
     patch_temporal: int = 1
-    num_attention_heads: int = 16
+    num_attention_heads: int = 6
     layernorm_epsilon = 1e-6
     normalization = "RMSNorm"
     add_bias_linear: bool = False
@@ -110,52 +109,27 @@ class DiTModelProvider(TransformerConfig, ModelProviderMixin[VisionModule]):
 
 
 @dataclass
-class DiT7BModelProvider(DiTModelProvider):
-    hidden_size: int = 4096
-    max_img_h: int = 240
-    max_img_w: int = 240
-    max_frames: int = 128
-    num_attention_heads: int = 32
+class DiTBModelProvider(DiTModelProvider):
+    """DiT-B"""
 
-    apply_rope_fusion: bool = True  # TODO: do we support this?
-    additional_timestamp_channels = None  # TODO: do we support this?
-    vae_module: str = None
-    vae_path: str = None
+    num_layers: int = 12
+    hidden_size: int = 768
+    num_attention_heads: int = 12
 
 
 @dataclass
-class DiT14BModelProvider(DiTModelProvider):
-    num_layers: int = 36
-    hidden_size: int = 5120
-    max_img_h: int = 240
-    max_img_w: int = 240
-    max_frames: int = 128
-    num_attention_heads: int = 40
-    apply_rope_fusion: bool = True
-    layernorm_zero_centered_gamma: bool = False
-    additional_timestamp_channels = None
-    vae_module: str = None
-    vae_path: str = None
-    loss_add_logvar: bool = True
+class DiTLModelProvider(DiTModelProvider):
+    """DiT-L"""
+
+    num_layers: int = 24
+    hidden_size: int = 1024
+    num_attention_heads: int = 16
 
 
 @dataclass
-class DiTLlama30BConfig(DiTModelProvider):
-    num_layers: int = 48
-    hidden_size: int = 6144
-    ffn_hidden_size: int = 16384
-    num_attention_heads: int = 48
-    num_query_groups: int = 8
-    gated_linear_unit: int = True
-    bias_activation_fusion: int = True
-    activation_func: Callable = torch.nn.functional.silu
-    layernorm_epsilon: float = 1e-5
-    max_frames: int = 128
-    max_img_h: int = 240
-    max_img_w: int = 240
-    init_method_std: float = 0.01
-    add_bias_linear: bool = False
-    seq_length: int = 256
-    masked_softmax_fusion: bool = True
-    persist_layer_norm: bool = True
-    bias_dropout_fusion: bool = True
+class DiTXLModelProvider(DiTModelProvider):
+    """DiT-XL"""
+
+    num_layers: int = 28
+    hidden_size: int = 1152
+    num_attention_heads: int = 16

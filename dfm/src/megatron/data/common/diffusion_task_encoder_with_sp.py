@@ -56,7 +56,7 @@ class DiffusionTaskEncoderWithSequencePacking(DefaultTaskEncoder, ABC):
         self,
         *args,
         max_frames: int = None,
-        text_embedding_padding_size: int = 512,
+        text_embedding_max_length: int = 512,
         seq_length: int = None,
         patch_spatial: int = 2,
         patch_temporal: int = 1,
@@ -65,7 +65,7 @@ class DiffusionTaskEncoderWithSequencePacking(DefaultTaskEncoder, ABC):
     ):
         super().__init__(*args, **kwargs)
         self.max_frames = max_frames
-        self.text_embedding_padding_size = text_embedding_padding_size
+        self.text_embedding_max_length = text_embedding_max_length
         self.seq_length = seq_length
         self.patch_spatial = patch_spatial
         self.patch_temporal = patch_temporal

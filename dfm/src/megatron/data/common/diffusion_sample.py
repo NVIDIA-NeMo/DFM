@@ -80,11 +80,14 @@ class DiffusionSample(Sample):
     def __add__(self, other: Any) -> int:
         """Adds the sequence length of this sample with another sample or integer."""
         if isinstance(other, DiffusionSample):
-            # Combine the values of the two instances
-            return self.seq_len_q.item() + other.seq_len_q.item()
+            # Use padded length if available (for CP), otherwise use unpadded
+            self_len = self.seq_len_q_padded.item() if self.seq_len_q_padded is not None else self.seq_len_q.item()
+            other_len = other.seq_len_q_padded.item() if other.seq_len_q_padded is not None else other.seq_len_q.item()
+            return self_len + other_len
         elif isinstance(other, int):
-            # Add an integer to the value
-            return self.seq_len_q.item() + other
+            # Use padded length if available (for CP), otherwise use unpadded
+            self_len = self.seq_len_q_padded.item() if self.seq_len_q_padded is not None else self.seq_len_q.item()
+            return self_len + other
         raise NotImplementedError
 
     def __radd__(self, other: Any) -> int:
@@ -92,13 +95,20 @@ class DiffusionSample(Sample):
         # This is called if sum or other operations start with a non-DiffusionSample object.
         # e.g., sum([DiffusionSample(1), DiffusionSample(2)]) -> the 0 + DiffusionSample(1) calls __radd__.
         if isinstance(other, int):
-            return self.seq_len_q.item() + other
+            # Use padded length if available (for CP), otherwise use unpadded
+            self_len = self.seq_len_q_padded.item() if self.seq_len_q_padded is not None else self.seq_len_q.item()
+            return self_len + other
         raise NotImplementedError
 
     def __lt__(self, other: Any) -> bool:
         """Compares this sample's sequence length with another sample or integer."""
         if isinstance(other, DiffusionSample):
-            return self.seq_len_q.item() < other.seq_len_q.item()
+            # Use padded length if available (for CP), otherwise use unpadded
+            self_len = self.seq_len_q_padded.item() if self.seq_len_q_padded is not None else self.seq_len_q.item()
+            other_len = other.seq_len_q_padded.item() if other.seq_len_q_padded is not None else other.seq_len_q.item()
+            return self_len < other_len
         elif isinstance(other, int):
-            return self.seq_len_q.item() < other
+            # Use padded length if available (for CP), otherwise use unpadded
+            self_len = self.seq_len_q_padded.item() if self.seq_len_q_padded is not None else self.seq_len_q.item()
+            return self_len < other
         raise NotImplementedError

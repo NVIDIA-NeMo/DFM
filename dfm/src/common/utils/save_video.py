@@ -44,5 +44,4 @@ def save_video(
         "output_params": ["-f", "mp4"],
     }
 
-    print("video_save_path", video_save_path)
     imageio.mimsave(video_save_path, grid, "mp4", **kwargs)
