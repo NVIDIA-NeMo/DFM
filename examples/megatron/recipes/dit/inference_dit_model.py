@@ -19,6 +19,7 @@ from pathlib import Path
 
 import numpy as np
 import torch
+import wandb
 from einops import rearrange
 from megatron.core import parallel_state as ps
 from megatron.core.tensor_parallel.random import model_parallel_cuda_manual_seed
@@ -143,12 +144,7 @@ class PosID3D:
         return self.grid[:t, :h, :w]
 
 
-def prepare_data_batch(args, t5_embeding_max_length=512):
-    tokenizer = T5TokenizerFast.from_pretrained("google-t5/t5-11b", cache_dir=args.t5_cache_dir)
-    text_encoder = T5EncoderModel.from_pretrained("google-t5/t5-11b", cache_dir=args.t5_cache_dir)
-    text_encoder.to("cuda")
-    text_encoder.eval()
-
+def prepare_data_batch(args, tokenizer, text_encoder, t5_embeding_max_length=512):
     print("[args.prompt]: ", args.prompt)
     # Encode text to T5 embedding
     out = encode_for_batch(tokenizer, text_encoder, [args.prompt])
@@ -254,8 +250,7 @@ def load_model_from_checkpoint(args):
     if isinstance(model, list):
         model = model[0]
 
-    model = model.cuda().to(torch.bfloat16)
-    model.eval()
+    model = model.cuda().to(torch.bfloat16).eval()
 
     print_rank_0(f"✅ Model loaded successfully from {checkpoint_path}")
 
@@ -311,12 +306,25 @@ def main(args):
 
     set_seed(42)
 
+    rank = torch.distributed.get_rank()
+    if rank == 0:
+        gather_list = [None for _ in range(ps.get_data_parallel_world_size())]
+        wandb.init(project="dit-inference-video", name="inference_generation")
+    else:
+        gather_list = None
+
     # Load model from checkpoint or initialize from scratch
     print_rank_0("Loading model from checkpoint...")
     model, diffusion_pipeline, model_config = load_model_from_checkpoint(args)
 
+    tokenizer = T5TokenizerFast.from_pretrained("google-t5/t5-11b", cache_dir=args.t5_cache_dir, dtype=torch.bfloat16)
+    text_encoder = T5EncoderModel.from_pretrained(
+        "google-t5/t5-11b", cache_dir=args.t5_cache_dir, dtype=torch.bfloat16
+    )
+    text_encoder.to("cuda").eval()
+
     print_rank_0("preparing data batch...")
-    data_batch, state_shape = prepare_data_batch(args)
+    data_batch, state_shape = prepare_data_batch(args, tokenizer, text_encoder)
     vae = CausalVideoTokenizer.from_pretrained(args.tokenizer_model, cache_dir=args.tokenizer_cache_dir)
     vae.to("cuda").eval()
 
@@ -355,6 +363,22 @@ def main(args):
         video_save_path=f"rank={rank}_" + args.video_save_path,
     )
     print_rank_0(f"saved video to rank={rank}_{args.video_save_path}")
+
+    torch.distributed.gather_object(
+        obj=(decoded_video[0], args.prompt),
+        object_gather_list=gather_list,
+        dst=0,
+        group=ps.get_data_parallel_group(),
+    )
+
+    if rank == 0 and wandb.run is not None:
+        videos = []
+        for video, caption in gather_list:
+            video_data_transposed = video.transpose(0, 3, 1, 2)
+            videos.append(wandb.Video(video_data_transposed, fps=args.fps, format="mp4", caption=caption))
+        wandb.log({"generated_videos": videos})
+        wandb.finish()
+        print_rank_0("✅ All videos gathered and logged to wandb with captions")
 
 
 if __name__ == "__main__":

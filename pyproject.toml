@@ -95,7 +95,11 @@ build = ["setuptools", "wheel", "torch", "pybind11", "Cython>=3.0.0", "numpy<2.0
 automodel = [
     "nemo-automodel",
 ]
-megatron-bridge = ["megatron-bridge"]
+megatron-bridge = [
+    "mediapy>=1.2.4",
+    "megatron-bridge",
+    "wandb[media]>=0.23.0",
+]
 torch-cu124 = [
     "torch",
     "torchvision",
