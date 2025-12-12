@@ -25,9 +25,14 @@ defaults:
     shell: bash -x -e -u -o pipefail {0}
 
 jobs:
+  pre-flight:
+    uses: NVIDIA-NeMo/FW-CI-templates/.github/workflows/_cicd_preflight.yml@v0.64.2
+
   build-test-publish-wheel:
+    needs: [pre-flight]
+    if: |
+      ${{ vars.BUILD_TEST_PUBLISH_WHEEL == 'true' && !(needs.pre-flight.outputs.docs_only == 'true') }}
     uses: NVIDIA-NeMo/FW-CI-templates/.github/workflows/_build_test_publish_wheel.yml@v0.33.0
-    if: ${{ vars.BUILD_TEST_PUBLISH_WHEEL == 'true' }}
     with:
       dry-run: true
       python-package: dfm
