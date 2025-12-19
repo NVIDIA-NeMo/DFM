@@ -19,7 +19,7 @@ import logging
 from dataclasses import dataclass
 from typing import Any, Dict, Literal
 
-from megatron.bridge.data.datasets.base_energon_datamodule import EnergonMultiModalDataModule
+from megatron.bridge.data.energon.base_energon_datamodule import EnergonMultiModalDataModule
 from megatron.bridge.data.utils import DatasetBuildContext, DatasetProvider
 from megatron.energon import DefaultTaskEncoder, get_train_dataset
 from torch import int_repr
