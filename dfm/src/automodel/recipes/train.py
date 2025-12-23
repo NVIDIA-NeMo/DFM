@@ -32,10 +32,9 @@ from nemo_automodel.recipes.llm.train_ft import build_distributed, build_wandb
 from torch.distributed.fsdp import MixedPrecisionPolicy
 from transformers.utils.hub import TRANSFORMERS_CACHE
 
-from dfm.src.automodel._diffusers.auto_diffusion_pipeline import NeMoWanPipeline
-from dfm.src.automodel.flow_matching.training_step_t2v import (
-    step_fsdp_transformer_t2v,
-)
+from dfm.src.automodel._diffusers.auto_diffusion_pipeline import NeMoWanPipeline, NeMoAutoDiffusionPipeline
+from dfm.src.automodel.flow_matching.flow_matching_pipeline import FlowMatchingPipeline
+from dfm.src.automodel.flow_matching.training_step_t2v import step_fsdp_transformer_t2v
 
 
 def build_model_and_optimizer(
@@ -47,11 +46,12 @@ def build_model_and_optimizer(
     dtype: torch.dtype,
     cpu_offload: bool = False,
     fsdp_cfg: Dict[str, Any] = {},
+    attention_backend: Optional[str] = None,
     optimizer_cfg: Optional[Dict[str, Any]] = None,
 ) -> tuple[NeMoWanPipeline, dict[str, Dict[str, Any]], torch.optim.Optimizer, Any]:
-    """Build the WAN 2.1 diffusion model, parallel scheme, and optimizer."""
+    """Build the diffusion model, parallel scheme, and optimizer."""
 
-    logging.info("[INFO] Building NeMoWanPipeline with transformer parallel scheme...")
+    logging.info("[INFO] Building NeMoAutoDiffusionPipeline with transformer parallel scheme...")
 
     if not dist.is_initialized():
         logging.info("[WARN] torch.distributed not initialized; proceeding in single-process mode")
@@ -74,7 +74,7 @@ def build_model_and_optimizer(
         "activation_checkpointing": True,
         "mp_policy": MixedPrecisionPolicy(
             param_dtype=dtype,
-            reduce_dtype=dtype,
+            reduce_dtype=torch.float32,
             output_dtype=dtype,
         ),
     }
@@ -85,7 +85,10 @@ def build_model_and_optimizer(
     if finetune_mode:
         kwargs["load_for_training"] = True
         kwargs["low_cpu_mem_usage"] = True
-    init_fn = NeMoWanPipeline.from_pretrained if finetune_mode else NeMoWanPipeline.from_config
+    if "wan" in model_id:
+        init_fn = NeMoWanPipeline.from_pretrained if finetune_mode else NeMoWanPipeline.from_config
+    else:
+        init_fn = NeMoAutoDiffusionPipeline.from_pretrained
 
     pipe, created_managers = init_fn(
         model_id,
@@ -97,6 +100,9 @@ def build_model_and_optimizer(
     )
     fsdp2_manager = created_managers["transformer"]
     transformer_module = pipe.transformer
+    if attention_backend is not None:
+        logging.info(f"[INFO] Setting attention backend to {attention_backend}")
+        transformer_module.set_attention_backend(attention_backend)
 
     trainable_params = [p for p in transformer_module.parameters() if p.requires_grad]
     if not trainable_params:
@@ -105,6 +111,7 @@ def build_model_and_optimizer(
     optimizer_cfg = optimizer_cfg or {}
     weight_decay = optimizer_cfg.get("weight_decay", 0.01)
     betas = optimizer_cfg.get("betas", (0.9, 0.999))
+    # TODO: Support other optimizers
     optimizer = torch.optim.AdamW(trainable_params, lr=learning_rate, weight_decay=weight_decay, betas=betas)
 
     logging.info("[INFO] Optimizer config: lr=%s, weight_decay=%s, betas=%s", learning_rate, weight_decay, betas)
@@ -145,8 +152,8 @@ def is_main_process():
     return (not dist.is_initialized()) or dist.get_rank() == 0
 
 
-class TrainWan21DiffusionRecipe(BaseRecipe):
-    """Config-driven wrapper around WAN 2.1 T2V training."""
+class TrainDiffusionRecipe(BaseRecipe):
+    """Training recipe for diffusion models."""
 
     def __init__(self, cfg):
         self.cfg = cfg
@@ -164,7 +171,8 @@ class TrainWan21DiffusionRecipe(BaseRecipe):
         self.seed = self.cfg.get("seed", 42)
         self.rng = StatefulRNG(seed=self.seed, ranked=True)
 
-        self.model_id = self.cfg.get("model.pretrained_model_name_or_path", "Wan-AI/Wan2.1-T2V-1.3B-Diffusers")
+        self.model_id = self.cfg.get("model.pretrained_model_name_or_path")
+        self.attention_backend = self.cfg.get("model.attention_backend", "_flash_3_hub")
         self.learning_rate = self.cfg.get("optim.learning_rate", 5e-6)
         self.bf16 = torch.bfloat16
 
@@ -180,7 +188,7 @@ class TrainWan21DiffusionRecipe(BaseRecipe):
         self.num_nodes = max(1, self.world_size // self.local_world_size)
         self.node_rank = dist.get_rank() // self.local_world_size if dist.is_initialized() else 0
 
-        logging.info("[INFO] WAN 2.1 T2V Trainer with Flow Matching")
+        logging.info("[INFO] Diffusion Trainer with Flow Matching")
         logging.info(
             f"[INFO] Total GPUs: {self.world_size}, GPUs per node: {self.local_world_size}, Num nodes: {self.num_nodes}"
         )
@@ -199,6 +207,8 @@ class TrainWan21DiffusionRecipe(BaseRecipe):
         self.mix_uniform_ratio = fm_cfg.get("mix_uniform_ratio", 0.1)
         self.sigma_min = fm_cfg.get("sigma_min", 0.0)
         self.sigma_max = fm_cfg.get("sigma_max", 1.0)
+        self.num_train_timesteps = fm_cfg.get("num_train_timesteps", 1000)
+        self.i2v_prob = fm_cfg.get("i2v_prob", 0.3)
 
         logging.info(f"[INFO] Flow matching: {'ENABLED' if self.use_sigma_noise else 'DISABLED'}")
         if self.use_sigma_noise:
@@ -215,6 +225,7 @@ class TrainWan21DiffusionRecipe(BaseRecipe):
             cpu_offload=self.cpu_offload,
             fsdp_cfg=fsdp_cfg,
             optimizer_cfg=self.cfg.get("optim.optimizer", {}),
+            attention_backend=self.attention_backend
         )
 
         self.model = self.pipe.transformer
@@ -309,6 +320,15 @@ class TrainWan21DiffusionRecipe(BaseRecipe):
 
         self.load_checkpoint(self.restore_from)
 
+        # Init Flow Matching Pipeline
+        self.flow_matching_pipeline = FlowMatchingPipeline(
+            num_train_timesteps=self.num_train_timesteps,
+            timestep_sampling=self.timestep_sampling,
+            flow_shift=self.flow_shift,
+            i2v_prob=self.i2v_prob,
+            device=self.device,
+        )
+
         if is_main_process():
             os.makedirs(self.checkpoint_config.checkpoint_dir, exist_ok=True)
 
@@ -344,7 +364,16 @@ class TrainWan21DiffusionRecipe(BaseRecipe):
                 micro_losses = []
                 for micro_batch in batch_group:
                     try:
-                        loss, _ = step_fsdp_transformer_t2v(
+                        # TODO: Ensure Wan also uses flow matching pipeline
+                        if self.model_id == "hunyuanvideo-community/HunyuanVideo-1.5-Diffusers-720p_t2v":
+                            loss, _ = self.flow_matching_pipeline.step(
+                                model=self.model,
+                                batch=micro_batch,
+                                device=self.device,
+                                dtype=self.bf16
+                            )
+                        else:
+                            loss, _ = step_fsdp_transformer_t2v(
                             scheduler=self.pipe.scheduler,
                             model=self.model,
                             batch=micro_batch,

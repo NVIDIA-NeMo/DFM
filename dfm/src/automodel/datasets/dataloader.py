@@ -111,6 +111,20 @@ class MetaFilesDataset(Dataset):
 
         text_embeddings: torch.Tensor = data["text_embeddings"].to(self.device)
         video_latents: torch.Tensor = data["video_latents"].to(self.device)
+        
+        # Load text_mask if available (backwards compatible)
+        text_mask = data.get("text_mask")
+        text_embeddings_2 = data.get("text_embeddings_2")
+        text_mask_2 = data.get("text_mask_2")
+        image_embeds = data.get("image_embeds")
+        if text_mask is not None:
+            text_mask = text_mask.to(self.device)
+        if text_embeddings_2 is not None:
+            text_embeddings_2 = text_embeddings_2.to(self.device)
+        if text_mask_2 is not None:
+            text_mask_2 = text_mask_2.to(self.device)
+        if image_embeds is not None:
+            image_embeds = image_embeds.to(self.device)
 
         if self.transform_text is not None:
             text_embeddings = self.transform_text(text_embeddings)
@@ -126,12 +140,24 @@ class MetaFilesDataset(Dataset):
             "num_frames": data.get("num_frames", "unknown"),
         }
 
-        return {
+        result = {
             "text_embeddings": text_embeddings,
             "video_latents": video_latents,
             "metadata": data.get("metadata", {}),
             "file_info": file_info,
         }
+        
+        # Add text_mask if available (backwards compatible)
+        if text_mask is not None:
+            result["text_mask"] = text_mask
+        if text_embeddings_2 is not None:
+            result["text_embeddings_2"] = text_embeddings_2
+        if text_mask_2 is not None:
+            result["text_mask_2"] = text_mask_2
+        if image_embeds is not None:
+            result["image_embeds"] = image_embeds
+            
+        return result
 
 
 def collate_fn(batch: List[Dict[str, torch.Tensor]]) -> Dict[str, torch.Tensor]:
@@ -141,12 +167,29 @@ def collate_fn(batch: List[Dict[str, torch.Tensor]]) -> Dict[str, torch.Tensor]:
     # use cat to stack the tensors in the batch
     text_embeddings = torch.cat([item["text_embeddings"] for item in batch], dim=0)
     video_latents = torch.cat([item["video_latents"] for item in batch], dim=0)
-    return {
+    
+    result = {
         "text_embeddings": text_embeddings,
         "video_latents": video_latents,
         "metadata": [item["metadata"] for item in batch],
         "file_info": [item["file_info"] for item in batch],
     }
+    
+    # Collate text_mask if available (backwards compatible)
+    if len(batch) > 0 and "text_mask" in batch[0]:
+        text_mask = torch.cat([item["text_mask"] for item in batch], dim=0)
+        result["text_mask"] = text_mask
+    if len(batch) > 0 and "text_embeddings_2" in batch[0]:
+        text_embeddings_2 = torch.cat([item["text_embeddings_2"] for item in batch], dim=0)
+        result["text_embeddings_2"] = text_embeddings_2
+    if len(batch) > 0 and "text_mask_2" in batch[0]:
+        text_mask_2 = torch.cat([item["text_mask_2"] for item in batch], dim=0)
+        result["text_mask_2"] = text_mask_2
+    if len(batch) > 0 and "image_embeds" in batch[0]:
+        image_embeds = torch.cat([item["image_embeds"] for item in batch], dim=0)
+        result["image_embeds"] = image_embeds
+    
+    return result
 
 
 def build_node_parallel_sampler(
@@ -167,7 +210,7 @@ def build_node_parallel_sampler(
     )
 
 
-def build_wan21_dataloader(
+def build_dataloader(
     *,
     meta_folder: str,
     batch_size: int,
@@ -211,4 +254,4 @@ def create_dataloader(
     batch_size: int,
     num_nodes: int,
 ) -> Tuple[DataLoader, Optional[DistributedSampler]]:
-    return build_wan21_dataloader(meta_folder=meta_folder, batch_size=batch_size, num_nodes=num_nodes)
+    return build_dataloader(meta_folder=meta_folder, batch_size=batch_size, num_nodes=num_nodes)
