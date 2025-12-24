@@ -158,7 +158,7 @@ class HunyuanParallelizationStrategy(ParallelizationStrategy):
         mp_policy: Optional[MixedPrecisionPolicy] = None,
         offload_policy: Optional[OffloadPolicy] = None,
         sequence_parallel: bool = False,
-        activation_checkpointing: bool = False,
+        activation_checkpointing: bool = True,
         tp_shard_plan: Optional[Union[Dict[str, ParallelStyle], str]] = None,
         dp_replicate_mesh_name: str = "dp_replicate",
         dp_shard_cp_mesh_name: str = "dp_shard_cp",
@@ -175,12 +175,13 @@ class HunyuanParallelizationStrategy(ParallelizationStrategy):
                 reduce_dtype=torch.float32,
                 output_dtype=torch.bfloat16,
             )
-
-        for idx in range(len(model.transformer_blocks)):
-            model.transformer_blocks[idx] = checkpoint_wrapper(
-                model.transformer_blocks[idx],
-                checkpoint_impl=CheckpointImpl.NO_REENTRANT,
-            )
+        # Apply activation checkpointing to transformer blocks if requested
+        if activation_checkpointing:
+            for idx in range(len(model.transformer_blocks)):
+                model.transformer_blocks[idx] = checkpoint_wrapper(
+                    model.transformer_blocks[idx],
+                    checkpoint_impl=CheckpointImpl.NO_REENTRANT,
+                )
 
         # Apply FSDP sharding recursively and to root
         apply_fsdp2_sharding_recursively(model, dp_mesh, mp_policy, offload_policy)
