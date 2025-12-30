@@ -122,7 +122,7 @@ class DiffusionDataModule(EnergonMultiModalDataModule):
             num_workers=num_workers,
             packing_buffer_size=packing_buffer_size,
             pin_memory=pin_memory,
-            task_encoder=task_encoder,   
+            task_encoder=task_encoder,
         )
         self.use_train_split_for_val = use_train_split_for_val
 
