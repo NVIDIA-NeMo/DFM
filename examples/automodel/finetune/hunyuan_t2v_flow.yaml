@@ -1,7 +1,7 @@
 # HunyuanVideo-1.5 720p T2V Training Configuration
 # 
 # This configuration file is fully compatible with TrainDiffusionRecipe class
-# (dfm/src/automodel/recipes/diff_train.py)
+# (dfm/src/automodel/recipes/train.py) using FlowMatchingPipelineV2
 
 # Model configuration
 model:
@@ -30,10 +30,13 @@ fsdp:
   activation_checkpointing: true
   use_hf_tp_plan: false
 
-# Flow matching configuration
+# Flow matching V2 configuration
 flow_matching:
-  use_sigma_noise: true
-  timestep_sampling: "lognorm"  # Options: "uniform", "lognorm", "mix", "mode"
+  adapter_type: "hunyuan"  # Options: "hunyuan", "simple"
+  adapter_kwargs:
+    use_condition_latents: true
+    default_image_embed_shape: [729, 1152]
+  timestep_sampling: "logit_normal"  # Options: "uniform", "logit_normal", "lognorm", "mix", "mode"
   logit_mean: 0.0
   logit_std: 1.0
   flow_shift: 3.0  # Flow shift for training
@@ -41,7 +44,10 @@ flow_matching:
   sigma_min: 0.0
   sigma_max: 1.0
   num_train_timesteps: 1000 
-  i2v_prob: 0.3  
+  i2v_prob: 0.3
+  use_loss_weighting: false
+  log_interval: 1000  # Steps between detailed logs
+  summary_log_interval: 100  # Steps between summary logs
 
 # Training step scheduler configuration
 step_scheduler:
@@ -62,7 +68,7 @@ data:
 # Checkpoint configuration
 checkpoint:
   enabled: true
-  checkpoint_dir: /opt/DFM/hunyuan_t2v_flow_outputs_base_recipe_multi_node_fsdp_run_image_embeds/
+  checkpoint_dir: /opt/DFM/hunyuan_t2v_flow_outputs_base_recipe_flowPipelineV2/
   model_save_format: torch_save
   save_consolidated: false
   restore_from: null

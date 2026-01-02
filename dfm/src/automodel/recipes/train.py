@@ -33,8 +33,7 @@ from torch.distributed.fsdp import MixedPrecisionPolicy
 from transformers.utils.hub import TRANSFORMERS_CACHE
 
 from dfm.src.automodel._diffusers.auto_diffusion_pipeline import NeMoWanPipeline, NeMoAutoDiffusionPipeline
-from dfm.src.automodel.flow_matching.flow_matching_pipeline import FlowMatchingPipeline
-from dfm.src.automodel.flow_matching.training_step_t2v import step_fsdp_transformer_t2v
+from dfm.src.automodel.flow_matching.flow_matching_pipeline import FlowMatchingPipeline, create_adapter
 
 
 def build_model_and_optimizer(
@@ -199,8 +198,10 @@ class TrainDiffusionRecipe(BaseRecipe):
         fm_cfg = self.cfg.get("flow_matching", {})
 
         self.cpu_offload = fsdp_cfg.get("cpu_offload", False)
-        self.use_sigma_noise = fm_cfg.get("use_sigma_noise", True)
-        self.timestep_sampling = fm_cfg.get("timestep_sampling", "uniform")
+        
+        # Flow matching configuration
+        self.adapter_type = fm_cfg.get("adapter_type", "simple")
+        self.timestep_sampling = fm_cfg.get("timestep_sampling", "logit_normal")
         self.logit_mean = fm_cfg.get("logit_mean", 0.0)
         self.logit_std = fm_cfg.get("logit_std", 1.0)
         self.flow_shift = fm_cfg.get("flow_shift", 3.0)
@@ -209,12 +210,20 @@ class TrainDiffusionRecipe(BaseRecipe):
         self.sigma_max = fm_cfg.get("sigma_max", 1.0)
         self.num_train_timesteps = fm_cfg.get("num_train_timesteps", 1000)
         self.i2v_prob = fm_cfg.get("i2v_prob", 0.3)
+        self.use_loss_weighting = fm_cfg.get("use_loss_weighting", True)
+        self.log_interval = fm_cfg.get("log_interval", 100)
+        self.summary_log_interval = fm_cfg.get("summary_log_interval", 10)
+        
+        # Adapter-specific configuration
+        adapter_kwargs = fm_cfg.get("adapter_kwargs", {})
+        self.adapter_kwargs = adapter_kwargs.to_dict() 
 
-        logging.info(f"[INFO] Flow matching: {'ENABLED' if self.use_sigma_noise else 'DISABLED'}")
-        if self.use_sigma_noise:
-            logging.info(f"[INFO]   - Timestep sampling: {self.timestep_sampling}")
-            logging.info(f"[INFO]   - Flow shift: {self.flow_shift}")
-            logging.info(f"[INFO]   - Mix uniform ratio: {self.mix_uniform_ratio}")
+        logging.info(f"[INFO] Flow Matching V2 Pipeline")
+        logging.info(f"[INFO]   - Adapter type: {self.adapter_type}")
+        logging.info(f"[INFO]   - Timestep sampling: {self.timestep_sampling}")
+        logging.info(f"[INFO]   - Flow shift: {self.flow_shift}")
+        logging.info(f"[INFO]   - Mix uniform ratio: {self.mix_uniform_ratio}")
+        logging.info(f"[INFO]   - Use loss weighting: {self.use_loss_weighting}")
 
         (self.pipe, self.optimizer, self.device_mesh) = build_model_and_optimizer(
             model_id=self.model_id,
@@ -320,14 +329,25 @@ class TrainDiffusionRecipe(BaseRecipe):
 
         self.load_checkpoint(self.restore_from)
 
-        # Init Flow Matching Pipeline
+        # Init Flow Matching Pipeline V2 with model adapter
+        model_adapter = create_adapter(self.adapter_type, **self.adapter_kwargs)
         self.flow_matching_pipeline = FlowMatchingPipeline(
+            model_adapter=model_adapter,
             num_train_timesteps=self.num_train_timesteps,
             timestep_sampling=self.timestep_sampling,
             flow_shift=self.flow_shift,
             i2v_prob=self.i2v_prob,
+            logit_mean=self.logit_mean,
+            logit_std=self.logit_std,
+            mix_uniform_ratio=self.mix_uniform_ratio,
+            sigma_min=self.sigma_min,
+            sigma_max=self.sigma_max,
+            use_loss_weighting=self.use_loss_weighting,
+            log_interval=self.log_interval,
+            summary_log_interval=self.summary_log_interval,
             device=self.device,
         )
+        logging.info(f"[INFO] Flow Matching Pipeline V2 initialized with {self.adapter_type} adapter")
 
         if is_main_process():
             os.makedirs(self.checkpoint_config.checkpoint_dir, exist_ok=True)
@@ -364,29 +384,11 @@ class TrainDiffusionRecipe(BaseRecipe):
                 micro_losses = []
                 for micro_batch in batch_group:
                     try:
-                        # TODO: Ensure Wan also uses flow matching pipeline
-                        if self.model_id == "hunyuanvideo-community/HunyuanVideo-1.5-Diffusers-720p_t2v":
-                            loss, _ = self.flow_matching_pipeline.step(
-                                model=self.model,
-                                batch=micro_batch,
-                                device=self.device,
-                                dtype=self.bf16
-                            )
-                        else:
-                            loss, _ = step_fsdp_transformer_t2v(
-                            scheduler=self.pipe.scheduler,
+                        loss, metrics = self.flow_matching_pipeline.step(
                             model=self.model,
                             batch=micro_batch,
                             device=self.device,
-                            bf16=self.bf16,
-                            use_sigma_noise=self.use_sigma_noise,
-                            timestep_sampling=self.timestep_sampling,
-                            logit_mean=self.logit_mean,
-                            logit_std=self.logit_std,
-                            flow_shift=self.flow_shift,
-                            mix_uniform_ratio=self.mix_uniform_ratio,
-                            sigma_min=self.sigma_min,
-                            sigma_max=self.sigma_max,
+                            dtype=self.bf16,
                             global_step=global_step,
                         )
                     except Exception as exc:

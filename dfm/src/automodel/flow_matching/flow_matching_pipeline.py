@@ -13,115 +13,264 @@
 # limitations under the License.
 
 """
-FlowMatching Pipeline
+FlowMatching Pipeline - Model-agnostic implementation with adapter pattern.
+
+This module provides a unified FlowMatchingPipeline class that is completely
+independent of specific model implementations through the ModelAdapter abstraction.
+
+Features:
+- Model-agnostic design via ModelAdapter protocol
+- Various timestep sampling strategies (uniform, logit_normal, mode, lognorm)
+- Flow shift transformation
+- Sigma clamping for finetuning
+- Loss weighting
+- Detailed training logging
 """
 
 import logging
 import math
+import os
 import random
-from typing import Dict, Tuple
+from dataclasses import dataclass
+from typing import Any, Dict, Optional, Tuple
 
 import torch
 import torch.nn as nn
 
+# Import adapters from the adapters module
+from .adapters import (
+    FlowMatchingContext,
+    HunyuanAdapter,
+    ModelAdapter,
+    SimpleAdapter,
+)
+
 logger = logging.getLogger(__name__)
 
 
+# =============================================================================
+# Data Classes
+# =============================================================================
+
+@dataclass
+class FlowMatchingOutput:
+    """Output from a flow matching training step."""
+    loss: torch.Tensor
+    metrics: Dict[str, Any]
+    model_pred: Optional[torch.Tensor] = None
+    target: Optional[torch.Tensor] = None
+
+
+# =============================================================================
+# Noise Schedule
+# =============================================================================
+
+class LinearInterpolationSchedule:
+    """Simple linear interpolation schedule for flow matching."""
+    
+    def forward(
+        self, 
+        x0: torch.Tensor, 
+        x1: torch.Tensor, 
+        sigma: torch.Tensor
+    ) -> torch.Tensor:
+        """
+        Linear interpolation: x_t = (1 - σ) * x_0 + σ * x_1
+        
+        Args:
+            x0: Starting point (clean latents)
+            x1: Ending point (noise)
+            sigma: Sigma values in [0, 1]
+            
+        Returns:
+            Interpolated tensor at sigma
+        """
+        sigma = sigma.view(-1, *([1] * (x0.ndim - 1)))
+        return (1.0 - sigma) * x0 + sigma * x1
+
+
+# =============================================================================
+# Flow Matching Pipeline
+# =============================================================================
+
 class FlowMatchingPipeline:
     """
-    Flow Matching Pipeline for video generation models.
+    Flow Matching Pipeline - Model-agnostic implementation.
     
-    This class encapsulates all the logic for flow matching training including:
-    - Noise scheduling
+    This pipeline handles all flow matching training logic while delegating
+    model-specific operations to a ModelAdapter. This allows adding support
+    for new model architectures without modifying the pipeline code.
+    
+    Features:
+    - Noise scheduling with linear interpolation
     - Timestep sampling with various strategies
-    - Conditional latent generation
-    - Training step execution
+    - Flow shift transformation
+    - Sigma clamping for finetuning
+    - Loss weighting
+    - Detailed training logging
+    
+    Example:
+        # Create pipeline with HunyuanVideo adapter
+        from automodel.flow_matching.adapters import HunyuanAdapter
+        
+        pipeline = FlowMatchingPipeline(
+            model_adapter=HunyuanAdapter(),
+            flow_shift=3.0,
+            timestep_sampling="logit_normal",
+        )
+        
+        # Training step
+        loss, metrics = pipeline.step(model, batch, device, dtype, global_step)
     """
     
     def __init__(
         self,
+        model_adapter: ModelAdapter,
         num_train_timesteps: int = 1000,
-        timestep_sampling: str = "lognorm",
+        timestep_sampling: str = "logit_normal",
         flow_shift: float = 3.0,
         i2v_prob: float = 0.3,
-        device: torch.device = None,
+        # Logit-normal distribution parameters
+        logit_mean: float = 0.0,
+        logit_std: float = 1.0,
+        # Mix sampling parameters
+        mix_uniform_ratio: float = 0.1,
+        # Sigma clamping for finetuning (pretrain uses [0.0, 1.0])
+        sigma_min: float = 0.0,
+        sigma_max: float = 1.0,
+        # Loss weighting
+        use_loss_weighting: bool = True,
+        # Logging
+        log_interval: int = 100,
+        summary_log_interval: int = 10,
+        device: Optional[torch.device] = None,
     ):
         """
         Initialize the FlowMatching pipeline.
         
         Args:
+            model_adapter: ModelAdapter instance for model-specific operations
             num_train_timesteps: Total number of timesteps for the flow
-            timestep_sampling: Sampling strategy ("uniform", "lognorm", "mix", "mode")
+            timestep_sampling: Sampling strategy:
+                - "uniform": Pure uniform sampling
+                - "logit_normal": SD3-style logit-normal (recommended)
+                - "mode": Mode-based sampling
+                - "lognorm": Log-normal based sampling
+                - "mix": Mix of lognorm and uniform
             flow_shift: Shift parameter for timestep transformation
             i2v_prob: Probability of using image-to-video conditioning
+            logit_mean: Mean for logit-normal distribution
+            logit_std: Std for logit-normal distribution
+            mix_uniform_ratio: Ratio of uniform samples when using mix
+            sigma_min: Minimum sigma (0.0 for pretrain)
+            sigma_max: Maximum sigma (1.0 for pretrain)
+            use_loss_weighting: Whether to apply flow-based loss weighting
+            log_interval: Steps between detailed logs
+            summary_log_interval: Steps between summary logs
             device: Device to use for computations
         """
+        self.model_adapter = model_adapter
         self.num_train_timesteps = num_train_timesteps
         self.timestep_sampling = timestep_sampling
         self.flow_shift = flow_shift
         self.i2v_prob = i2v_prob
+        self.logit_mean = logit_mean
+        self.logit_std = logit_std
+        self.mix_uniform_ratio = mix_uniform_ratio
+        self.sigma_min = sigma_min
+        self.sigma_max = sigma_max
+        self.use_loss_weighting = use_loss_weighting
+        self.log_interval = log_interval
+        self.summary_log_interval = summary_log_interval
         self.device = device if device is not None else torch.device("cuda")
         
-        # Initialize components
-        self.noise_schedule = LinearInterpolationSchedule(T=num_train_timesteps)
-        self.timestep_sampler = TimestepSampler(
-            T=num_train_timesteps,
-            device=self.device,
-            snr_type=timestep_sampling,
-        )
+        # Initialize noise schedule
+        self.noise_schedule = LinearInterpolationSchedule()
     
-    def get_condition_latents(self, latents: torch.Tensor, task_type: str) -> torch.Tensor:
+    def sample_timesteps(
+        self,
+        batch_size: int,
+        device: Optional[torch.device] = None,
+    ) -> Tuple[torch.Tensor, torch.Tensor, str]:
         """
-        Generate conditional latents based on task type.
+        Sample timesteps and compute sigma values with flow shift.
+        
+        Implements the flow shift transformation:
+        σ = shift / (shift + (1/u - 1))
         
         Args:
-            latents: Input latents [B, C, F, H, W]
-            task_type: Task type ("t2v" or "i2v")
+            batch_size: Number of timesteps to sample
+            device: Device for tensor operations
             
         Returns:
-            Conditional latents [B, C+1, F, H, W]
+            sigma: Sigma values in [sigma_min, sigma_max]
+            timesteps: Timesteps in [0, num_train_timesteps]
+            sampling_method: Name of the sampling method used
         """
-        b, c, f, h, w = latents.shape
-        cond = torch.zeros([b, c + 1, f, h, w], device=latents.device, dtype=latents.dtype)
-            
-        if task_type == "t2v":
-            return cond
-        elif task_type == "i2v":
-            cond[:, :-1, :1] = latents[:, :, :1]
-            cond[:, -1, 0] = 1
-            return cond
+        if device is None:
+            device = self.device
+        
+        # Determine if we should use uniform (for mix strategy)
+        use_uniform = (
+            self.timestep_sampling == "uniform" or
+            (self.mix_uniform_ratio > 0 and torch.rand(1).item() < self.mix_uniform_ratio)
+        )
+        
+        if use_uniform:
+            u = torch.rand(size=(batch_size,), device=device)
+            sampling_method = "uniform"
         else:
-            raise ValueError(f"Unsupported task type: {task_type}")
-    
-    def timestep_transform(self, timesteps: torch.Tensor) -> torch.Tensor:
-        """
-        Transform timesteps with shift parameter.
+            u = self._sample_from_distribution(batch_size, device)
+            sampling_method = self.timestep_sampling
         
-        Args:
-            timesteps: Original timesteps
+        # Apply flow shift: σ = shift / (shift + (1/u - 1))
+        u_clamped = torch.clamp(u, min=1e-5)  # Avoid division by zero
+        sigma = self.flow_shift / (self.flow_shift + (1.0 / u_clamped - 1.0))
+        
+        # Apply sigma clamping
+        sigma = torch.clamp(sigma, self.sigma_min, self.sigma_max)
+        
+        # Convert sigma to timesteps [0, T]
+        timesteps = sigma * self.num_train_timesteps
+        
+        return sigma, timesteps, sampling_method
+    
+    def _sample_from_distribution(
+        self, 
+        batch_size: int, 
+        device: torch.device
+    ) -> torch.Tensor:
+        """Sample u values from the configured distribution."""
+        if self.timestep_sampling == "logit_normal":
+            u = torch.normal(
+                mean=self.logit_mean,
+                std=self.logit_std,
+                size=(batch_size,),
+                device=device,
+            )
+            u = torch.sigmoid(u)
             
-        Returns:
-            Transformed timesteps
-        """
-        if self.flow_shift == 1.0:
-            return timesteps
-        timesteps_normalized = timesteps / self.num_train_timesteps
-        timesteps_transformed = (
-            self.flow_shift * timesteps_normalized / 
-            (1 + (self.flow_shift - 1) * timesteps_normalized)
-        )
-        return timesteps_transformed * self.num_train_timesteps
+        elif self.timestep_sampling == "lognorm":
+            u = torch.normal(mean=0.0, std=1.0, size=(batch_size,), device=device)
+            u = torch.sigmoid(u)
+            
+        elif self.timestep_sampling == "mode":
+            mode_scale = 1.29
+            u = torch.rand(size=(batch_size,), device=device)
+            u = 1.0 - u - mode_scale * (torch.cos(math.pi * u / 2.0) ** 2 - 1.0 + u)
+            u = torch.clamp(u, 0.0, 1.0)
+            
+        elif self.timestep_sampling == "mix":
+            u = torch.normal(mean=0.0, std=1.0, size=(batch_size,), device=device)
+            u = torch.sigmoid(u)
+            
+        else:
+            u = torch.rand(size=(batch_size,), device=device)
+            
+        return u
     
     def determine_task_type(self, data_type: str) -> str:
-        """
-        Determine task type based on data type and randomization.
-        
-        Args:
-            data_type: Type of data ("image" or "video")
-            
-        Returns:
-            Task type ("t2v" or "i2v")
-        """
+        """Determine task type based on data type and randomization."""
         if data_type == "image":
             return "t2v"
         elif data_type == "video":
@@ -129,13 +278,54 @@ class FlowMatchingPipeline:
         else:
             return "t2v"
     
+    def compute_loss(
+        self,
+        model_pred: torch.Tensor,
+        target: torch.Tensor,
+        sigma: torch.Tensor,
+    ) -> Tuple[torch.Tensor, torch.Tensor, torch.Tensor]:
+        """
+        Compute flow matching loss with optional weighting.
+        
+        Loss weight: w = 1 + flow_shift * σ
+        
+        Args:
+            model_pred: Model prediction
+            target: Target (velocity = noise - clean)
+            sigma: Sigma values for each sample
+            
+        Returns:
+            weighted_loss: Final loss to backprop
+            unweighted_loss: Raw MSE loss
+            loss_weight: Applied weights
+        """
+        loss = nn.functional.mse_loss(
+            model_pred.float(), 
+            target.float(), 
+            reduction="none"
+        )
+        
+        if self.use_loss_weighting:
+            loss_weight = 1.0 + self.flow_shift * sigma
+            loss_weight = loss_weight.view(-1, *([1] * (loss.ndim - 1)))
+        else:
+            loss_weight = torch.ones_like(sigma).view(-1, *([1] * (loss.ndim - 1)))
+        
+        loss_weight = loss_weight.to(model_pred.device)
+        
+        unweighted_loss = loss.mean()
+        weighted_loss = (loss * loss_weight).mean()
+        
+        return weighted_loss, unweighted_loss, loss_weight
+    
     def step(
         self,
         model: nn.Module,
-        batch: Dict,
+        batch: Dict[str, Any],
         device: torch.device,
         dtype: torch.dtype,
-    ) -> Tuple[torch.Tensor, Dict]:
+        global_step: int = 0,
+    ) -> Tuple[torch.Tensor, Dict[str, Any]]:
         """
         Execute a single training step with flow matching.
         
@@ -143,10 +333,8 @@ class FlowMatchingPipeline:
         {
             "video_latents": torch.Tensor,  # [B, C, F, H, W]
             "text_embeddings": torch.Tensor,  # [B, seq_len, dim]
-            "text_mask": torch.Tensor,  # [B, seq_len]
-            "text_embeddings_2": torch.Tensor,  # [B, seq_len, dim]
-            "text_mask_2": torch.Tensor,  # [B, seq_len]
-            Optional: "data_type": str,  # "video" or "image"
+            "data_type": str,  # "video" or "image" (optional)
+            # ... additional model-specific keys handled by adapter
         }
         
         Args:
@@ -154,189 +342,258 @@ class FlowMatchingPipeline:
             batch: Batch of training data
             device: Device to use
             dtype: Data type for operations
+            global_step: Current training step (for logging)
             
         Returns:
             loss: The computed loss
             metrics: Dictionary of training metrics
         """
+        debug_mode = os.environ.get("DEBUG_TRAINING", "0") == "1"
+        detailed_log = global_step % self.log_interval == 0
+        summary_log = global_step % self.summary_log_interval == 0
         
-        # Extract batch data
-        video_latents = batch["video_latents"].to(device, dtype=dtype)  # [B, C, F, H, W]
-        text_embeddings = batch["text_embeddings"].to(device, dtype=dtype)  # [B, seq_len, dim]
-        text_mask = batch["text_mask"].to(device, dtype=dtype)  # [B, seq_len]
-        text_embeddings_2 = batch["text_embeddings_2"].to(device, dtype=dtype)  # [B, seq_len, dim]
-        text_mask_2 = batch["text_mask_2"].to(device, dtype=dtype)  # [B, seq_len]
+        # Extract and prepare batch data
+        video_latents = batch["video_latents"].to(device, dtype=dtype)
+        
+        # Handle tensor shapes
+        if video_latents.ndim == 4:
+            video_latents = video_latents.unsqueeze(0)
+        
+        batch_size = video_latents.shape[0]
         
         # Determine task type
         data_type = batch.get("data_type", "video")
         task_type = self.determine_task_type(data_type)
-        if task_type == "i2v":
-            image_embeds = batch["image_embeds"].to(device, dtype=dtype)
-        else:
-            image_embeds = torch.zeros(
-                video_latents.shape[0],
-                729,
-                1152,
-                dtype=dtype,
-                device=device,
+        
+        # ====================================================================
+        # Flow Matching: Sample Timesteps
+        # ====================================================================
+        sigma, timesteps, sampling_method = self.sample_timesteps(batch_size, device)
+        
+        # ====================================================================
+        # Flow Matching: Add Noise
+        # ====================================================================
+        noise = torch.randn_like(video_latents, dtype=torch.float32)
+        
+        # x_t = (1 - σ) * x_0 + σ * ε
+        noisy_latents = self.noise_schedule.forward(
+            video_latents.float(), noise, sigma
+        )
+        
+        # ====================================================================
+        # Logging
+        # ====================================================================
+        if detailed_log or debug_mode:
+            self._log_detailed(
+                global_step, sampling_method, batch_size,
+                sigma, timesteps, video_latents, noise, noisy_latents
+            )
+        elif summary_log:
+            logger.info(
+                f"[STEP {global_step}] σ=[{sigma.min():.3f},{sigma.max():.3f}] | "
+                f"t=[{timesteps.min():.1f},{timesteps.max():.1f}] | "
+                f"noisy=[{noisy_latents.min():.1f},{noisy_latents.max():.1f}] | "
+                f"{sampling_method}"
             )
         
-        # Get condition latents
-        cond_latents = self.get_condition_latents(video_latents, task_type)
+        # Convert to target dtype
+        noisy_latents = noisy_latents.to(dtype)
         
-        # Generate noise
-        noise = torch.randn_like(video_latents, device=device)  # [B, C, F, H, W]
+        # ====================================================================
+        # Forward Pass (via adapter)
+        # ====================================================================
+        context = FlowMatchingContext(
+            noisy_latents=noisy_latents,
+            video_latents=video_latents,
+            timesteps=timesteps,
+            sigma=sigma,
+            task_type=task_type,
+            data_type=data_type,
+            device=device,
+            dtype=dtype,
+            batch=batch,
+        )
         
-        # Sample and transform timesteps
-        timesteps = self.timestep_sampler.sample(video_latents.shape[0], device=device)
-        timesteps = self.timestep_transform(timesteps)
+        inputs = self.model_adapter.prepare_inputs(context)
+        model_pred = self.model_adapter.forward(model, inputs)
         
-        # Flow matching: x_t = (1 - t/T) * x0 + (t/T) * noise
-        latents_noised = self.noise_schedule.forward(video_latents, noise, timesteps)
+        # ====================================================================
+        # Target: Flow Matching Velocity
+        # ====================================================================
+        # v = ε - x_0
+        target = noise - video_latents.float()
         
-        # Target is velocity: v = noise - x0
-        target = noise - video_latents
+        # ====================================================================
+        # Loss Computation
+        # ====================================================================
+        weighted_loss, unweighted_loss, loss_weight = self.compute_loss(
+            model_pred, target, sigma
+        )
         
-        # Concatenate noised latents with conditional latents (for HunyuanVideo 1.5)
-        # Model expects [B, 65, F, H, W] = [B, 32+32+1, F, H, W]
-        latents_with_condition = torch.cat([latents_noised, cond_latents], dim=1)
+        # Safety check
+        if torch.isnan(weighted_loss) or weighted_loss > 100:
+            logger.error(f"[ERROR] Loss explosion! Loss={weighted_loss.item():.3f}")
+            raise ValueError(f"Loss exploded: {weighted_loss.item()}")
         
-        # Forward pass through model
-        model_pred = model(
-            latents_with_condition.to(dtype=dtype),
-            timesteps,
-            encoder_hidden_states=text_embeddings.to(dtype=dtype),
-            encoder_attention_mask=text_mask.to(dtype=dtype),
-            encoder_hidden_states_2=text_embeddings_2.to(dtype=dtype),
-            encoder_attention_mask_2=text_mask_2.to(dtype=dtype),
-            image_embeds=image_embeds.to(dtype=dtype),
-            return_dict=False
-        )[0]
-        
-        # Compute MSE loss
-        target = target.to(dtype=model_pred.dtype)
-        loss = nn.functional.mse_loss(model_pred, target)
+        # Logging
+        if detailed_log or debug_mode:
+            self._log_loss_detailed(
+                global_step, model_pred, target, loss_weight,
+                unweighted_loss, weighted_loss
+            )
+        elif summary_log:
+            logger.info(
+                f"[STEP {global_step}] Loss: {weighted_loss.item():.6f} | "
+                f"w=[{loss_weight.min():.2f},{loss_weight.max():.2f}]"
+            )
         
         # Collect metrics
         metrics = {
+            "loss": weighted_loss.item(),
+            "unweighted_loss": unweighted_loss.item(),
+            "sigma_min": sigma.min().item(),
+            "sigma_max": sigma.max().item(),
+            "sigma_mean": sigma.mean().item(),
+            "weight_min": loss_weight.min().item(),
+            "weight_max": loss_weight.max().item(),
+            "timestep_min": timesteps.min().item(),
+            "timestep_max": timesteps.max().item(),
+            "noisy_min": noisy_latents.min().item(),
+            "noisy_max": noisy_latents.max().item(),
+            "sampling_method": sampling_method,
             "task_type": task_type,
             "data_type": data_type,
         }
         
-        return loss, metrics
-
-
-class LinearInterpolationSchedule:
-    """Simple linear interpolation schedule for flow matching"""
+        return weighted_loss, metrics
     
-    def __init__(self, T: int = 1000):
-        """
-        Initialize the linear interpolation schedule.
-        
-        Args:
-            T: Total number of timesteps
-        """
-        self.T = T
-    
-    def forward(self, x0: torch.Tensor, x1: torch.Tensor, t: torch.Tensor) -> torch.Tensor:
-        """
-        Linear interpolation: x_t = (1 - t/T) * x0 + (t/T) * x1
-        
-        Args:
-            x0: Starting point (clean latents)
-            x1: Ending point (noise)
-            t: Timesteps
-            
-        Returns:
-            Interpolated tensor at timestep t
-        """
-        t_normalized = t / self.T
-        t_normalized = t_normalized.view(-1, *([1] * (x0.ndim - 1)))
-        return (1 - t_normalized) * x0 + t_normalized * x1
-
-
-class TimestepSampler:
-    """Timestep sampler for flow matching with various strategies"""
-    
-    TRAIN_EPS = 1e-5
-    SAMPLE_EPS = 1e-3
-    
-    def __init__(
-        self, 
-        T: int = 1000, 
-        device: torch.device = None,
-        snr_type: str = "lognorm",
+    def _log_detailed(
+        self,
+        global_step: int,
+        sampling_method: str,
+        batch_size: int,
+        sigma: torch.Tensor,
+        timesteps: torch.Tensor,
+        video_latents: torch.Tensor,
+        noise: torch.Tensor,
+        noisy_latents: torch.Tensor,
     ):
-        """
-        Initialize the timestep sampler.
-        
-        Args:
-            T: Total number of timesteps
-            device: Device for tensor operations
-            snr_type: Sampling strategy ("uniform", "lognorm", "mix", "mode")
-        """
-        self.T = T
-        self.device = device
-        self.snr_type = snr_type
-    
-    def _check_interval(self, eval: bool = False) -> Tuple[float, float]:
-        """
-        Get the sampling interval with epsilon margins.
-        
-        Args:
-            eval: Whether in evaluation mode
-            
-        Returns:
-            Tuple of (t0, t1) interval bounds
-        """
-        eps = self.SAMPLE_EPS if eval else self.TRAIN_EPS
-        t0 = eps
-        t1 = 1.0 - eps
-        return t0, t1
-    
-    def sample(self, batch_size: int, device: torch.device = None) -> torch.Tensor:
-        """
-        Sample timesteps according to the configured strategy.
-        
-        Args:
-            batch_size: Number of timesteps to sample
-            device: Device for tensor operations
-            
-        Returns:
-            Sampled timesteps [batch_size]
-        """
-        if device is None:
-            device = self.device if self.device is not None else torch.device("cuda")
-        
-        t0, t1 = self._check_interval(eval=False)
-        
-        if self.snr_type == "uniform":
-            t = torch.rand((batch_size,), device=device) * (t1 - t0) + t0
-            
-        elif self.snr_type == "lognorm":
-            u = torch.normal(mean=0.0, std=1.0, size=(batch_size,), device=device)
-            t = 1.0 / (1.0 + torch.exp(-u)) * (t1 - t0) + t0
-            
-        elif self.snr_type == "mix":
-            u = torch.normal(mean=0.0, std=1.0, size=(batch_size,), device=device)
-            t_lognorm = 1.0 / (1.0 + torch.exp(-u)) * (t1 - t0) + t0
-            
-            delta = 0.0
-            t0_clip = t0 + delta
-            t1_clip = t1 - delta
-            t_clip_uniform = torch.rand((batch_size,), device=device) * (t1_clip - t0_clip) + t0_clip
-            
-            mask = (torch.rand((batch_size,), device=device) > 0.3).float()
-            t = mask * t_lognorm + (1 - mask) * t_clip_uniform
-            
-        elif self.snr_type == "mode":
-            mode_scale = 1.29
-            u = torch.rand(size=(batch_size,), device=device)
-            t = 1.0 - u - mode_scale * (torch.cos(math.pi * u / 2.0) ** 2 - 1.0 + u)
-            t = t * (t1 - t0) + t0
+        """Log detailed training information."""
+        logger.info("\n" + "=" * 80)
+        logger.info(f"[STEP {global_step}] FLOW MATCHING")
+        logger.info("=" * 80)
+        logger.info("[INFO] Using: x_t = (1-σ)x_0 + σ*ε")
+        logger.info("")
+        logger.info(f"[SAMPLING] Method: {sampling_method}")
+        logger.info(f"[FLOW] Shift: {self.flow_shift}")
+        logger.info(f"[BATCH] Size: {batch_size}")
+        logger.info("")
+        logger.info(f"[SIGMA] Range: [{sigma.min():.4f}, {sigma.max():.4f}]")
+        if sigma.numel() > 1:
+            logger.info(f"[SIGMA] Mean: {sigma.mean():.4f}, Std: {sigma.std():.4f}")
         else:
-            raise ValueError(f"Unknown SNR type: {self.snr_type}")
+            logger.info(f"[SIGMA] Value: {sigma.item():.4f}")
+        logger.info("")
+        logger.info(f"[TIMESTEPS] Range: [{timesteps.min():.2f}, {timesteps.max():.2f}]")
+        logger.info("")
+        logger.info(f"[RANGES] Clean latents: [{video_latents.min():.4f}, {video_latents.max():.4f}]")
+        logger.info(f"[RANGES] Noise:         [{noise.min():.4f}, {noise.max():.4f}]")
+        logger.info(f"[RANGES] Noisy latents: [{noisy_latents.min():.4f}, {noisy_latents.max():.4f}]")
         
-        timesteps = t * self.T
-        return timesteps
+        # Sanity check
+        max_expected = max(
+            abs(video_latents.max().item()),
+            abs(video_latents.min().item()),
+            abs(noise.max().item()),
+            abs(noise.min().item()),
+        ) * 1.5
+        if abs(noisy_latents.max()) > max_expected or abs(noisy_latents.min()) > max_expected:
+            logger.info(f"\n⚠️  WARNING: Noisy range seems large! Expected ~{max_expected:.1f}")
+        else:
+            logger.info("\n✓ Noisy latents range is reasonable")
+        logger.info("=" * 80 + "\n")
+    
+    def _log_loss_detailed(
+        self,
+        global_step: int,
+        model_pred: torch.Tensor,
+        target: torch.Tensor,
+        loss_weight: torch.Tensor,
+        unweighted_loss: torch.Tensor,
+        weighted_loss: torch.Tensor,
+    ):
+        """Log detailed loss information."""
+        logger.info("=" * 80)
+        logger.info(f"[STEP {global_step}] LOSS DEBUG")
+        logger.info("=" * 80)
+        logger.info("[TARGET] Flow matching: v = ε - x_0")
+        logger.info("")
+        logger.info(f"[RANGES] Model pred: [{model_pred.min():.4f}, {model_pred.max():.4f}]")
+        logger.info(f"[RANGES] Target (v): [{target.min():.4f}, {target.max():.4f}]")
+        logger.info("")
+        logger.info(f"[WEIGHTS] Formula: 1 + {self.flow_shift} * σ")
+        logger.info(f"[WEIGHTS] Range: [{loss_weight.min():.4f}, {loss_weight.max():.4f}]")
+        logger.info(f"[WEIGHTS] Mean: {loss_weight.mean():.4f}")
+        logger.info("")
+        logger.info(f"[LOSS] Unweighted: {unweighted_loss.item():.6f}")
+        logger.info(f"[LOSS] Weighted:   {weighted_loss.item():.6f}")
+        logger.info(f"[LOSS] Impact:     {(weighted_loss / max(unweighted_loss, 1e-8)):.3f}x")
+        logger.info("=" * 80 + "\n")
 
+
+# =============================================================================
+# Factory Functions
+# =============================================================================
+
+def create_adapter(adapter_type: str, **kwargs) -> ModelAdapter:
+    """
+    Factory function to create a model adapter by name.
+    
+    Args:
+        adapter_type: Type of adapter ("hunyuan", "simple")
+        **kwargs: Additional arguments passed to the adapter constructor
+        
+    Returns:
+        ModelAdapter instance
+    """
+    adapters = {
+        "hunyuan": HunyuanAdapter,
+        "simple": SimpleAdapter,
+    }
+    
+    if adapter_type not in adapters:
+        raise ValueError(
+            f"Unknown adapter type: {adapter_type}. "
+            f"Available: {list(adapters.keys())}"
+        )
+    
+    return adapters[adapter_type](**kwargs)
+
+
+def create_pipeline(
+    adapter_type: str,
+    adapter_kwargs: Optional[Dict[str, Any]] = None,
+    **pipeline_kwargs,
+) -> FlowMatchingPipeline:
+    """
+    Factory function to create a pipeline with a specific adapter.
+    
+    Args:
+        adapter_type: Type of adapter ("hunyuan", "simple")
+        adapter_kwargs: Arguments for the adapter constructor
+        **pipeline_kwargs: Arguments for the pipeline constructor
+        
+    Returns:
+        FlowMatchingPipeline instance
+        
+    Example:
+        pipeline = create_pipeline(
+            adapter_type="hunyuan",
+            adapter_kwargs={"use_condition_latents": True},
+            flow_shift=3.0,
+            timestep_sampling="logit_normal",
+        )
+    """
+    adapter_kwargs = adapter_kwargs or {}
+    adapter = create_adapter(adapter_type, **adapter_kwargs)
+    return FlowMatchingPipeline(model_adapter=adapter, **pipeline_kwargs)
