@@ -30,27 +30,27 @@ from .base import FlowMatchingContext, ModelAdapter
 class SimpleAdapter(ModelAdapter):
     """
     Model adapter for simple transformer models (e.g., Wan).
-    
+
     These models use a simple interface with:
     - hidden_states: noisy latents
     - timestep: timestep values
     - encoder_hidden_states: text embeddings
-    
+
     Expected batch keys:
     - text_embeddings: Text encoder output [B, seq_len, dim]
-    
+
     Example:
         adapter = SimpleAdapter()
         pipeline = FlowMatchingPipelineV2(model_adapter=adapter)
     """
-    
+
     def prepare_inputs(self, context: FlowMatchingContext) -> Dict[str, Any]:
         """
         Prepare inputs for simple transformer model.
-        
+
         Args:
             context: FlowMatchingContext with batch data
-            
+
         Returns:
             Dictionary containing:
             - hidden_states: Noisy latents
@@ -60,26 +60,26 @@ class SimpleAdapter(ModelAdapter):
         batch = context.batch
         device = context.device
         dtype = context.dtype
-        
+
         # Get text embeddings
         text_embeddings = batch["text_embeddings"].to(device, dtype=dtype)
         if text_embeddings.ndim == 2:
             text_embeddings = text_embeddings.unsqueeze(0)
-        
+
         return {
             "hidden_states": context.noisy_latents,
             "timestep": context.timesteps.to(dtype),
             "encoder_hidden_states": text_embeddings,
         }
-    
+
     def forward(self, model: nn.Module, inputs: Dict[str, Any]) -> torch.Tensor:
         """
         Execute forward pass for simple transformer model.
-        
+
         Args:
             model: Transformer model
             inputs: Dictionary from prepare_inputs()
-            
+
         Returns:
             Model prediction tensor
         """
@@ -90,4 +90,3 @@ class SimpleAdapter(ModelAdapter):
             return_dict=False,
         )
         return self.post_process_prediction(model_pred)
-

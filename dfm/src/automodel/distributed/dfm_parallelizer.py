@@ -21,6 +21,10 @@ from nemo_automodel.components.distributed.parallelizer import (
     apply_fsdp2_sharding_recursively,
 )
 from torch import nn
+from torch.distributed.algorithms._checkpoint.checkpoint_wrapper import (
+    CheckpointImpl,
+    checkpoint_wrapper,
+)
 from torch.distributed.device_mesh import DeviceMesh
 from torch.distributed.fsdp import (
     MixedPrecisionPolicy,
@@ -32,10 +36,6 @@ from torch.distributed.tensor.parallel import (
     ParallelStyle,
     RowwiseParallel,
     parallelize_module,
-)
-from torch.distributed.algorithms._checkpoint.checkpoint_wrapper import (
-    checkpoint_wrapper,
-    CheckpointImpl,
 )
 
 
@@ -148,9 +148,10 @@ class WanParallelizationStrategy(ParallelizationStrategy):
             reshard_after_forward=False,
         )
 
+
 class HunyuanParallelizationStrategy(ParallelizationStrategy):
-    """Parallelization strategy for Hunyuan-style transformer modules used in HunyuanVideo..
-    """
+    """Parallelization strategy for Hunyuan-style transformer modules used in HunyuanVideo.."""
+
     def parallelize(
         self,
         model: nn.Module,

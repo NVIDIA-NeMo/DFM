@@ -31,10 +31,10 @@ import torch.nn as nn
 class FlowMatchingContext:
     """
     Context object passed to model adapters containing all necessary data.
-    
+
     This provides a clean interface for adapters to access the data they need
     without coupling to the batch dictionary structure.
-    
+
     Attributes:
         noisy_latents: [B, C, F, H, W] - Noisy latents after interpolation
         video_latents: [B, C, F, H, W] - Original clean latents
@@ -46,20 +46,21 @@ class FlowMatchingContext:
         dtype: Data type for tensor operations
         batch: Original batch dictionary (for model-specific data)
     """
+
     # Core tensors
     noisy_latents: torch.Tensor
     video_latents: torch.Tensor
     timesteps: torch.Tensor
     sigma: torch.Tensor
-    
+
     # Task info
     task_type: str
     data_type: str
-    
+
     # Device/dtype
     device: torch.device
     dtype: torch.dtype
-    
+
     # Original batch (for model-specific data)
     batch: Dict[str, Any]
 
@@ -67,13 +68,13 @@ class FlowMatchingContext:
 class ModelAdapter(ABC):
     """
     Abstract base class for model-specific forward pass logic.
-    
+
     Implement this class to add support for new model architectures
     without modifying the FlowMatchingPipeline.
-    
+
     The adapter pattern decouples the flow matching logic from model-specific
     details like input preparation and forward pass conventions.
-    
+
     Example:
         class MyCustomAdapter(ModelAdapter):
             def prepare_inputs(self, context: FlowMatchingContext) -> Dict[str, Any]:
@@ -82,61 +83,57 @@ class ModelAdapter(ABC):
                     "t": context.timesteps,
                     "cond": context.batch["my_conditioning"],
                 }
-            
+
             def forward(self, model: nn.Module, inputs: Dict[str, Any]) -> torch.Tensor:
                 return model(**inputs)
-        
+
         pipeline = FlowMatchingPipelineV2(model_adapter=MyCustomAdapter())
     """
-    
+
     @abstractmethod
     def prepare_inputs(self, context: FlowMatchingContext) -> Dict[str, Any]:
         """
         Prepare model-specific inputs from the context.
-        
+
         Args:
             context: FlowMatchingContext containing all necessary data
-            
+
         Returns:
             Dictionary of inputs to pass to the model's forward method
         """
         pass
-    
+
     @abstractmethod
     def forward(self, model: nn.Module, inputs: Dict[str, Any]) -> torch.Tensor:
         """
         Execute the model forward pass.
-        
+
         Args:
             model: The model to call
             inputs: Dictionary of inputs from prepare_inputs()
-            
+
         Returns:
             Model prediction tensor
         """
         pass
-    
-    def get_condition_latents(
-        self, 
-        latents: torch.Tensor, 
-        task_type: str
-    ) -> torch.Tensor:
+
+    def get_condition_latents(self, latents: torch.Tensor, task_type: str) -> torch.Tensor:
         """
         Generate conditional latents based on task type.
-        
+
         Override this method if your model uses a different conditioning scheme.
         Default implementation adds a channel for conditioning mask.
-        
+
         Args:
             latents: Input latents [B, C, F, H, W]
             task_type: Task type ("t2v" or "i2v")
-            
+
         Returns:
             Conditional latents [B, C+1, F, H, W]
         """
         b, c, f, h, w = latents.shape
         cond = torch.zeros([b, c + 1, f, h, w], device=latents.device, dtype=latents.dtype)
-            
+
         if task_type == "t2v":
             return cond
         elif task_type == "i2v":
@@ -145,20 +142,19 @@ class ModelAdapter(ABC):
             return cond
         else:
             raise ValueError(f"Unsupported task type: {task_type}")
-    
+
     def post_process_prediction(self, model_pred: torch.Tensor) -> torch.Tensor:
         """
         Post-process model prediction if needed.
-        
+
         Override this for models that return extra outputs or need transformation.
-        
+
         Args:
             model_pred: Raw model output
-            
+
         Returns:
             Processed prediction tensor
         """
         if isinstance(model_pred, tuple):
             return model_pred[0]
         return model_pred
-

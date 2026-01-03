@@ -134,7 +134,7 @@ def main():
     pipe.vae.enable_slicing()
     pipe.vae.enable_tiling()
     print("[INFO] Enabled VAE slicing and tiling")
-    
+
     # Enable CPU offloading to reduce GPU memory usage (optional but helpful)
     # Uncomment if you need more memory savings:
     # pipe.enable_model_cpu_offload()
@@ -247,7 +247,7 @@ def main():
             export_to_video(output, output_path, fps=args.fps)
 
             print(f"  ✅ Saved to {output_path}")
-            
+
             # Clear GPU memory after successful generation to prevent accumulation
             del output
             torch.cuda.empty_cache()
@@ -258,11 +258,11 @@ def main():
             import traceback
 
             traceback.print_exc()
-            
+
             # Critical: Clear GPU memory after failure to prevent accumulation
             torch.cuda.empty_cache()
             torch.cuda.synchronize()
-            
+
             continue
 
     print("\n" + "=" * 80)
@@ -273,4 +273,3 @@ def main():
 
 if __name__ == "__main__":
     main()
-

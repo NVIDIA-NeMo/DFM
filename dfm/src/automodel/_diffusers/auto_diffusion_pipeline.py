@@ -24,7 +24,7 @@ from nemo_automodel.components.distributed import parallelizer
 from nemo_automodel.components.distributed.fsdp2 import FSDP2Manager
 from nemo_automodel.shared.utils import dtype_from_str
 
-from dfm.src.automodel.distributed.dfm_parallelizer import WanParallelizationStrategy, HunyuanParallelizationStrategy
+from dfm.src.automodel.distributed.dfm_parallelizer import HunyuanParallelizationStrategy, WanParallelizationStrategy
 
 
 logger = logging.getLogger(__name__)

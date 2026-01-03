@@ -30,32 +30,32 @@ from .base import FlowMatchingContext, ModelAdapter
 class HunyuanAdapter(ModelAdapter):
     """
     Model adapter for HunyuanVideo 1.5 style models.
-    
+
     These models use:
     - Condition latents concatenated with noisy latents
     - Dual text encoders with attention masks
     - Image embeddings for i2v
-    
+
     Expected batch keys:
     - text_embeddings: Primary text encoder output [B, seq_len, dim]
     - text_mask: Attention mask for primary encoder [B, seq_len] (optional)
     - text_embeddings_2: Secondary text encoder output [B, seq_len, dim] (optional)
     - text_mask_2: Attention mask for secondary encoder [B, seq_len] (optional)
     - image_embeds: Image embeddings for i2v [B, seq_len, dim] (optional)
-    
+
     Example:
         adapter = HunyuanAdapter()
         pipeline = FlowMatchingPipelineV2(model_adapter=adapter)
     """
-    
+
     def __init__(
-        self, 
+        self,
         default_image_embed_shape: Tuple[int, int] = (729, 1152),
         use_condition_latents: bool = True,
     ):
         """
         Initialize the HunyuanAdapter.
-        
+
         Args:
             default_image_embed_shape: Default shape for image embeddings (seq_len, dim)
                 when not provided in batch. Defaults to (729, 1152).
@@ -64,14 +64,14 @@ class HunyuanAdapter(ModelAdapter):
         """
         self.default_image_embed_shape = default_image_embed_shape
         self.use_condition_latents = use_condition_latents
-    
+
     def prepare_inputs(self, context: FlowMatchingContext) -> Dict[str, Any]:
         """
         Prepare inputs for HunyuanVideo model.
-        
+
         Args:
             context: FlowMatchingContext with batch data
-            
+
         Returns:
             Dictionary containing:
             - latents: Noisy latents (optionally concatenated with condition latents)
@@ -86,41 +86,44 @@ class HunyuanAdapter(ModelAdapter):
         batch_size = context.noisy_latents.shape[0]
         device = context.device
         dtype = context.dtype
-        
+
         # Get text embeddings
         text_embeddings = batch["text_embeddings"].to(device, dtype=dtype)
         if text_embeddings.ndim == 2:
             text_embeddings = text_embeddings.unsqueeze(0)
-        
+
         # Get optional elements
         text_mask = batch.get("text_mask")
         text_embeddings_2 = batch.get("text_embeddings_2")
         text_mask_2 = batch.get("text_mask_2")
-        
+
         if text_mask is not None:
             text_mask = text_mask.to(device, dtype=dtype)
         if text_embeddings_2 is not None:
             text_embeddings_2 = text_embeddings_2.to(device, dtype=dtype)
         if text_mask_2 is not None:
             text_mask_2 = text_mask_2.to(device, dtype=dtype)
-        
+
         # Handle image embeds for i2v
         if context.task_type == "i2v" and "image_embeds" in batch:
             image_embeds = batch["image_embeds"].to(device, dtype=dtype)
         else:
             seq_len, dim = self.default_image_embed_shape
             image_embeds = torch.zeros(
-                batch_size, seq_len, dim,
-                dtype=dtype, device=device,
+                batch_size,
+                seq_len,
+                dim,
+                dtype=dtype,
+                device=device,
             )
-        
+
         # Prepare latents (with or without condition)
         if self.use_condition_latents:
             cond_latents = self.get_condition_latents(context.video_latents, context.task_type)
             latents = torch.cat([context.noisy_latents, cond_latents], dim=1)
         else:
             latents = context.noisy_latents
-        
+
         return {
             "latents": latents,
             "timesteps": context.timesteps.to(dtype),
@@ -130,15 +133,15 @@ class HunyuanAdapter(ModelAdapter):
             "encoder_attention_mask_2": text_mask_2,
             "image_embeds": image_embeds,
         }
-    
+
     def forward(self, model: nn.Module, inputs: Dict[str, Any]) -> torch.Tensor:
         """
         Execute forward pass for HunyuanVideo model.
-        
+
         Args:
             model: HunyuanVideo model
             inputs: Dictionary from prepare_inputs()
-            
+
         Returns:
             Model prediction tensor
         """
@@ -153,4 +156,3 @@ class HunyuanAdapter(ModelAdapter):
             return_dict=False,
         )
         return self.post_process_prediction(model_pred)
-

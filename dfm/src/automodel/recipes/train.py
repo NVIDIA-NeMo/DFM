@@ -21,7 +21,6 @@ from typing import Any, Dict, Optional
 
 import torch
 import torch.distributed as dist
-import wandb
 from nemo_automodel.components.checkpoint.checkpointing import Checkpointer, CheckpointingConfig
 from nemo_automodel.components.loggers.log_utils import setup_logging
 from nemo_automodel.components.loggers.wandb_utils import suppress_wandb_log_messages
@@ -32,7 +31,8 @@ from nemo_automodel.recipes.llm.train_ft import build_distributed, build_wandb
 from torch.distributed.fsdp import MixedPrecisionPolicy
 from transformers.utils.hub import TRANSFORMERS_CACHE
 
-from dfm.src.automodel._diffusers.auto_diffusion_pipeline import NeMoWanPipeline, NeMoAutoDiffusionPipeline
+import wandb
+from dfm.src.automodel._diffusers.auto_diffusion_pipeline import NeMoAutoDiffusionPipeline, NeMoWanPipeline
 from dfm.src.automodel.flow_matching.flow_matching_pipeline import FlowMatchingPipeline, create_adapter
 
 
@@ -198,7 +198,7 @@ class TrainDiffusionRecipe(BaseRecipe):
         fm_cfg = self.cfg.get("flow_matching", {})
 
         self.cpu_offload = fsdp_cfg.get("cpu_offload", False)
-        
+
         # Flow matching configuration
         self.adapter_type = fm_cfg.get("adapter_type", "simple")
         self.timestep_sampling = fm_cfg.get("timestep_sampling", "logit_normal")
@@ -213,12 +213,12 @@ class TrainDiffusionRecipe(BaseRecipe):
         self.use_loss_weighting = fm_cfg.get("use_loss_weighting", True)
         self.log_interval = fm_cfg.get("log_interval", 100)
         self.summary_log_interval = fm_cfg.get("summary_log_interval", 10)
-        
+
         # Adapter-specific configuration
         adapter_kwargs = fm_cfg.get("adapter_kwargs", {})
-        self.adapter_kwargs = adapter_kwargs.to_dict() 
+        self.adapter_kwargs = adapter_kwargs.to_dict()
 
-        logging.info(f"[INFO] Flow Matching V2 Pipeline")
+        logging.info("[INFO] Flow Matching V2 Pipeline")
         logging.info(f"[INFO]   - Adapter type: {self.adapter_type}")
         logging.info(f"[INFO]   - Timestep sampling: {self.timestep_sampling}")
         logging.info(f"[INFO]   - Flow shift: {self.flow_shift}")
@@ -234,7 +234,7 @@ class TrainDiffusionRecipe(BaseRecipe):
             cpu_offload=self.cpu_offload,
             fsdp_cfg=fsdp_cfg,
             optimizer_cfg=self.cfg.get("optim.optimizer", {}),
-            attention_backend=self.attention_backend
+            attention_backend=self.attention_backend,
         )
 
         self.model = self.pipe.transformer

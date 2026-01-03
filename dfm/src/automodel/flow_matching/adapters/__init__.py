@@ -25,7 +25,7 @@ Available Adapters:
 
 Usage:
     from automodel.flow_matching.adapters import HunyuanAdapter, SimpleAdapter
-    
+
     # Or import the base class to create custom adapters
     from automodel.flow_matching.adapters import ModelAdapter
 """
@@ -34,10 +34,10 @@ from .base import FlowMatchingContext, ModelAdapter
 from .hunyuan import HunyuanAdapter
 from .simple import SimpleAdapter
 
+
 __all__ = [
     "FlowMatchingContext",
     "ModelAdapter",
     "HunyuanAdapter",
     "SimpleAdapter",
 ]
-

@@ -111,7 +111,7 @@ class MetaFilesDataset(Dataset):
 
         text_embeddings: torch.Tensor = data["text_embeddings"].to(self.device)
         video_latents: torch.Tensor = data["video_latents"].to(self.device)
-        
+
         # Load text_mask if available (backwards compatible)
         text_mask = data.get("text_mask")
         text_embeddings_2 = data.get("text_embeddings_2")
@@ -146,7 +146,7 @@ class MetaFilesDataset(Dataset):
             "metadata": data.get("metadata", {}),
             "file_info": file_info,
         }
-        
+
         # Add text_mask if available (backwards compatible)
         if text_mask is not None:
             result["text_mask"] = text_mask
@@ -156,7 +156,7 @@ class MetaFilesDataset(Dataset):
             result["text_mask_2"] = text_mask_2
         if image_embeds is not None:
             result["image_embeds"] = image_embeds
-            
+
         return result
 
 
@@ -167,14 +167,14 @@ def collate_fn(batch: List[Dict[str, torch.Tensor]]) -> Dict[str, torch.Tensor]:
     # use cat to stack the tensors in the batch
     text_embeddings = torch.cat([item["text_embeddings"] for item in batch], dim=0)
     video_latents = torch.cat([item["video_latents"] for item in batch], dim=0)
-    
+
     result = {
         "text_embeddings": text_embeddings,
         "video_latents": video_latents,
         "metadata": [item["metadata"] for item in batch],
         "file_info": [item["file_info"] for item in batch],
     }
-    
+
     # Collate text_mask if available (backwards compatible)
     if len(batch) > 0 and "text_mask" in batch[0]:
         text_mask = torch.cat([item["text_mask"] for item in batch], dim=0)
@@ -188,7 +188,7 @@ def collate_fn(batch: List[Dict[str, torch.Tensor]]) -> Dict[str, torch.Tensor]:
     if len(batch) > 0 and "image_embeds" in batch[0]:
         image_embeds = torch.cat([item["image_embeds"] for item in batch], dim=0)
         result["image_embeds"] = image_embeds
-    
+
     return result
 
 
