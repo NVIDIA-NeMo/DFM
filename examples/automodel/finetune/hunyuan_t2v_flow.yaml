@@ -1,5 +1,5 @@
 # HunyuanVideo-1.5 720p T2V Training Configuration
-# 
+#
 # This configuration file is fully compatible with TrainDiffusionRecipe class
 # (dfm/src/automodel/recipes/train.py) using FlowMatchingPipelineV2
 
@@ -13,7 +13,7 @@ model:
 # Optimizer configuration
 optim:
   learning_rate: 5e-6
-  
+
   optimizer:
     weight_decay: 0.01
     betas: [0.9, 0.999]
@@ -43,7 +43,7 @@ flow_matching:
   mix_uniform_ratio: 0.1  # For "mix" timestep sampling
   sigma_min: 0.0
   sigma_max: 1.0
-  num_train_timesteps: 1000 
+  num_train_timesteps: 1000
   i2v_prob: 0.3
   use_loss_weighting: false
   log_interval: 1000  # Steps between detailed logs
