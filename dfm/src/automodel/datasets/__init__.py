@@ -12,19 +12,19 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-from dfm.src.automodel.datasets.wan21 import (
+from dfm.src.automodel.datasets.dataloader import (
     MetaFilesDataset,
+    build_dataloader,
     build_node_parallel_sampler,
-    build_wan21_dataloader,
     collate_fn,
     create_dataloader,
 )
 
 
 __all__ = [
+    "build_dataloader",
     "MetaFilesDataset",
     "build_node_parallel_sampler",
-    "build_wan21_dataloader",
     "collate_fn",
     "create_dataloader",
 ]

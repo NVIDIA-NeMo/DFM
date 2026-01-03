@@ -24,7 +24,7 @@ from nemo_automodel.components.distributed import parallelizer
 from nemo_automodel.components.distributed.fsdp2 import FSDP2Manager
 from nemo_automodel.shared.utils import dtype_from_str
 
-from dfm.src.automodel.distributed.dfm_parallelizer import WanParallelizationStrategy
+from dfm.src.automodel.distributed.dfm_parallelizer import HunyuanParallelizationStrategy, WanParallelizationStrategy
 
 
 logger = logging.getLogger(__name__)
@@ -32,6 +32,7 @@ logger = logging.getLogger(__name__)
 
 def _init_parallelizer():
     parallelizer.PARALLELIZATION_STRATEGIES["WanTransformer3DModel"] = WanParallelizationStrategy()
+    parallelizer.PARALLELIZATION_STRATEGIES["HunyuanVideo15Transformer3DModel"] = HunyuanParallelizationStrategy()
 
 
 def _choose_device(device: Optional[torch.device]) -> torch.device:
