@@ -50,21 +50,6 @@ logger = logging.getLogger(__name__)
 
 
 # =============================================================================
-# Data Classes
-# =============================================================================
-
-
-@dataclass
-class FlowMatchingOutput:
-    """Output from a flow matching training step."""
-
-    loss: torch.Tensor
-    metrics: Dict[str, Any]
-    model_pred: Optional[torch.Tensor] = None
-    target: Optional[torch.Tensor] = None
-
-
-# =============================================================================
 # Noise Schedule
 # =============================================================================
 
