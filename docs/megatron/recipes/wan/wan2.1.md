@@ -147,6 +147,38 @@ uv run --group megatron-bridge python -m torch.distributed.run --nproc-per-node 
 
 **Note**: Current inference path is single-GPU. Parallel inference is not yet supported.
 
+
+---
+
+### 🔄 Checkpoint Converting (optional)
+
+If you plan to fine-tune Wan using a pre-trained model, you must first convert the HuggingFace checkpoint (e.g., `Wan-AI/Wan2.1-T2V-1.3B-Diffusers`) into the Megatron format. The provided script supports bidirectional conversion, allowing you to move between HuggingFace and Megatron formats as needed.
+
+Follow these steps to convert your checkpoints:
+```
+  # Download the HF checkpoint locally
+  huggingface-cli download Wan-AI/Wan2.1-T2V-1.3B-Diffusers \
+  --local-dir /root/.cache/huggingface/wan2.1 \
+  --local-dir-use-symlinks False
+
+  # Import a HuggingFace model to Megatron format
+  python examples/megatron/recipes/wan/conversion/convert_checkpoints.py import \
+  --hf-model /root/.cache/huggingface/wan2.1 \
+  --megatron-path /workspace/checkpoints/megatron_checkpoints/wan_1_3b
+
+  # Export a Megatron checkpoint to HuggingFace format
+  python examples/megatron/recipes/wan/conversion/convert_checkpoints.py export \
+  --hf-model /root/.cache/huggingface/wan2.1 \
+  --megatron-path /workspace/checkpoints/megatron_checkpoints/wan_1_3b/iter_0000000 \
+  --hf-path /workspace/checkpoints/hf_checkpoints/wan_1_3b_hf
+
+```
+
+**Note**: The exported checkpoint from Megatron to HuggingFace (`/workspace/checkpoints/hf_checkpoints/wan_1_3b_hf`) contains only the DiT transformer weights. To run inference, you still require the other pipeline components (VAE, text encoders, etc.).
+To assemble a functional inference directory:
+- Duplicate the original HF checkpoint directory.
+- Replace the `./transformer` folder in that directory with your newly exported `/transformer` folder.
+
 ---
 
 ### ⚡ Parallelism Support
