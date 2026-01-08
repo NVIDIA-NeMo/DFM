@@ -56,7 +56,8 @@ classifiers = [
 ]
 dependencies = [
     "accelerate",
-    "diffusers==0.35.1",
+    "diffusers>=0.36.0",
+    "kernels",
     "easydict",
     "ftfy",
     "imageio",
