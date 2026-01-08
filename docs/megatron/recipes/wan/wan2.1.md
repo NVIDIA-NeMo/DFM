@@ -30,7 +30,7 @@ export HF_TOKEN=<your_huggingface_token>
 #    --center-crop: run center crop to exact target size after resize
 #    --mode: to process video or frames of video
 uv run --group megatron-bridge python -m torch.distributed.run --nproc-per-node 8 \
-  examples/megatron/recipes/wan/prepare_dataset_wan.py \
+  examples/common/wan/prepare_dataset_wan.py \
   --video_folder "${DATASET_SRC}" \
   --output_dir "${DATASET_PATH}" \
   --output_format energon \

@@ -58,7 +58,7 @@ There are two preprocessing modes:
 
 **Mode 1: Full video (recommended for training)**
 ```bash
-python examples/megatron/recipes/wan/prepare_dataset_wan.py \
+python examples/common/wan/prepare_dataset_wan.py \
   --video_folder <your_video_folder> \
   --output_folder ./processed_meta \
   --output_format automodel \
@@ -72,7 +72,7 @@ python examples/megatron/recipes/wan/prepare_dataset_wan.py \
 
 **Mode 2: Extract frames (for frame-based training)**
 ```bash
-python examples/megatron/recipes/wan/prepare_dataset_wan.py \
+python examples/common/wan/prepare_dataset_wan.py \
   --video_folder <your_video_folder> \
   --output_folder ./processed_meta \
   --output_format automodel \
