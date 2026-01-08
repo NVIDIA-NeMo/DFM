@@ -130,7 +130,7 @@ def _resize_frame(
 
     if maintain_aspect_ratio and center_crop:
         target_height, target_width = target_size
-        
+
         # Calculate crop coordinates
         if resized_frame.shape[0] > target_height or resized_frame.shape[1] > target_width:
             y_start = max(0, (resized_frame.shape[0] - target_height) // 2)
@@ -362,22 +362,21 @@ def _encode_text(
         return_attention_mask=True,
     )
     inputs = {k: v.to(device) for k, v in inputs.items()}
-    
+
     # Calculate actual sequence length (excluding padding)
     seq_lens = inputs["attention_mask"].gt(0).sum(dim=1).long()
-    
-    prompt_embeds = text_encoder(input_ids=inputs["input_ids"], attention_mask=inputs["attention_mask"]).last_hidden_state
-    
+
+    prompt_embeds = text_encoder(
+        input_ids=inputs["input_ids"], attention_mask=inputs["attention_mask"]
+    ).last_hidden_state
+
     # CRITICAL: Trim to actual length and re-pad with zeros to match WanPipeline/preprocess_resize.py
     prompt_embeds = [u[:v] for u, v in zip(prompt_embeds, seq_lens)]
     prompt_embeds = torch.stack(
-        [
-            torch.cat([u, u.new_zeros(max_sequence_length - u.size(0), u.size(1))])
-            for u in prompt_embeds
-        ],
+        [torch.cat([u, u.new_zeros(max_sequence_length - u.size(0), u.size(1))]) for u in prompt_embeds],
         dim=0,
     )
-    
+
     return prompt_embeds
 
 
@@ -399,10 +398,10 @@ def _encode_video_latents(
 
     if not hasattr(vae.config, "latents_mean") or not hasattr(vae.config, "latents_std"):
         raise ValueError("Wan2.1 VAE requires latents_mean and latents_std in config")
-    
+
     latents_mean = torch.tensor(vae.config.latents_mean, device=device, dtype=vae.dtype).view(1, -1, 1, 1, 1)
     latents_std = torch.tensor(vae.config.latents_std, device=device, dtype=vae.dtype).view(1, -1, 1, 1, 1)
-    
+
     final_latents = (video_latents - latents_mean) / latents_std
 
     return final_latents
@@ -476,7 +475,7 @@ def main():
     output_dir = Path(args.output_dir)
     if rank == 0:
         output_dir.mkdir(parents=True, exist_ok=True)
-    
+
     if world_size > 1:
         dist.barrier()
 
@@ -504,6 +503,7 @@ def main():
         context = wds.ShardWriter(shard_pattern, maxcount=args.shard_maxcount)
     else:
         from contextlib import nullcontext
+
         context = nullcontext()
 
     with context as sink:
@@ -547,7 +547,7 @@ def main():
                 _, T, H, W = video_tensor.shape[1:]
 
                 if args.output_format == "automodel":
-                    # Extract first frame exactly as preprocess_resize.py does (avoiding float round-trip)
+                    # Extract first frame
                     first_frame_numpy = _extract_first_frame(
                         video_path=video_path,
                         start_frame=start_frame,
@@ -649,7 +649,7 @@ def main():
                             "text_embeddings": text_embed_cpu_unsqueezed,
                             "video_latents": latents_cpu_unsqueezed,
                             # no "first_frame" in --mode frames
-                            "metadata": meta, 
+                            "metadata": meta,
                             "frame_index": int(frame_idx),
                             "total_frames_in_video": int(total_extracted),
                             "num_frames": 1,
@@ -671,7 +671,6 @@ def main():
                             pickle.dump(processed_data, f)
                         written += 1
                     elif args.output_format == "energon":
-
                         json_data = {
                             "video_path": video_path,
                             "processed_frames": 1,
