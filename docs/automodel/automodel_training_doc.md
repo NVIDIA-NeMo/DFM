@@ -80,26 +80,30 @@ There are two preprocessing modes. Use this guide to choose the right mode:
 
 **Mode 1: Full video (recommended for training)**
 ```bash
-python dfm/src/automodel/utils/data/preprocess_resize.py \
-  --mode video \
+python examples/megatron/recipes/wan/prepare_dataset_wan.py \
   --video_folder <your_video_folder> \
   --output_folder ./processed_meta \
-  --model Wan-AI/Wan2.1-T2V-1.3B-Diffusers \
+  --output_format automodel \
+  --model "Wan-AI/Wan2.1-T2V-1.3B-Diffusers" \
+  --mode video \
   --height 480 \
-  --width 720 \
+  --width 832 \
+  --resize_mode bilinear \
   --center-crop
 ```
 
 **Mode 2: Extract frames (for frame-based training)**
 ```bash
-python dfm/src/automodel/utils/data/preprocess_resize.py \
+python examples/megatron/recipes/wan/prepare_dataset_wan.py \
+  --video_folder <your_video_folder> \
+  --output_folder ./processed_meta \
+  --output_format automodel \
+  --model "Wan-AI/Wan2.1-T2V-1.3B-Diffusers" \
   --mode frames \
   --num-frames 40 \
-  --video_folder <your_video_folder> \
-  --output_folder ./processed_frames \
-  --model Wan-AI/Wan2.1-T2V-1.3B-Diffusers \
-  --height 240 \
-  --width 416 \
+  --height 480 \
+  --width 832 \
+  --resize_mode bilinear \
   --center-crop
 ```
 
