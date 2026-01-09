@@ -19,6 +19,11 @@ from dfm.src.automodel.datasets.dataloader import (
     collate_fn,
     create_dataloader,
 )
+from dfm.src.automodel.datasets.mock_dataloader import (
+    MockWanDataset,
+    build_mock_dataloader,
+    mock_collate_fn,
+)
 
 
 __all__ = [
@@ -27,4 +32,7 @@ __all__ = [
     "build_node_parallel_sampler",
     "collate_fn",
     "create_dataloader",
+    "MockWanDataset",
+    "build_mock_dataloader",
+    "mock_collate_fn",
 ]
