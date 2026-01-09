@@ -25,14 +25,20 @@ export HF_TOKEN=<your_huggingface_token>
 
 # 3) Create WAN shards with latents + text embeddings
 # Wan's VAE encoder and T5 encoder is used to extract videos' latents and caption embeddings offline before training, using the following core arugments:
+#    --output_format: select output format of "automodel" or "energon"
 #    --height/--width: control resize target (832x480 is supported for both 1.3B and 14B model)
 #    --center-crop: run center crop to exact target size after resize
-uv run --group megatron-bridge python -m torch.distributed.run --nproc-per-node 1 \
-  examples/megatron/recipes/wan/prepare_energon_dataset_wan.py \
+#    --mode: to process video or frames of video
+uv run --group megatron-bridge python -m torch.distributed.run --nproc-per-node 8 \
+  examples/common/wan/prepare_dataset_wan.py \
   --video_folder "${DATASET_SRC}" \
   --output_dir "${DATASET_PATH}" \
+  --output_format energon \
   --model "Wan-AI/Wan2.1-T2V-1.3B-Diffusers" \
-  --height 480 --width 832 \
+  --mode video \
+  --height 480 \
+  --width 832 \
+  --resize_mode bilinear \
   --center-crop
 
 # 4) Use Energon to process shards and create its metadata/spec
