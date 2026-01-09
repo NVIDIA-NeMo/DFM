@@ -15,7 +15,7 @@
 
 import logging
 from dataclasses import dataclass
-from typing import Callable
+from typing import Callable, Optional
 
 import torch
 import torch.nn.functional as F
@@ -32,6 +32,8 @@ logger = logging.getLogger(__name__)
 
 @dataclass
 class WanModelProvider(TransformerConfig, ModelProviderMixin[VisionModule]):
+    training_mode: str = "pretrain"
+    hf_checkpoint_path: Optional[str] = None  # path to HuggingFace checkpoint for finetuning
     crossattn_emb_size: int = 1536  # cross attention emebedding size after linear projection
     add_bias_linear: bool = True
     gated_linear_unit: bool = False
@@ -52,9 +54,9 @@ class WanModelProvider(TransformerConfig, ModelProviderMixin[VisionModule]):
     fp16_lm_cross_entropy: bool = False
     parallel_output: bool = True
     bf16: bool = False
-    params_dtype: torch.dtype = torch.float32
+    params_dtype: torch.dtype = torch.bfloat16
     qkv_format: str = "thd"  # "sbhd". NOTE: if we use context parallelism, we need to use "thd"
-    apply_rope_fusion: bool = True
+    apply_rope_fusion: bool = False
     bias_activation_fusion: bool = True
     # these attributes are unused for images/videos, we just set because bridge training requires for LLMs
     seq_length: int = 1024
@@ -71,6 +73,13 @@ class WanModelProvider(TransformerConfig, ModelProviderMixin[VisionModule]):
     text_len: int = 512
     text_dim: int = 4096
 
+    def download_hf_weights(self):
+        from huggingface_hub import snapshot_download
+
+        downloaded_path = snapshot_download("Wan-AI/Wan2.1-T2V-1.3B", cache_dir="/opt/artifacts")
+        print("downloaded_path: ", downloaded_path)
+        return downloaded_path
+
     def provide(self, pre_process=None, post_process=None, vp_stage=None) -> WanModel:
         vp_size = self.virtual_pipeline_model_parallel_size
         if vp_size:
@@ -81,10 +90,23 @@ class WanModelProvider(TransformerConfig, ModelProviderMixin[VisionModule]):
 
         model = WanModel
 
-        return model(
+        model = model(
             self,
             pre_process=parallel_state.is_pipeline_first_stage(),
             post_process=parallel_state.is_pipeline_last_stage(),
             fp16_lm_cross_entropy=self.fp16_lm_cross_entropy,
             parallel_output=self.parallel_output,
         )
+        if self.training_mode == "finetune":
+            print("Loading Megatron checkpoint weights...")
+            from megatron.bridge.training.checkpointing import _load_model_weights_from_checkpoint
+
+            megatron_checkpoint_path = "/opt/artifacts/megatron_checkpoint_1.3B/iter_0000000"
+            _load_model_weights_from_checkpoint(
+                checkpoint_path=megatron_checkpoint_path,
+                model=[model],
+                strict=True,
+            )
+            logger.info("Successfully loaded Megatron checkpoint weights.")
+
+        return model

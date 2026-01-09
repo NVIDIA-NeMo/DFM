@@ -15,7 +15,7 @@
 # pylint: disable=C0115,C0116,C0301
 
 import math
-from typing import Dict, Optional, Tuple
+from typing import Dict, List, Optional, Set, Tuple, Union
 
 import torch
 import torch.nn as nn
@@ -31,6 +31,7 @@ from megatron.core.utils import make_sharded_tensor_for_checkpoint
 from torch import Tensor
 
 from dfm.src.megatron.model.common.dit_embeddings import ParallelTimestepEmbedding
+from dfm.src.megatron.model.wan.utils import patchify_compact, unpatchify_compact
 from dfm.src.megatron.model.wan.wan_layer_spec import (
     get_wan_block_with_transformer_engine_spec as WanLayerWithAdaLNspec,
 )
@@ -86,7 +87,7 @@ class WanModel(VisionModule):
         post_process (bool): Whether to apply post-processing steps.
         fp16_lm_cross_entropy (bool): Whether to use fp16 for cross-entropy loss.
         parallel_output (bool): Whether to use parallel output.
-        transformer_decoder_layer_spec (WanLayerWithAdaLNspec): Specification for the transformer decoder layer.
+        transformer_decoder_layer_spec: Specification for the transformer decoder layer. Auto-selects based on params_dtype if None.
         model_type (ModelType): Type of the model.
     """
 
@@ -180,28 +181,48 @@ class WanModel(VisionModule):
     def forward(
         self,
         x: Tensor,
-        grid_sizes: list[Tuple[int, int, int]],
         t: Tensor,
         context: Tensor,
+        grid_sizes: list[Tuple[int, int, int]],
+        fwd_pred_type: Optional[str] = None,
         packed_seq_params: PackedSeqParams = None,
+        scale_t: bool = False,
+        unpatchify_features: bool = False,
+        feature_indices: Optional[Set[int]] = None,
+        return_features_early: bool = False,
         **kwargs,
-    ) -> Tensor:
+    ) -> Union[Tensor, List[Tensor]]:
         """Forward pass.
 
         Args:
             x List[Tensor]: list of vae encoded data (in_channel, f, h, w)
             grid_sizes List[Tuple[int, int, int]]: list of grid sizes (f, h, w)
-            t Tensor: timesteps
+            t Tensor: timesteps (in [0, 1] if scale_t=True, or [0, 1000] if scale_t=False)
             context List[Tensor]: list of context (text_len, hidden_size)
             packed_seq_params PackedSeqParams: packed sequence parameters
+            scale_t: If True, rescale t from [0, 1] to [0, 1000] for timestep embeddings.
+                     Use this when t comes from noise_scheduler (e.g., during distillation).
+            feature_indices: A set of layer indices (0-based) from which to extract
+                intermediate hidden states. Consistent with FastGen's Wan implementation.
+            return_features_early: If True and feature_indices is non-empty, returns only
+                the features list. If False (default), returns [output, features] when
+                feature_indices is non-empty.
 
         Returns:
-            Tensor: output tensor (still patchified) of shape [seq_len, batch_size, hidden_size]
+            Union[Tensor, List[Tensor]]:
+                - If feature_indices is None or empty: output tensor
+                - If feature_indices is non-empty and return_features_early is True: features list only
+                - If feature_indices is non-empty and return_features_early is False: [output, features]
         """
         #################################
         ########## Wan forward ##########
 
+        print("context passed to WanModel", context.flatten()[:20].tolist())
+        x_input = x
+
         # ============= embedders =============
+        if unpatchify_features:
+            x = patchify_compact(x, self.patch_size)
 
         # run input embedding
         if self.pre_process:
@@ -226,12 +247,39 @@ class WanModel(VisionModule):
             # intermediate stage of pipeline
             x = self.decoder.input_tensor
 
+        # ============= DEBUG: Patch embedding output =============
+        print(
+            f"[Megatron] x (after patch_embedding): shape={x.shape}, sum={x.sum().item():.4f}, first5={x[0, 0, :5].tolist()}"
+        )
+
+        # Rescale t from [0, 1] to [0, 1000] if scale_t is True
+        # This is needed when t comes from noise_scheduler (e.g., during distillation with DMD2Model)
+        input_t = t
+        if scale_t:
+            t = self.noise_scheduler.rescale_t(t)
+        assert 1 <= t <= 1000, "t must be in [1, 1000]"
+
+        # ============= DEBUG: Timestep value =============
+        print(f"[Megatron] timestep t (rescaled): {t.item():.4f}")
+
         # time embeddings
-        e = self.time_embedder(self.timesteps_proj(t).to(x.dtype))
+        timestep_sinusoidal = self.timesteps_proj(t).to(x.dtype)
+        print(
+            f"[Megatron] timestep_sinusoidal: sum={timestep_sinusoidal.sum().item():.4f}, first5={timestep_sinusoidal[0, :5].tolist()}"
+        )
+
+        e = self.time_embedder(timestep_sinusoidal)
+        print(f"[Megatron] temb (after time_embedder): sum={e.sum().item():.4f}, first5={e[0, :5].tolist()}")
+
         e0 = self.time_proj(self.time_proj_act_fn(e)).unflatten(1, (6, self.config.hidden_size))
+        print(f"[Megatron] timestep_proj: shape={e0.shape}, sum={e0.sum().item():.4f}, first5={e0[0, 0, :5].tolist()}")
 
         # context embeddings
+        context_input = context.clone()
         context = self.text_embedding(context)  # shape [text_len, b, hidden_size]
+        print(
+            f"[Megatron] context (after text_embedding): shape={context.shape}, sum={context.sum().item():.4f}, first5={context[0, 0, :5].tolist()}"
+        )
 
         # ============= decoder =============
         # calculate rotary pos emb
@@ -240,9 +288,10 @@ class WanModel(VisionModule):
         rotary_pos_emb = self.rope_embeddings(
             n_head, dim_head, cu_seqlens_q_padded, grid_sizes, t.device
         )  # output: rotary_pos_emb.shape [s, b, 1, dim_head]
+        # print(f'[Megatron] rotary_pos_emb: shape={rotary_pos_emb.shape}, values={rotary_pos_emb[0, 0, 0, :5].tolist()}')
 
         # run decoder
-        x = self.decoder(
+        decoder_output = self.decoder(
             hidden_states=x,
             attention_mask=e0,
             context=context,
@@ -251,7 +300,32 @@ class WanModel(VisionModule):
             rotary_pos_cos=None,
             rotary_pos_sin=None,
             packed_seq_params=packed_seq_params,
+            feature_indices=feature_indices,
         )
+
+        # Handle feature extraction (consistent with FastGen's Wan implementation)
+        if feature_indices is not None and len(feature_indices) > 0:
+            # decoder returns (hidden_states, features) tuple when feature_indices is non-empty
+            x, features = decoder_output
+            # Unpatchify features to spatial format using unpatchify_compact
+            # For features, out_dim = hidden_size / (p_t * p_h * p_w)
+            feature_out_dim = self.config.hidden_size // math.prod(self.patch_size)
+            features = [unpatchify_compact(feat, grid_sizes, feature_out_dim, self.patch_size) for feat in features]
+
+            if return_features_early:
+                # Return only the features list (for discriminator feature extraction)
+                return features
+            # Otherwise, continue to compute output and return [output, features] below
+        else:
+            x = decoder_output
+            features = None
+
+        # If we have features but not returning early, x is already set from decoder_output unpacking
+        # ============= DEBUG: After transformer blocks =============
+        print(f"[Megatron] after decoder: shape={x.shape}, sum={x.sum().item():.4f}, first5={x[0, 0, :5].tolist()}")
+
+        if fwd_pred_type is None:
+            fwd_pred_type = self.net_pred_type
 
         # return if not post_process
         if not self.post_process:
@@ -262,12 +336,34 @@ class WanModel(VisionModule):
         x = self.head(x, e)  # output: x.shape [b, s, c * pF * pH * pW]
         x = x.transpose(0, 1)  # reshape back to shape [s, b, c * pF * pH * pW]
 
+        # ============= DEBUG: After head =============
+        print(f"[Megatron] after head: shape={x.shape}, sum={x.sum().item():.4f}, first5={x[0, 0, :5].tolist()}")
+
         # gather outputs for sequence_parallel
         # Note: in GPT models, because the vocab projection matrix is ColumnParallelLinear, the sequence is
         #   automatically gathered in ColumnParallelLinear forward pass.
         #   However, in Wan models, we need to gather the outputs manually.
         if self.config.sequence_parallel:
             x = tensor_parallel.gather_from_sequence_parallel_region(x)
+
+        if unpatchify_features:
+            x = unpatchify_compact(x, grid_sizes, self.config.z_dim, self.patch_size)
+            print(
+                f"[Megatron] after unpatchify: shape={x.shape}, sum={x.sum().item():.4f}, first5={x.flatten()[:5].tolist()}"
+            )
+
+        # ============= DEBUG: Before/After scheduler step =============
+        print(f"[Megatron] before convert_model_output: sum={x.sum().item():.4f}")
+        x = self.noise_scheduler.convert_model_output(
+            x_input, x, input_t, src_pred_type=self.net_pred_type, target_pred_type=fwd_pred_type
+        )
+        print(f"[Megatron] after convert_model_output: sum={x.sum().item():.4f}, first5={x.flatten()[:5].tolist()}")
+
+        # Return [output, features] when feature_indices was provided and not returning early
+        # (consistent with FastGen's behavior when return_features_early=False)
+        if features is not None:
+            return [x, features]
+
         return x  # output: x.shape [s, b, c * pF * pH * pW]
 
     def set_input_tensor(self, input_tensor: Tensor) -> None:
@@ -350,3 +446,27 @@ class WanModel(VisionModule):
             replica_id=replica_id,
             allow_shape_mismatch=False,
         )
+
+    def load_state_dict(self, state_dict, strict=True):
+        """Load state dict with automatic handling of 'module.' prefix mismatch.
+
+        This method handles the case where checkpoints saved with DistributedDataParallel
+        have a 'module.' prefix that needs to be removed when loading.
+
+        Args:
+            state_dict (dict): The state dictionary to load
+            strict (bool): Whether to strictly enforce that the keys match
+
+        Returns:
+            NamedTuple: with 'missing_keys' and 'unexpected_keys' fields
+        """
+        # Check if state_dict has 'module.' prefix but model doesn't
+        has_module_prefix = any(k.startswith("module.") for k in state_dict.keys())
+        if has_module_prefix:
+            new_state_dict = {}
+            for key, value in state_dict.items():
+                new_key = key.replace("module.", "", 1) if key.startswith("module.") else key
+                new_state_dict[new_key] = value
+            state_dict = new_state_dict
+
+        return super().load_state_dict(state_dict, strict=strict)

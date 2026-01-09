@@ -71,6 +71,12 @@ def patchify(x, patch_size):
     return out
 
 
+def patchify_compact(x, patch_size):
+    x = patchify(x, patch_size)
+    x = torch.stack(x, dim=0)
+    return x.transpose(0, 1)
+
+
 def unpatchify(
     x: list[torch.Tensor], grid_sizes: list[Tuple[int, int, int]], out_dim: int, patch_size: Tuple[int, int, int]
 ) -> list[torch.Tensor]:
@@ -96,6 +102,12 @@ def unpatchify(
         u = u.reshape(c, *[i * j for i, j in zip(v, patch_size)])
         out.append(u)
     return out
+
+
+def unpatchify_compact(x, grid_sizes, out_dim, patch_size):
+    x = x.transpose(0, 1)
+    x = unpatchify(x, grid_sizes, out_dim, patch_size)
+    return torch.stack(x, dim=0)
 
 
 def thd_split_inputs_cp(

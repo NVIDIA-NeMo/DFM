@@ -24,15 +24,16 @@ from easydict import EasyDict
 
 
 warnings.filterwarnings("ignore")
-
 import random
 
 import torch
 import torch.distributed as dist
+from megatron.core import parallel_state as ps
 
 from dfm.src.megatron.model.wan.flow_matching.flow_inference_pipeline import FlowInferencePipeline
 from dfm.src.megatron.model.wan.inference import SIZE_CONFIGS, SUPPORTED_SIZES
 from dfm.src.megatron.model.wan.inference.utils import cache_video, str2bool
+from dfm.src.megatron.model.wan.wan_provider import WanModelProvider
 
 
 EXAMPLE_PROMPT = {
@@ -142,6 +143,7 @@ def _parse_args():
     parser.add_argument("--context_parallel_size", type=int, default=1, help="Context parallel size.")
     parser.add_argument("--pipeline_parallel_size", type=int, default=1, help="Pipeline parallel size.")
     parser.add_argument("--sequence_parallel", type=str2bool, default=False, help="Sequence parallel.")
+    parser.add_argument("--cp_size", type=int, default=1, help="Context parallel size.")
 
     args = parser.parse_args()
 
@@ -163,19 +165,26 @@ def _init_logging(rank):
         logging.basicConfig(level=logging.ERROR)
 
 
+def initialize_distributed(tensor_model_parallel_size=1, pipeline_model_parallel_size=1, context_parallel_size=1):
+    ps.destroy_model_parallel()
+    local_rank = int(os.environ.get("LOCAL_RANK", 0))
+    torch.cuda.set_device(local_rank)
+    torch.distributed.init_process_group(backend="nccl")
+    ps.initialize_model_parallel(
+        tensor_model_parallel_size, pipeline_model_parallel_size, context_parallel_size=context_parallel_size
+    )
+
+
 def generate(args):
-    rank = int(os.getenv("RANK", 0))
-    world_size = int(os.getenv("WORLD_SIZE", 1))
-    local_rank = int(os.getenv("LOCAL_RANK", 0))
-    device = local_rank
+    initialize_distributed(1, 1, context_parallel_size=args.cp_size)
+    rank = torch.distributed.get_rank()
+    device = torch.cuda.current_device()
+
     _init_logging(rank)
     videos = []
 
     if args.offload_model is None:
         logging.info(f"offload_model is not specified, set to {args.offload_model}.")
-    if world_size > 1:
-        torch.cuda.set_device(local_rank)
-        dist.init_process_group(backend="nccl", init_method="env://", rank=rank, world_size=world_size)
 
     inference_cfg = EasyDict(
         {
@@ -228,6 +237,13 @@ def generate(args):
             f"must have the same length"
         )
 
+        model_provider = WanModelProvider(training_mode="finetune")
+        model_provider.finalize()
+        model = model_provider.provide()
+        # model to bfloat16
+        model = model.cuda().to(torch.bfloat16)
+        # model.eval()
+
         logging.info("Creating flow inference pipeline.")
         pipeline = FlowInferencePipeline(
             inference_cfg=inference_cfg,
@@ -237,6 +253,7 @@ def generate(args):
             t5_checkpoint_dir=args.t5_checkpoint_dir,
             vae_checkpoint_dir=args.vae_checkpoint_dir,
             device_id=device,
+            model=model,
             rank=rank,
             t5_cpu=args.t5_cpu,
             tensor_parallel_size=args.tensor_parallel_size,
@@ -244,6 +261,7 @@ def generate(args):
             pipeline_parallel_size=args.pipeline_parallel_size,
             sequence_parallel=args.sequence_parallel,
             pipeline_dtype=torch.float32,
+            cache_dir="/opt/artifacts",
         )
 
         rank = dist.get_rank()

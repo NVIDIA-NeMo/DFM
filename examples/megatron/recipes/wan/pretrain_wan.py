@@ -138,7 +138,7 @@ def main() -> None:
     logger.info("------------------------------------------------------------------")
 
     # Load base configuration from the recipe as a Python dataclass
-    cfg: ConfigContainer = pretrain_config(mock=args.mock)
+    cfg: ConfigContainer = pretrain_config(mock=args.mock, training_mode=args.training_mode)
     logger.info("Loaded base configuration")
 
     # Print configuration on rank 0

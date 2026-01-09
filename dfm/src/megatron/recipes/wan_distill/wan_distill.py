@@ -13,7 +13,6 @@
 # limitations under the License.
 
 import os
-import sys
 from typing import List, Optional, Union
 
 import torch
@@ -37,16 +36,14 @@ from dfm.src.megatron.model.wan.wan_provider import WanModelProvider
 from dfm.src.megatron.model.wan_distillation.wan_distillation_model_provider import DMDModelProvider
 
 
-sys.path.insert(0, "/opt/fastgen")
-
-from dfm.src.megatron.model.wan_distillation.distill_config import DMD2DistillConfig
+# from dfm.src.megatron.model.wan_distillation.distill_config import DMD2DistillConfig
 
 
 def model_config(
     training_mode: str = "pretrain",
     tensor_parallelism: int = 1,
     pipeline_parallelism: int = 1,
-    pipeline_parallelism_dtype: Optional[torch.dtype] = torch.bfloat16,
+    pipeline_parallelism_dtype: Optional[torch.dtype] = torch.bfloat16,  # fp32 for debugging
     virtual_pipeline_parallelism: Optional[int] = 1,
     context_parallelism: int = 1,
     sequence_parallelism: bool = False,
@@ -67,17 +64,24 @@ def model_config(
         WanModelProvider: Configuration for the Wan model.
     """
 
+    # For fp32 debugging, set params_dtype to float32
+    # This is controlled by pipeline_parallelism_dtype for consistency
+    params_dtype = pipeline_parallelism_dtype
+
     return DMDModelProvider(
         training_mode=training_mode,
         seq_length=seq_length,
+        params_dtype=params_dtype,
         # Separate providers for fake_score and teacher
         fake_score_model_provider=WanModelProvider(
             training_mode=training_mode,
             seq_length=seq_length,
+            params_dtype=params_dtype,
         ),
         teacher_model_provider=WanModelProvider(
             training_mode=training_mode,
             seq_length=seq_length,
+            params_dtype=params_dtype,
         ),
         # Parallelism config
         tensor_model_parallel_size=tensor_parallelism,
@@ -104,7 +108,7 @@ def distill_config(
     # Model configuration
     tensor_parallelism: int = 1,
     pipeline_parallelism: int = 1,
-    pipeline_parallelism_dtype: Optional[torch.dtype] = torch.bfloat16,
+    pipeline_parallelism_dtype: Optional[torch.dtype] = torch.bfloat16,  # Changed from bfloat16 for fp32 debugging
     virtual_pipeline_parallelism: Optional[int] = 1,
     context_parallelism: int = 1,
     sequence_parallelism: bool = False,
@@ -115,7 +119,7 @@ def distill_config(
     micro_batch_size: int = 1,
     lr: float = 0.9e-4,
     lr_warmup_iters: int = 2000,
-    # Precision recipe
+    # Precision recipe - use "fp32" for pure float32, "bf16_mixed" for bfloat16
     precision_config: Optional[Union[MixedPrecisionConfig, str]] = "bf16_mixed",
     comm_overlap_config: Optional[CommOverlapConfig] = None,
 ) -> ConfigContainer:
@@ -176,9 +180,9 @@ def distill_config(
     )
     opt_config.use_precision_aware_optimizer = False
 
+    # Handle precision config - support "fp32" for pure float32 training
     if isinstance(precision_config, str):
         precision_config = get_mixed_precision_config(precision_config)
-
     precision_config.grad_reduce_in_fp32 = False
 
     if mock:
@@ -206,12 +210,12 @@ def distill_config(
             packing_buffer_size=40,  # 131,072 = 2^17 tokens, each 5 secs of 832*480 is about 45k tokens
         )
 
-    distillation_cfg = DMD2DistillConfig(
-        input_shape=[16, 21, 60, 104],
-        gan_loss_weight_gen=0.0,
-        guidance_scale=5.0,
-    )
-    print("distillation_cfg: ", distillation_cfg)
+    # distillation_cfg = DMD2DistillConfig(
+    #     input_shape=[16, 21, 60, 104],
+    #     gan_loss_weight_gen=0.0,
+    #     guidance_scale=5.0,
+    # )
+    # print("distillation_cfg: ", distillation_cfg)
 
     # Config Container
     cfg = ConfigContainer(
@@ -256,6 +260,6 @@ def distill_config(
         comm_overlap=comm_overlap_config,
         mixed_precision=precision_config,
     )
-    cfg.distill = distillation_cfg
+    # cfg.distill = distillation_cfg
 
     return cfg

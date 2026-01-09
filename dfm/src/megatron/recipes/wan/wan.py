@@ -36,6 +36,7 @@ from dfm.src.megatron.model.wan.wan_provider import WanModelProvider
 
 
 def model_config(
+    training_mode: str = "pretrain",
     tensor_parallelism: int = 1,
     pipeline_parallelism: int = 1,
     pipeline_parallelism_dtype: Optional[torch.dtype] = torch.bfloat16,
@@ -59,6 +60,7 @@ def model_config(
         WanModelProvider: Configuration for the Wan model.
     """
     return WanModelProvider(
+        training_mode=training_mode,
         tensor_model_parallel_size=tensor_parallelism,
         pipeline_model_parallel_size=pipeline_parallelism,
         pipeline_dtype=pipeline_parallelism_dtype,
@@ -70,6 +72,7 @@ def model_config(
 
 
 def pretrain_config(
+    training_mode: str = "pretrain",
     dir: Optional[str] = None,
     name: str = "default",
     # Dataset configuration
@@ -138,6 +141,7 @@ def pretrain_config(
     tensorboard_dir = os.path.join(run_output_dir, "tb_logs")
 
     model_cfg = model_config(
+        training_mode=training_mode,
         tensor_parallelism=tensor_parallelism,
         pipeline_parallelism=pipeline_parallelism,
         pipeline_parallelism_dtype=pipeline_parallelism_dtype,
@@ -181,7 +185,7 @@ def pretrain_config(
             global_batch_size=global_batch_size,
             num_workers=10,
             task_encoder_seq_length=None,
-            packing_buffer_size=131072,  # 131,072 = 2^17 tokens, each 5 secs of 832*480 is about 45k tokens
+            packing_buffer_size=40,  # 131,072 = 2^17 tokens, each 5 secs of 832*480 is about 45k tokens
         )
 
     # Config Container

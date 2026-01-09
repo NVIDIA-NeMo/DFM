@@ -30,7 +30,9 @@ class FlowPipeline:
         """
         Initializes the FlowPipeline with the given parameters.
         """
-        self.pipe = WanPipeline.from_pretrained(model_id, vae=None, torch_dtype=torch.float32, text_encoder=None)
+        self.pipe = WanPipeline.from_pretrained(
+            model_id, vae=None, torch_dtype=torch.float32, text_encoder=None, cache_dir="/opt/artifacts"
+        )
 
     def training_step(
         self,
