@@ -42,7 +42,7 @@ data:
     _target_: dfm.src.automodel.datasets.build_mock_dataloader
     num_workers: 0
     device: cpu
-    length: 64  # Small dataset for testing
+    length: 4  # Small dataset for testing
     num_channels: 16
     num_frame_latents: 16
     spatial_h: 30

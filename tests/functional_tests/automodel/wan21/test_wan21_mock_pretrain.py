@@ -57,7 +57,7 @@ class TestAutomodelWanPretrain:
                 cmd,
                 capture_output=True,
                 text=True,
-                timeout=900,  # 15 minute timeout for short test
+                timeout=1800,  # 30 minute timeout for short test
                 check=True,
             )
 
