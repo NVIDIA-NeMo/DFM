@@ -117,32 +117,6 @@ class ModelAdapter(ABC):
         """
         pass
 
-    def get_condition_latents(self, latents: torch.Tensor, task_type: str) -> torch.Tensor:
-        """
-        Generate conditional latents based on task type.
-
-        Override this method if your model uses a different conditioning scheme.
-        Default implementation adds a channel for conditioning mask.
-
-        Args:
-            latents: Input latents [B, C, F, H, W]
-            task_type: Task type ("t2v" or "i2v")
-
-        Returns:
-            Conditional latents [B, C+1, F, H, W]
-        """
-        b, c, f, h, w = latents.shape
-        cond = torch.zeros([b, c + 1, f, h, w], device=latents.device, dtype=latents.dtype)
-
-        if task_type == "t2v":
-            return cond
-        elif task_type == "i2v":
-            cond[:, :-1, :1] = latents[:, :, :1]
-            cond[:, -1, 0] = 1
-            return cond
-        else:
-            raise ValueError(f"Unsupported task type: {task_type}")
-
     def post_process_prediction(self, model_pred: torch.Tensor) -> torch.Tensor:
         """
         Post-process model prediction if needed.

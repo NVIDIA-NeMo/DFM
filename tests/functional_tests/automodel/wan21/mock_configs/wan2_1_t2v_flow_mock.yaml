@@ -1,0 +1,81 @@
+# Copyright (c) 2025, NVIDIA CORPORATION.  All rights reserved.
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+#     http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+
+# Mock configuration for WAN 2.1 T2V pretraining tests
+# Uses 2 GPUs with mock dataloader for functional testing
+
+seed: 42
+
+wandb:
+  project: wan-t2v-flow-matching-mock-test
+  mode: disabled  # Disable wandb for testing
+  name: wan2_1_t2v_mock_test
+
+dist_env:
+  backend: nccl
+  timeout_minutes: 30
+
+model:
+  pretrained_model_name_or_path: Wan-AI/Wan2.1-T2V-1.3B-Diffusers
+  mode: pretrain
+
+step_scheduler:
+  global_batch_size: 2
+  local_batch_size: 1
+  ckpt_every_steps: 1000  # Won't trigger in short test
+  num_epochs: 1
+  log_every: 1
+
+data:
+  dataloader:
+    _target_: dfm.src.automodel.datasets.build_mock_dataloader
+    num_workers: 0
+    device: cpu
+    length: 4  # Small dataset for testing
+    num_channels: 16
+    num_frame_latents: 16
+    spatial_h: 30
+    spatial_w: 52
+    text_seq_len: 77
+    text_embed_dim: 4096
+
+optim:
+  learning_rate: 5e-6
+  optimizer:
+    weight_decay: 0.1
+    betas: [0.9, 0.95]
+
+flow_matching:
+  adapter_type: "simple"  # Options: "hunyuan", "simple"
+  adapter_kwargs: {}
+  use_sigma_noise: true
+  timestep_sampling: uniform
+  logit_mean: 0.0
+  logit_std: 1.5
+  flow_shift: 2.5
+  mix_uniform_ratio: 0.2
+
+fsdp:
+  tp_size: 1
+  cp_size: 1
+  pp_size: 1
+  dp_replicate_size: 1
+  dp_size: 2  # 2 GPUs for data parallel
+
+checkpoint:
+  enabled: false  # Disable checkpointing for mock tests
+  checkpoint_dir: /tmp/
+  model_save_format: torch_save
+  save_consolidated: false
+  restore_from: null

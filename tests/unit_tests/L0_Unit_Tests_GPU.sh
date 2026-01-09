@@ -11,4 +11,4 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
-CUDA_VISIBLE_DEVICES="0,1" uv run --group megatron-bridge coverage run -a --data-file=/opt/DFM/.coverage --source=/opt/DFM/ -m pytest tests/unit_tests -m "not pleasefixme" --with_downloads
+CUDA_VISIBLE_DEVICES="0,1" uv run --group megatron-bridge --group automodel coverage run -a --data-file=/opt/DFM/.coverage --source=/opt/DFM/ -m pytest tests/unit_tests -m "not pleasefixme" --with_downloads
