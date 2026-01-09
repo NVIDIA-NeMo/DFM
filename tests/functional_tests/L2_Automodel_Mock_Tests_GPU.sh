@@ -14,4 +14,3 @@
 
 # Run automodel WAN mock tests with 2 GPUs
 CUDA_VISIBLE_DEVICES="0,1" uv run --group automodel coverage run -a --data-file=/opt/DFM/.coverage --source=/opt/DFM/ -m pytest tests/functional_tests/automodel/wan21/test_wan21_mock_pretrain.py -m "not pleasefixme" --with_downloads -v
-
