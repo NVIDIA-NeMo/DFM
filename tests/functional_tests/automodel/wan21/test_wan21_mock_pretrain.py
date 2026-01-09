@@ -47,7 +47,7 @@ class TestAutomodelWanPretrain:
             "--nproc_per_node=2",
             "examples/automodel/pretrain/pretrain.py",
             "-c",
-            mock_config_path
+            mock_config_path,
         ]
 
         # Run the command with a timeout
@@ -74,4 +74,3 @@ class TestAutomodelWanPretrain:
             if result is not None:
                 print("STDOUT:", result.stdout)
                 print("STDERR:", result.stderr)
-
