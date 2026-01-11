@@ -262,6 +262,7 @@ class FlowMatchingPipeline:
         model_pred: torch.Tensor,
         target: torch.Tensor,
         sigma: torch.Tensor,
+        batch: Dict[str, Any],
     ) -> Tuple[torch.Tensor, torch.Tensor, torch.Tensor]:
         """
         Compute flow matching loss with optional weighting.
@@ -279,6 +280,7 @@ class FlowMatchingPipeline:
             loss_weight: Applied weights
         """
         loss = nn.functional.mse_loss(model_pred.float(), target.float(), reduction="none")
+        loss_mask = batch["loss_mask"] if "loss_mask" in batch else None
 
         if self.use_loss_weighting:
             loss_weight = 1.0 + self.flow_shift * sigma
@@ -291,14 +293,14 @@ class FlowMatchingPipeline:
         unweighted_loss = loss.mean()
         weighted_loss = (loss * loss_weight).mean()
 
-        return weighted_loss, unweighted_loss, loss_weight
+        return weighted_loss, unweighted_loss, loss_weight, loss_mask
 
     def step(
         self,
         model: nn.Module,
         batch: Dict[str, Any],
-        device: torch.device,
-        dtype: torch.dtype,
+        device: torch.device = torch.device("cuda"),
+        dtype: torch.dtype = torch.bfloat16,
         global_step: int = 0,
     ) -> Tuple[torch.Tensor, Dict[str, Any]]:
         """
@@ -330,11 +332,17 @@ class FlowMatchingPipeline:
         # Extract and prepare batch data
         video_latents = batch["video_latents"].to(device, dtype=dtype)
 
+        # NEEDS FIXING
+        # DEBUGGING
+        print("[DEBUG] flow_matching_pipeline.step - video_latents.shape: ", video_latents.shape)
+
         # Handle tensor shapes
         if video_latents.ndim == 4:
             video_latents = video_latents.unsqueeze(0)
 
-        batch_size = video_latents.shape[0]
+        # DEBUGGING
+        # batch_size = video_latents.shape[0]
+        batch_size = video_latents.shape[1]
 
         # Determine task type
         data_type = batch.get("data_type", "video")
@@ -398,7 +406,7 @@ class FlowMatchingPipeline:
         # ====================================================================
         # Loss Computation
         # ====================================================================
-        weighted_loss, unweighted_loss, loss_weight = self.compute_loss(model_pred, target, sigma)
+        weighted_loss, unweighted_loss, loss_weight, loss_mask = self.compute_loss(model_pred, target, sigma, batch)
 
         # Safety check
         if torch.isnan(weighted_loss) or weighted_loss > 100:
@@ -432,7 +440,7 @@ class FlowMatchingPipeline:
             "data_type": data_type,
         }
 
-        return weighted_loss, metrics
+        return weighted_loss, loss_mask, metrics
 
     def _log_detailed(
         self,
