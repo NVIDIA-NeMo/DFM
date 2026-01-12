@@ -201,18 +201,6 @@ class WanModel(VisionModule):
         #################################
         ########## Wan forward ##########
 
-        # # DEBUGGING
-        # rank = torch.distributed.get_rank()
-        # output_str = ""
-        # output_str += f"rank: {rank}\n"
-        # output_str += f"context.shape: {context.shape}\n"
-        # output_str += f"x.shape: {x.shape}\n"
-        # output_str += f"grid_sizes: {grid_sizes}\n"
-        # output_str += f"t.shape: {t.shape}\n"
-        # output_str += f"packed_seq_params: {packed_seq_params}\n"
-        # print(output_str)
-        # # print(stop_here)
-
         # ============= embedders =============
 
         # run input embedding

@@ -85,7 +85,6 @@ class WanForwardStep:
         sigma_min: float = 0.0,  # Default: no clamping (pretrain)
         sigma_max: float = 1.0,  # Default: no clamping (pretrain)
     ):
-        # self.diffusion_pipeline = FlowPipeline()
         self.diffusion_pipeline = WanFlowMatchingPipeline(model_adapter=WanAdapter())
         self.use_sigma_noise = use_sigma_noise
         self.timestep_sampling = timestep_sampling

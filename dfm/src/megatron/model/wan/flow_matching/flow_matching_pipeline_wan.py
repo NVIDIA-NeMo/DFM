@@ -120,31 +120,6 @@ class WanFlowMatchingPipeline(FlowMatchingPipeline):
     3. Masked loss computation
     """
 
-    # def __init__(
-    #     self,
-    #     model_adapter: ModelAdapter,
-    #     num_train_timesteps: int = 1000,
-    #     timestep_sampling: str = "logit_normal",
-    #     flow_shift: float = 3.0,
-    #     i2v_prob: float = 0.3,
-    #     # Logit-normal distribution parameters
-    #     logit_mean: float = 0.0,
-    #     logit_std: float = 1.0,
-    #     # Mix sampling parameters
-    #     mix_uniform_ratio: float = 0.1,
-    #     # Sigma clamping for finetuning (pretrain uses [0.0, 1.0])
-    #     sigma_min: float = 0.0,
-    #     sigma_max: float = 1.0,
-    #     # Loss weighting
-    #     use_loss_weighting: bool = True,
-    #     # Logging
-    #     log_interval: int = 100,
-    #     summary_log_interval: int = 10,
-    #     device: Optional[torch.device] = None,
-    # ):
-    
-    #     return None
-
     def determine_task_type(self, data_type: str) -> str:
         """Determine task type based on data type and randomization."""
         return "t2v"

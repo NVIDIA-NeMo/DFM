@@ -336,9 +336,7 @@ class FlowMatchingPipeline:
         if video_latents.ndim == 4:
             video_latents = video_latents.unsqueeze(0)
 
-        # DEBUGGING
         batch_size = video_latents.shape[0]
-        # batch_size = video_latents.shape[1]
 
         # Determine task type
         data_type = batch.get("data_type", "video")
