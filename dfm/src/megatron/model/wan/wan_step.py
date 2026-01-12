@@ -25,8 +25,7 @@ from megatron.core.models.common.vision_module.vision_module import VisionModule
 from megatron.core.packed_seq_params import PackedSeqParams
 from megatron.core.utils import get_model_config
 
-# from dfm.src.megatron.model.wan.flow_matching.flow_pipeline import FlowPipeline
-from dfm.src.megatron.model.wan.flow_matching.flow_pipeline_megatron_wan import WanAdapter, WanFlowMatchingPipeline
+from dfm.src.megatron.model.wan.flow_matching.flow_matching_pipeline_wan import WanAdapter, WanFlowMatchingPipeline
 
 logger = logging.getLogger(__name__)
 
@@ -67,21 +66,9 @@ def wan_data_step(qkv_format, dataloader_iter):
             ),
         }
 
-    # # DEBUGGING
-    # # tranpose to have shape [batch_size, seq_len, ...] to be compatible with flow matching pipeline
-    # batch['video_latents'] = batch['video_latents'].transpose(0, 1)
-
-    # # DEBUGGING
-    # output_str = ""
-    # output_str += f"[DEBUG] wan_data_step - batch['video_latents'].shape: {batch['video_latents'].shape}\n"
-    # output_str += f"[DEBUG] wan_data_step - batch['context_embeddings'].shape: {batch['context_embeddings'].shape}\n"
-    # output_str += f"[DEBUG] wan_data_step - batch['loss_mask'].shape: {batch['loss_mask'].shape}\n"
-    # output_str += f"[DEBUG] wan_data_step - batch['seq_len_q'].shape: {batch['seq_len_q'].shape}\n"
-    # output_str += f"[DEBUG] wan_data_step - batch['seq_len_q_padded'].shape: {batch['seq_len_q_padded'].shape}\n"
-    # output_str += f"[DEBUG] wan_data_step - batch['seq_len_kv'].shape: {batch['seq_len_kv'].shape}\n"
-    # output_str += f"[DEBUG] wan_data_step - batch['seq_len_kv_padded'].shape: {batch['seq_len_kv_padded'].shape}\n"
-    # output_str += f"[DEBUG] wan_data_step - batch['grid_sizes']: {batch['grid_sizes']}\n"
-    # print(output_str)
+    # DEBUGGING
+    # tranpose from "sbhd" to "bshd" to be compatible with flow matching pipeline
+    batch['video_latents'] = batch['video_latents'].transpose(0, 1)
 
     return batch
 
@@ -132,23 +119,6 @@ class WanForwardStep:
 
         # run diffusion training step
         with straggler_timer:
-            # if parallel_state.is_pipeline_last_stage():
-            #     output_batch, loss, split_loss_mask = self.diffusion_pipeline.training_step(
-            #         model,
-            #         batch,
-            #         use_sigma_noise=self.use_sigma_noise,
-            #         timestep_sampling=self.timestep_sampling,
-            #         logit_mean=self.logit_mean,
-            #         logit_std=self.logit_std,
-            #         flow_shift=self.flow_shift,
-            #         mix_uniform_ratio=self.mix_uniform_ratio,
-            #         sigma_min=self.sigma_min,
-            #         sigma_max=self.sigma_max,
-            #     )
-            #     output_tensor = torch.mean(loss, dim=-1)
-            #     batch["loss_mask"] = split_loss_mask
-            # else:
-            #     output_tensor = self.diffusion_pipeline.training_step(model, batch)
             weighted_loss, loss_mask, metrics = self.diffusion_pipeline.step(
                 model, 
                 batch,

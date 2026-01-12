@@ -332,17 +332,13 @@ class FlowMatchingPipeline:
         # Extract and prepare batch data
         video_latents = batch["video_latents"].to(device, dtype=dtype)
 
-        # NEEDS FIXING
-        # DEBUGGING
-        print("[DEBUG] flow_matching_pipeline.step - video_latents.shape: ", video_latents.shape)
-
         # Handle tensor shapes
         if video_latents.ndim == 4:
             video_latents = video_latents.unsqueeze(0)
 
         # DEBUGGING
-        # batch_size = video_latents.shape[0]
-        batch_size = video_latents.shape[1]
+        batch_size = video_latents.shape[0]
+        # batch_size = video_latents.shape[1]
 
         # Determine task type
         data_type = batch.get("data_type", "video")
