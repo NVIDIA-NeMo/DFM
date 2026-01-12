@@ -16,14 +16,16 @@ import os
 from typing import List, Optional, Union
 
 import torch
-from megatron.bridge.recipes.utils.optimizer_utils import distributed_fused_adam_with_cosine_annealing
 from megatron.bridge.recipes.utils.tokenizer_utils import DEFAULT_NULL_TOKENIZER_VOCAB_SIZE
 from megatron.bridge.training.comm_overlap import CommOverlapConfig
+
+# from dfm.src.megatron.model.wan_distillation.distill_config import DMD2DistillConfig
 from megatron.bridge.training.config import (
     CheckpointConfig,
     ConfigContainer,
     LoggerConfig,
     RNGConfig,
+    SchedulerConfig,
     TokenizerConfig,
     TrainingConfig,
 )
@@ -33,10 +35,8 @@ from megatron.core.distributed import DistributedDataParallelConfig
 from dfm.src.megatron.data.wan.wan_energon_datamodule import WanDataModuleConfig
 from dfm.src.megatron.data.wan.wan_mock_datamodule import WanMockDataModuleConfig
 from dfm.src.megatron.model.wan.wan_provider import WanModelProvider
+from dfm.src.megatron.model.wan_distillation.dmd_optimizer_provider import DMDOptimizerProvider
 from dfm.src.megatron.model.wan_distillation.wan_distillation_model_provider import DMDModelProvider
-
-
-# from dfm.src.megatron.model.wan_distillation.distill_config import DMD2DistillConfig
 
 
 def model_config(
@@ -90,6 +90,83 @@ def model_config(
         virtual_pipeline_model_parallel_size=None,
         context_parallel_size=context_parallelism,
         sequence_parallel=sequence_parallelism,
+    )
+
+
+def create_dmd_optimizer_provider(
+    student_interval: int = 1,
+    fake_score_lr_mult: float = 1.0,
+    student_lr_mult: float = 1.0,
+    discriminator_lr_mult: float = 1.0,
+    precision: str = "bf16-mixed",
+    adam_beta1: float = 0.9,
+    adam_beta2: float = 0.95,
+    adam_eps: float = 1e-5,
+    weight_decay: float = 0.1,
+    max_lr: float = 1e-4,
+    min_lr: Optional[float] = None,
+    clip_grad: float = 1.0,
+) -> DMDOptimizerProvider:
+    """Factory function to create a DMDOptimizerProvider instance.
+
+    Example usage:
+        # Alternating updates: optimize fake_score and student on even iterations,
+        # discriminator on odd iterations
+        def fake_score_cond():
+            return trainer.iteration % 2 != 0
+
+        def student_cond():
+            return trainer.iteration % 2 == 0
+
+        def discriminator_cond():
+            return trainer.iteration % 2 != 1
+
+        optimizer_provider = create_dmd_optimizer_provider(
+            fake_score_condition=fake_score_cond,
+            student_condition=student_cond,
+            discriminator_condition=discriminator_cond,
+            fake_score_lr_mult=1.0,
+            student_lr_mult=1.0,
+            discriminator_lr_mult=2.0,  # Higher LR for discriminator
+        )
+
+    Args:
+        student_interval: Training interval for student and discriminator updates (default: 1)
+        fake_score_lr_mult: Learning rate multiplier for fake_score
+        student_lr_mult: Learning rate multiplier for student
+        discriminator_lr_mult: Learning rate multiplier for discriminator
+
+    Returns:
+        DMDOptimizerProvider instance configured with the specified conditions
+    """
+
+    def fake_score_condition(iteration):
+        return iteration % student_interval != 0
+
+    def student_condition(iteration):
+        return iteration % student_interval == 0
+
+    def discriminator_condition(iteration):
+        return iteration % student_interval != 0
+
+    return DMDOptimizerProvider(
+        optimizer="adam",
+        lr=max_lr,
+        min_lr=min_lr,
+        weight_decay=weight_decay,
+        bf16=precision == "bf16-mixed",
+        fp16=precision == "16-mixed",
+        adam_beta1=adam_beta1,
+        adam_beta2=adam_beta2,
+        adam_eps=adam_eps,
+        use_distributed_optimizer=True,
+        clip_grad=clip_grad,
+        fake_score_condition=fake_score_condition,
+        student_condition=student_condition,
+        discriminator_condition=discriminator_condition,
+        fake_score_lr_mult=fake_score_lr_mult,
+        student_lr_mult=student_lr_mult,
+        discriminator_lr_mult=discriminator_lr_mult,
     )
 
 
@@ -173,12 +250,25 @@ def distill_config(
         seq_length=1024,
     )
 
-    opt_config, scheduler = distributed_fused_adam_with_cosine_annealing(
-        lr_warmup_iters=lr_warmup_iters,
-        lr_decay_iters=train_iters,
-        max_lr=lr,
+    student_update_freq = model_cfg.fast_gen_config.student_update_freq
+    optimizer = create_dmd_optimizer_provider(
+        student_interval=student_update_freq,
+        fake_score_lr_mult=1.0,
+        student_lr_mult=1.0,
+        discriminator_lr_mult=1.0,
     )
-    opt_config.use_precision_aware_optimizer = False
+    optimizer.use_precision_aware_optimizer = False
+
+    scheduler = SchedulerConfig(
+        start_weight_decay=0.033,
+        end_weight_decay=0.033,
+        weight_decay_incr_style="constant",
+        lr_decay_style="cosine",
+        lr_warmup_iters=lr_warmup_iters,
+        lr_warmup_init=0.0,
+        lr_decay_iters=None,
+        override_opt_param_scheduler=True,
+    )
 
     # Handle precision config - support "fp32" for pure float32 training
     if isinstance(precision_config, str):
@@ -231,7 +321,7 @@ def distill_config(
             manual_gc_interval=100,
             manual_gc_eval=100,
         ),
-        optimizer=opt_config,
+        optimizer=optimizer,
         scheduler=scheduler,
         ddp=DistributedDataParallelConfig(
             check_for_nan_in_grad=True,
