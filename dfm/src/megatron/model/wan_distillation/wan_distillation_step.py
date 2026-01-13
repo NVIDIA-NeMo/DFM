@@ -139,6 +139,7 @@ class WanDistillationStep:
         self.valid = False
         self.train = False
         self.training_trigered = False
+        self._inference_pipeline = None
 
         # Cached negative condition embedding (computed lazily on first forward)
         self._neg_condition = None
@@ -221,8 +222,8 @@ class WanDistillationStep:
         Generate validation videos from teacher (50 steps) and student (1 step).
         Logs videos to Weights & Biases.
         """
-        print("on_validation_start")
-        self._ensure_inference_pipeline_loaded(teacher)
+        if self._inference_pipeline is None:
+            self._ensure_inference_pipeline_loaded(teacher)
 
         # Clear GPU memory before video generation to avoid OOM on single GPU
         gc.collect()

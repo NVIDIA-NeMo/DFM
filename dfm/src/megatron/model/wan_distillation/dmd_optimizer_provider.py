@@ -70,7 +70,7 @@ class ConditionalChainedOptimizer(ChainedOptimizer):
         Args:
             iteration: Current training iteration number
         """
-        self.iteration = iteration + 1
+        self.iteration = iteration
 
     def _should_execute(self, idx: int) -> bool:
         """Check if the optimizer at index idx should be executed.
