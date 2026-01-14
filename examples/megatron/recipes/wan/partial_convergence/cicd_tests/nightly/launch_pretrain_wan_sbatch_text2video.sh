@@ -8,7 +8,7 @@
 #SBATCH --time=04:00:00
 
 
-EXP_NAME=sbatch_wan_1.3B_pretrain_text2video_cicd_3000vids_text2image64ksteps
+EXP_NAME=sbatch_wan_1.3B_pretrain_text2video_cicd_3000vids_example
 CHECKPOINT_DIR=/lustre/fsw/coreai_dlalgo_genai/huvu/data/nemo_vfm/results/wan_finetune/${EXP_NAME}
 PROJECT=wan
 MBS=1
@@ -16,7 +16,7 @@ GBS=2
 LR=5e-5
 WARMUP_ITERS=1000
 # set this PRETRAIN_CHECKPOINT_DIR to CHECKPOINT_DIR to train from scratch
-PRETRAIN_CHECKPOINT_DIR=/lustre/fsw/coreai_dlalgo_genai/huvu/data/nemo_vfm/results/wan_finetune/sbatch_wan_1.3B_pretrain_text2image_cicd_3000vids
+PRETRAIN_CHECKPOINT_DIR=/lustre/fsw/coreai_dlalgo_genai/huvu/data/nemo_vfm/results/wan_finetune/sbatch_wan_1.3B_pretrain_text2image_cicd_3000vids_example
 
 # compute rendezvous/master addresses and ports (avoid port collision)
 MASTER_ADDR=$(scontrol show hostnames "$SLURM_JOB_NODELIST" | head -n 1)
