@@ -81,8 +81,9 @@ class WanForwardStep:
         mix_uniform_ratio: float = 0.1,
         sigma_min: float = 0.0,  # Default: no clamping (pretrain)
         sigma_max: float = 1.0,  # Default: no clamping (pretrain)
+        cache_dir: str = None,
     ):
-        self.diffusion_pipeline = FlowPipeline()
+        self.diffusion_pipeline = FlowPipeline(cache_dir=cache_dir)
         self.use_sigma_noise = use_sigma_noise
         self.timestep_sampling = timestep_sampling
         self.logit_mean = logit_mean

@@ -22,15 +22,13 @@ from dfm.src.megatron.model.wan.utils import patchify, thd_split_inputs_cp
 
 
 class FlowPipeline:
-    def __init__(
-        self,
-        model_id="Wan-AI/Wan2.1-T2V-1.3B-Diffusers",
-        seed=1234,
-    ):
+    def __init__(self, model_id="Wan-AI/Wan2.1-T2V-1.3B-Diffusers", seed=1234, cache_dir=None):
         """
         Initializes the FlowPipeline with the given parameters.
         """
-        self.pipe = WanPipeline.from_pretrained(model_id, vae=None, torch_dtype=torch.float32, text_encoder=None)
+        self.pipe = WanPipeline.from_pretrained(
+            model_id, vae=None, torch_dtype=torch.float32, text_encoder=None, cache_dir=cache_dir
+        )
 
     def training_step(
         self,

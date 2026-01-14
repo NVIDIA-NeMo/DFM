@@ -65,8 +65,8 @@ from megatron.bridge.training.utils.omegaconf_utils import (
 from megatron.bridge.utils.common_utils import get_rank_safe
 from omegaconf import OmegaConf
 
-from dfm.src.megatron.model.wan.wan_step import WanForwardStep
-from dfm.src.megatron.recipes.wan.wan import pretrain_config
+from dfm.src.megatron.model.wan_dmd.wan_dmd_step import WanDMDStep
+from dfm.src.megatron.recipes.wan_distill.wan_distill import distill_config
 
 
 logger: logging.Logger = logging.getLogger(__name__)
@@ -138,7 +138,7 @@ def main() -> None:
     logger.info("------------------------------------------------------------------")
 
     # Load base configuration from the recipe as a Python dataclass
-    cfg: ConfigContainer = pretrain_config(mock=args.mock, training_mode=args.training_mode)
+    cfg: ConfigContainer = distill_config(mock=args.mock, training_mode=args.training_mode)
     logger.info("Loaded base configuration")
 
     # Print configuration on rank 0
@@ -170,35 +170,16 @@ def main() -> None:
     # Apply overrides while preserving excluded fields
     apply_overrides(cfg, final_overrides_as_dict, excluded_fields)
 
-    # Config FlowPipeline based on training mode
-    if args.training_mode == "pretrain":
-        wan_forward_step = WanForwardStep(
-            timestep_sampling="logit_normal",
-            logit_std=1.5,
-            flow_shift=2.5,
-            mix_uniform_ratio=0.2,
-            sigma_min=0.0,
-            sigma_max=1.0,
-        )
-    elif args.training_mode == "finetune":
-        wan_forward_step = WanForwardStep(
-            timestep_sampling="uniform",
-            logit_std=1.0,
-            flow_shift=3.0,
-            mix_uniform_ratio=0.1,
-            sigma_min=0.0,
-            sigma_max=1.0,
-        )
-
     # Display final configuration
     if get_rank_safe() == 0:
         logger.info("--- Final Merged Configuration ---")
         cfg.print_yaml()
         logger.info("----------------------------------")
 
+    wan_distillation_step = WanDMDStep()
     # Start training
     logger.debug("Starting pretraining...")
-    pretrain(config=cfg, forward_step_func=wan_forward_step)
+    pretrain(config=cfg, forward_step_func=wan_distillation_step)
 
 
 if __name__ == "__main__":

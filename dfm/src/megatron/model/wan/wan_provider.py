@@ -52,9 +52,9 @@ class WanModelProvider(TransformerConfig, ModelProviderMixin[VisionModule]):
     fp16_lm_cross_entropy: bool = False
     parallel_output: bool = True
     bf16: bool = False
-    params_dtype: torch.dtype = torch.float32
+    params_dtype: torch.dtype = torch.bfloat16
     qkv_format: str = "thd"  # "sbhd". NOTE: if we use context parallelism, we need to use "thd"
-    apply_rope_fusion: bool = True
+    apply_rope_fusion: bool = False
     bias_activation_fusion: bool = True
     # these attributes are unused for images/videos, we just set because bridge training requires for LLMs
     seq_length: int = 1024

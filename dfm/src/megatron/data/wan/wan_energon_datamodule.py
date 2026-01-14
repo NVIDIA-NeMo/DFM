@@ -38,10 +38,14 @@ class WanDataModuleConfig(DiffusionDataModuleConfig):
             path=self.path,
             seq_length=self.seq_length,
             packing_buffer_size=self.packing_buffer_size,
-            task_encoder=WanTaskEncoder(seq_length=self.seq_length, packing_buffer_size=self.packing_buffer_size),
+            task_encoder=WanTaskEncoder(
+                seq_length=self.task_encoder_seq_length,  # Use task_encoder_seq_length for packing
+                packing_buffer_size=self.packing_buffer_size,
+            ),
             micro_batch_size=self.micro_batch_size,
             global_batch_size=self.global_batch_size,
             num_workers=self.num_workers,
+            use_train_split_for_val=self.use_train_split_for_val,
         )
         self.sequence_length = self.dataset.seq_length
 

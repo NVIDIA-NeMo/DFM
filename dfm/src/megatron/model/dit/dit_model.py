@@ -329,6 +329,14 @@ class DiTCrossAttentionModel(VisionModule):
             for param_name, param in getattr(self, module).named_parameters():
                 weight_key = f"{prefix}{module}.{param_name}"
                 self._set_embedder_weights_replica_id(param, sharded_state_dict, weight_key)
+
+        # Remove pos_embedder from sharded state dict - it uses deterministic sincos embeddings
+        # that are not trained and will be regenerated based on model config dimensions.
+        # This avoids shape mismatch errors when loading checkpoints with different max_img_h/w/frames.
+        pos_embedder_keys = [k for k in sharded_state_dict.keys() if "pos_embedder" in k]
+        for key in pos_embedder_keys:
+            del sharded_state_dict[key]
+
         return sharded_state_dict
 
     def _set_embedder_weights_replica_id(

@@ -16,14 +16,16 @@ import os
 from typing import List, Optional, Union
 
 import torch
-from megatron.bridge.recipes.utils.optimizer_utils import distributed_fused_adam_with_cosine_annealing
 from megatron.bridge.recipes.utils.tokenizer_utils import DEFAULT_NULL_TOKENIZER_VOCAB_SIZE
 from megatron.bridge.training.comm_overlap import CommOverlapConfig
+
+# from dfm.src.megatron.model.wan_distillation.distill_config import DMD2DistillConfig
 from megatron.bridge.training.config import (
     CheckpointConfig,
     ConfigContainer,
     LoggerConfig,
     RNGConfig,
+    SchedulerConfig,
     TokenizerConfig,
     TrainingConfig,
 )
@@ -33,17 +35,20 @@ from megatron.core.distributed import DistributedDataParallelConfig
 from dfm.src.megatron.data.wan.wan_energon_datamodule import WanDataModuleConfig
 from dfm.src.megatron.data.wan.wan_mock_datamodule import WanMockDataModuleConfig
 from dfm.src.megatron.model.wan.wan_provider import WanModelProvider
+from dfm.src.megatron.model.wan_distillation.dmd_optimizer_provider import DMDOptimizerProvider
+from dfm.src.megatron.model.wan_distillation.wan_distillation_model_provider import DMDModelProvider
 
 
 def model_config(
+    training_mode: str = "pretrain",
     tensor_parallelism: int = 1,
     pipeline_parallelism: int = 1,
-    pipeline_parallelism_dtype: Optional[torch.dtype] = torch.bfloat16,
+    pipeline_parallelism_dtype: Optional[torch.dtype] = torch.bfloat16,  # fp32 for debugging
     virtual_pipeline_parallelism: Optional[int] = 1,
     context_parallelism: int = 1,
     sequence_parallelism: bool = False,
     seq_length: int = 1024,
-) -> WanModelProvider:
+) -> DMDModelProvider:
     """
     Configure the Wan model.
 
@@ -58,18 +63,115 @@ def model_config(
     Returns:
         WanModelProvider: Configuration for the Wan model.
     """
-    return WanModelProvider(
+
+    # For fp32 debugging, set params_dtype to float32
+    # This is controlled by pipeline_parallelism_dtype for consistency
+    params_dtype = pipeline_parallelism_dtype
+
+    return DMDModelProvider(
+        training_mode=training_mode,
+        seq_length=seq_length,
+        params_dtype=params_dtype,
+        # Separate providers for fake_score and teacher
+        fake_score_model_provider=WanModelProvider(
+            training_mode=training_mode,
+            seq_length=seq_length,
+            params_dtype=params_dtype,
+        ),
+        teacher_model_provider=WanModelProvider(
+            training_mode=training_mode,
+            seq_length=seq_length,
+            params_dtype=params_dtype,
+        ),
+        # Parallelism config
         tensor_model_parallel_size=tensor_parallelism,
         pipeline_model_parallel_size=pipeline_parallelism,
         pipeline_dtype=pipeline_parallelism_dtype,
         virtual_pipeline_model_parallel_size=None,
         context_parallel_size=context_parallelism,
         sequence_parallel=sequence_parallelism,
-        seq_length=seq_length,
     )
 
 
-def pretrain_config(
+def create_dmd_optimizer_provider(
+    student_interval: int = 1,
+    fake_score_lr_mult: float = 1.0,
+    student_lr_mult: float = 1.0,
+    discriminator_lr_mult: float = 1.0,
+    precision: str = "bf16-mixed",
+    adam_beta1: float = 0.9,
+    adam_beta2: float = 0.95,
+    adam_eps: float = 1e-5,
+    weight_decay: float = 0.1,
+    max_lr: float = 1e-4,
+    min_lr: Optional[float] = None,
+    clip_grad: float = 1.0,
+) -> DMDOptimizerProvider:
+    """Factory function to create a DMDOptimizerProvider instance.
+
+    Example usage:
+        # Alternating updates: optimize fake_score and student on even iterations,
+        # discriminator on odd iterations
+        def fake_score_cond():
+            return trainer.iteration % 2 != 0
+
+        def student_cond():
+            return trainer.iteration % 2 == 0
+
+        def discriminator_cond():
+            return trainer.iteration % 2 != 1
+
+        optimizer_provider = create_dmd_optimizer_provider(
+            fake_score_condition=fake_score_cond,
+            student_condition=student_cond,
+            discriminator_condition=discriminator_cond,
+            fake_score_lr_mult=1.0,
+            student_lr_mult=1.0,
+            discriminator_lr_mult=2.0,  # Higher LR for discriminator
+        )
+
+    Args:
+        student_interval: Training interval for student and discriminator updates (default: 1)
+        fake_score_lr_mult: Learning rate multiplier for fake_score
+        student_lr_mult: Learning rate multiplier for student
+        discriminator_lr_mult: Learning rate multiplier for discriminator
+
+    Returns:
+        DMDOptimizerProvider instance configured with the specified conditions
+    """
+
+    def fake_score_condition(iteration):
+        return iteration % student_interval != 0
+
+    def student_condition(iteration):
+        return iteration % student_interval == 0
+
+    def discriminator_condition(iteration):
+        return iteration % student_interval != 0
+
+    return DMDOptimizerProvider(
+        optimizer="adam",
+        lr=max_lr,
+        min_lr=min_lr,
+        weight_decay=weight_decay,
+        bf16=precision == "bf16-mixed",
+        fp16=precision == "16-mixed",
+        adam_beta1=adam_beta1,
+        adam_beta2=adam_beta2,
+        adam_eps=adam_eps,
+        use_distributed_optimizer=True,
+        clip_grad=clip_grad,
+        fake_score_condition=fake_score_condition,
+        student_condition=student_condition,
+        discriminator_condition=discriminator_condition,
+        fake_score_lr_mult=fake_score_lr_mult,
+        student_lr_mult=student_lr_mult,
+        discriminator_lr_mult=discriminator_lr_mult,
+    )
+
+
+def distill_config(
+    training_mode: str = "finetune",
     dir: Optional[str] = None,
     name: str = "default",
     # Dataset configuration
@@ -83,7 +185,7 @@ def pretrain_config(
     # Model configuration
     tensor_parallelism: int = 1,
     pipeline_parallelism: int = 1,
-    pipeline_parallelism_dtype: Optional[torch.dtype] = torch.bfloat16,
+    pipeline_parallelism_dtype: Optional[torch.dtype] = torch.bfloat16,  # Changed from bfloat16 for fp32 debugging
     virtual_pipeline_parallelism: Optional[int] = 1,
     context_parallelism: int = 1,
     sequence_parallelism: bool = False,
@@ -94,7 +196,7 @@ def pretrain_config(
     micro_batch_size: int = 1,
     lr: float = 0.9e-4,
     lr_warmup_iters: int = 2000,
-    # Precision recipe
+    # Precision recipe - use "fp32" for pure float32, "bf16_mixed" for bfloat16
     precision_config: Optional[Union[MixedPrecisionConfig, str]] = "bf16_mixed",
     comm_overlap_config: Optional[CommOverlapConfig] = None,
 ) -> ConfigContainer:
@@ -138,6 +240,7 @@ def pretrain_config(
     tensorboard_dir = os.path.join(run_output_dir, "tb_logs")
 
     model_cfg = model_config(
+        training_mode=training_mode,
         tensor_parallelism=tensor_parallelism,
         pipeline_parallelism=pipeline_parallelism,
         pipeline_parallelism_dtype=pipeline_parallelism_dtype,
@@ -147,16 +250,29 @@ def pretrain_config(
         seq_length=1024,
     )
 
-    opt_config, scheduler = distributed_fused_adam_with_cosine_annealing(
-        lr_warmup_iters=lr_warmup_iters,
-        lr_decay_iters=train_iters,
-        max_lr=lr,
+    student_update_freq = model_cfg.fast_gen_config.student_update_freq
+    optimizer = create_dmd_optimizer_provider(
+        student_interval=student_update_freq,
+        fake_score_lr_mult=1.0,
+        student_lr_mult=1.0,
+        discriminator_lr_mult=1.0,
     )
-    opt_config.use_precision_aware_optimizer = False
+    optimizer.use_precision_aware_optimizer = False
 
+    scheduler = SchedulerConfig(
+        start_weight_decay=0.033,
+        end_weight_decay=0.033,
+        weight_decay_incr_style="constant",
+        lr_decay_style="cosine",
+        lr_warmup_iters=lr_warmup_iters,
+        lr_warmup_init=0.0,
+        lr_decay_iters=None,
+        override_opt_param_scheduler=True,
+    )
+
+    # Handle precision config - support "fp32" for pure float32 training
     if isinstance(precision_config, str):
         precision_config = get_mixed_precision_config(precision_config)
-
     precision_config.grad_reduce_in_fp32 = False
 
     if mock:
@@ -186,6 +302,7 @@ def pretrain_config(
 
     # Config Container
     cfg = ConfigContainer(
+        # TODO: add distillation model configuration
         model=model_cfg,
         train=TrainingConfig(
             train_iters=train_iters,
@@ -197,7 +314,7 @@ def pretrain_config(
             manual_gc_interval=100,
             manual_gc_eval=100,
         ),
-        optimizer=opt_config,
+        optimizer=optimizer,
         scheduler=scheduler,
         ddp=DistributedDataParallelConfig(
             check_for_nan_in_grad=True,
@@ -226,5 +343,6 @@ def pretrain_config(
         comm_overlap=comm_overlap_config,
         mixed_precision=precision_config,
     )
+    # cfg.distill = distillation_cfg
 
     return cfg
