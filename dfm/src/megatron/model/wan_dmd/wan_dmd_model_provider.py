@@ -87,8 +87,6 @@ class WanDMDCombinedModelProvider(WanDMDModelProvider):
                     provider.finalize()
 
         student_provider = super().provide
-        self.fake_score_model_provider.z_dim = self.z_dim
-        self.teacher_model_provider.z_dim = self.z_dim
         # Capture model_id from the provider for text encoder initialization
         model_id = getattr(self, "model_id", "Wan-AI/Wan2.1-T2V-1.3B-Diffusers")
 

@@ -2,11 +2,11 @@ import math
 from typing import List, Optional, Set, Tuple, Union
 
 from megatron.core import tensor_parallel
-from megatron.core.models.transformer import TransformerConfig
 from megatron.core.packed_seq_params import PackedSeqParams
+from megatron.core.transformer.transformer_config import TransformerConfig
 from torch import Tensor
-from utils import patchify_compact, unpatchify_compact
 
+from dfm.src.megatron.model.wan.utils import patchify_compact, unpatchify_compact
 from dfm.src.megatron.model.wan.wan_model import WanModel
 
 
@@ -142,10 +142,9 @@ class WanDMDModel(WanModel):
             x = tensor_parallel.gather_from_sequence_parallel_region(x)
 
         if unpatchify_features:
-            x = unpatchify_compact(x, grid_sizes, self.config.z_dim, self.patch_size)
-            print(
-                f"[Megatron] after unpatchify: shape={x.shape}, sum={x.sum().item():.4f}, first5={x.flatten()[:5].tolist()}"
-            )
+            # Infer z_dim from input shape: z_dim = feature_dim / (pF * pH * pW)
+            z_dim = x.shape[-1] // math.prod(self.patch_size)
+            x = unpatchify_compact(x, grid_sizes, z_dim, self.patch_size)
 
         x = self.noise_scheduler.convert_model_output(
             x_input, x, input_t, src_pred_type=self.net_pred_type, target_pred_type=fwd_pred_type

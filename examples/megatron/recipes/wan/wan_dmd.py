@@ -66,7 +66,7 @@ from megatron.bridge.utils.common_utils import get_rank_safe
 from omegaconf import OmegaConf
 
 from dfm.src.megatron.model.wan_dmd.wan_dmd_step import WanDMDStep
-from dfm.src.megatron.recipes.wan_distill.wan_distill import distill_config
+from dfm.src.megatron.recipes.wan.wan_dmd import wan_dmd_config
 
 
 logger: logging.Logger = logging.getLogger(__name__)
@@ -138,7 +138,7 @@ def main() -> None:
     logger.info("------------------------------------------------------------------")
 
     # Load base configuration from the recipe as a Python dataclass
-    cfg: ConfigContainer = distill_config(mock=args.mock, training_mode=args.training_mode)
+    cfg: ConfigContainer = wan_dmd_config(mock=args.mock, training_mode=args.training_mode)
     logger.info("Loaded base configuration")
 
     # Print configuration on rank 0

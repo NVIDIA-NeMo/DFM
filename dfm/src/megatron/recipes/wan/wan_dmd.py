@@ -18,8 +18,6 @@ from typing import List, Optional, Union
 import torch
 from megatron.bridge.recipes.utils.tokenizer_utils import DEFAULT_NULL_TOKENIZER_VOCAB_SIZE
 from megatron.bridge.training.comm_overlap import CommOverlapConfig
-
-# from dfm.src.megatron.model.wan_distillation.distill_config import DMD2DistillConfig
 from megatron.bridge.training.config import (
     CheckpointConfig,
     ConfigContainer,
@@ -34,9 +32,11 @@ from megatron.core.distributed import DistributedDataParallelConfig
 
 from dfm.src.megatron.data.wan.wan_energon_datamodule import WanDataModuleConfig
 from dfm.src.megatron.data.wan.wan_mock_datamodule import WanMockDataModuleConfig
-from dfm.src.megatron.model.wan.wan_provider import WanModelProvider
-from dfm.src.megatron.model.wan_distillation.dmd_optimizer_provider import DMDOptimizerProvider
-from dfm.src.megatron.model.wan_distillation.wan_distillation_model_provider import DMDModelProvider
+from dfm.src.megatron.model.wan_dmd.dmd_optimizer_provider import DMDOptimizerProvider
+from dfm.src.megatron.model.wan_dmd.wan_dmd_model_provider import (
+    WanDMDCombinedModelProvider,
+    WanDMDModelProvider,
+)
 
 
 def model_config(
@@ -48,7 +48,7 @@ def model_config(
     context_parallelism: int = 1,
     sequence_parallelism: bool = False,
     seq_length: int = 1024,
-) -> DMDModelProvider:
+) -> WanDMDCombinedModelProvider:
     """
     Configure the Wan model.
 
@@ -68,18 +68,15 @@ def model_config(
     # This is controlled by pipeline_parallelism_dtype for consistency
     params_dtype = pipeline_parallelism_dtype
 
-    return DMDModelProvider(
-        training_mode=training_mode,
+    return WanDMDCombinedModelProvider(
         seq_length=seq_length,
         params_dtype=params_dtype,
         # Separate providers for fake_score and teacher
-        fake_score_model_provider=WanModelProvider(
-            training_mode=training_mode,
+        fake_score_model_provider=WanDMDModelProvider(
             seq_length=seq_length,
             params_dtype=params_dtype,
         ),
-        teacher_model_provider=WanModelProvider(
-            training_mode=training_mode,
+        teacher_model_provider=WanDMDModelProvider(
             seq_length=seq_length,
             params_dtype=params_dtype,
         ),
@@ -170,7 +167,7 @@ def create_dmd_optimizer_provider(
     )
 
 
-def distill_config(
+def wan_dmd_config(
     training_mode: str = "finetune",
     dir: Optional[str] = None,
     name: str = "default",

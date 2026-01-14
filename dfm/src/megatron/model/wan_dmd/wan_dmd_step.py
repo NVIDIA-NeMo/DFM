@@ -34,7 +34,6 @@ from megatron.core.utils import get_model_config, unwrap_model
 import wandb
 from dfm.src.fastgen.fastgen.methods.model import FastGenModel
 from dfm.src.fastgen.fastgen.networks.Wan.network import _decode
-from dfm.src.megatron.core.utils import timers
 from dfm.src.megatron.model.wan.flow_matching.flow_inference_pipeline import FlowInferencePipeline
 from dfm.src.megatron.model.wan.inference import SIZE_CONFIGS
 from dfm.src.megatron.model.wan.wan_step import wan_data_step
@@ -407,6 +406,7 @@ class WanDMDStep:
         """
         Forward training step.
         """
+        timers = state.timers
         straggler_timer = state.straggler_timer
         qkv_format = getattr(model_config, "qkv_format", "sbhd")
         unwrapped_model = unwrap_model(model)
@@ -420,6 +420,14 @@ class WanDMDStep:
         check_for_spiky_loss = state.cfg.rerun_state_machine.check_for_spiky_loss
 
         with straggler_timer:
+            import math
+
+            from dfm.src.megatron.model.wan.utils import unpatchify_compact
+
+            z_dim = batch["video_latents"].shape[-1] // math.prod(unwrapped_model.net.patch_size)
+            batch["real"] = unpatchify_compact(
+                batch["video_latents"], batch["grid_sizes"], z_dim, unwrapped_model.net.patch_size
+            )
             # Debug: check pipeline parallel state
             if parallel_state.is_pipeline_last_stage():
                 loss_map, outputs_dict = model.forward(
@@ -427,7 +435,6 @@ class WanDMDStep:
                     iteration=state.train_state.step + 1,
                 )
                 output_tensor = loss_map["total_loss"]
-                print("final total loss", output_tensor)
             else:
                 output_tensor = model.forward(
                     data=batch,

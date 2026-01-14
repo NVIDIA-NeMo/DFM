@@ -74,7 +74,6 @@ class ConditionalChainedOptimizer(ChainedOptimizer):
         success = True
         for optimizer_idx, optimizer in enumerate(self.chained_optimizers):
             if self._should_execute(optimizer_idx):
-                print(f"stepping optimizer {optimizer_idx}")
                 success &= optimizer.step_with_ready_grads()
                 if self.config.overlap_param_gather_with_optimizer_step and optimizer_idx == 0:
                     assert success
