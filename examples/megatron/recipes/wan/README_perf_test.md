@@ -147,6 +147,7 @@ NVTE_FUSED_ATTN=1 torchrun --nproc_per_node=8 examples/megatron/recipes/wan/pret
 
 - Please use the appropriate system config recipe in `examples/megatron/recipes/wan/conf/<h100/gb200/gb300>_perf_pretrain_mock.yaml`
 - Usage example `examples/megatron/recipes/wan/pretrain_wan.py --mock --training-mode pretrain --config-file examples/megatron/recipes/wan/conf/gb300_perf_pretrain_mock.yaml`
+- Note that the FLOPs calculation for Wan 2.1 is not currently supported in Megatron-Bridge. Please use a manual calculator until a fix is made.
 
 ## Inference
 
