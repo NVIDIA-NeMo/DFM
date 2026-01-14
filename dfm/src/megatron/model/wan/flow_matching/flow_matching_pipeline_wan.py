@@ -160,5 +160,5 @@ class WanFlowMatchingPipeline(FlowMatchingPipeline):
             split_loss_mask = loss_mask
         
         batch["loss_mask"] = split_loss_mask
-        weighted_loss, unweighted_loss, loss_weight, loss_mask = super().compute_loss(model_pred, target, sigma, batch)
-        return weighted_loss, unweighted_loss, loss_weight, loss_mask
+        weighted_loss, average_weighted_loss, unweighted_loss, average_unweighted_loss, loss_weight, loss_mask = super().compute_loss(model_pred, target, sigma, batch)
+        return weighted_loss, average_weighted_loss, unweighted_loss, average_unweighted_loss, loss_weight, loss_mask

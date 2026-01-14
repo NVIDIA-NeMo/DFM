@@ -290,10 +290,12 @@ class FlowMatchingPipeline:
 
         loss_weight = loss_weight.to(model_pred.device)
 
-        unweighted_loss = loss.mean()
-        weighted_loss = (loss * loss_weight).mean()
+        unweighted_loss = loss
+        weighted_loss = loss * loss_weight
+        average_unweighted_loss = unweighted_loss.mean()
+        average_weighted_loss = weighted_loss.mean()
 
-        return weighted_loss, unweighted_loss, loss_weight, loss_mask
+        return weighted_loss, average_weighted_loss, unweighted_loss, average_unweighted_loss, loss_weight, loss_mask
 
     def step(
         self,
@@ -400,26 +402,26 @@ class FlowMatchingPipeline:
         # ====================================================================
         # Loss Computation
         # ====================================================================
-        weighted_loss, unweighted_loss, loss_weight, loss_mask = self.compute_loss(model_pred, target, sigma, batch)
+        weighted_loss, average_weighted_loss, unweighted_loss, average_unweighted_loss, loss_weight, loss_mask = self.compute_loss(model_pred, target, sigma, batch)
 
         # Safety check
-        if torch.isnan(weighted_loss) or weighted_loss > 100:
-            logger.error(f"[ERROR] Loss explosion! Loss={weighted_loss.item():.3f}")
-            raise ValueError(f"Loss exploded: {weighted_loss.item()}")
+        if torch.isnan(average_weighted_loss) or average_weighted_loss > 100:
+            logger.error(f"[ERROR] Loss explosion! Loss={average_weighted_loss.item():.3f}")
+            raise ValueError(f"Loss exploded: {average_weighted_loss.item()}")
 
         # Logging
         if detailed_log or debug_mode:
-            self._log_loss_detailed(global_step, model_pred, target, loss_weight, unweighted_loss, weighted_loss)
+            self._log_loss_detailed(global_step, model_pred, target, loss_weight, average_unweighted_loss, average_weighted_loss)
         elif summary_log:
             logger.info(
-                f"[STEP {global_step}] Loss: {weighted_loss.item():.6f} | "
+                f"[STEP {global_step}] Loss: {average_weighted_loss.item():.6f} | "
                 f"w=[{loss_weight.min():.2f},{loss_weight.max():.2f}]"
             )
 
         # Collect metrics
         metrics = {
-            "loss": weighted_loss.item(),
-            "unweighted_loss": unweighted_loss.item(),
+            "loss": average_weighted_loss.item(),
+            "unweighted_loss": average_unweighted_loss.item(),
             "sigma_min": sigma.min().item(),
             "sigma_max": sigma.max().item(),
             "sigma_mean": sigma.mean().item(),
@@ -434,7 +436,7 @@ class FlowMatchingPipeline:
             "data_type": data_type,
         }
 
-        return weighted_loss, loss_mask, metrics
+        return weighted_loss, average_weighted_loss, loss_mask, metrics
 
     def _log_detailed(
         self,

@@ -85,7 +85,16 @@ class WanForwardStep:
         sigma_min: float = 0.0,  # Default: no clamping (pretrain)
         sigma_max: float = 1.0,  # Default: no clamping (pretrain)
     ):
-        self.diffusion_pipeline = WanFlowMatchingPipeline(model_adapter=WanAdapter())
+        self.diffusion_pipeline = WanFlowMatchingPipeline(
+            model_adapter=WanAdapter(),
+            timestep_sampling = timestep_sampling,
+            logit_mean = logit_mean,
+            logit_std = logit_std,
+            flow_shift = flow_shift,
+            mix_uniform_ratio = mix_uniform_ratio,
+            sigma_min = sigma_min,
+            sigma_max = sigma_max,
+            )
         self.use_sigma_noise = use_sigma_noise
         self.timestep_sampling = timestep_sampling
         self.logit_mean = logit_mean
@@ -118,7 +127,7 @@ class WanForwardStep:
 
         # run diffusion training step
         with straggler_timer:
-            weighted_loss, loss_mask, metrics = self.diffusion_pipeline.step(
+            weighted_loss, average_weighted_loss, loss_mask, metrics = self.diffusion_pipeline.step(
                 model, 
                 batch,
             )
