@@ -12,25 +12,24 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+from typing import Any, Dict, Tuple
+
 import torch
 import torch.nn as nn
-from typing import Dict, Any, Optional, Tuple
-
 from megatron.core import parallel_state
 
+from dfm.src.automodel.flow_matching.adapters.base import FlowMatchingContext, ModelAdapter
 from dfm.src.automodel.flow_matching.flow_matching_pipeline import FlowMatchingPipeline
-from dfm.src.automodel.flow_matching.adapters.base import ModelAdapter, FlowMatchingContext
-from dfm.src.megatron.model.wan.flow_matching.time_shift_utils import compute_density_for_timestep_sampling
-from dfm.src.megatron.model.wan.utils import patchify, thd_split_inputs_cp
-from dfm.src.automodel.flow_matching.adapters.base import FlowMatchingContext
+from dfm.src.megatron.model.wan.utils import thd_split_inputs_cp
 
 
 class WanAdapter(ModelAdapter):
     """
     Model adapter for Wan model (Megatron version).
-    
+
     Handles mapping of standard FlowMatchingContext to Wan specific inputs.
     """
+
     def prepare_inputs(self, context: FlowMatchingContext) -> Dict[str, Any]:
 
         grid_sizes = context.batch["grid_sizes"]
@@ -112,7 +111,7 @@ class WanAdapter(ModelAdapter):
 class WanFlowMatchingPipeline(FlowMatchingPipeline):
     """
     Wan-specific Flow Matching pipeline handling Context Parallelism and Custom Noise.
-    
+
     This pipeline extends the standard FlowMatchingPipeline to support:
     1. Wan-specific noise generation (patching + padding)
     2. Context Parallelism (CP) splitting of inputs

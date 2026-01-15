@@ -1,3 +1,17 @@
+# Copyright (c) 2024, NVIDIA CORPORATION.  All rights reserved.
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+#     http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+
 import pytest
 import torch
 from unittest.mock import MagicMock, patch
@@ -159,18 +173,23 @@ class TestWanFlowMatchingPipeline:
             }
         }
         
-        with patch("dfm.src.automodel.flow_matching.flow_matching_pipeline.FlowMatchingPipeline.compute_loss") as mock_super_loss, \
-             patch("dfm.src.megatron.model.wan.flow_matching.flow_matching_pipeline_wan.parallel_state") as mock_ps, \
-             patch("dfm.src.megatron.model.wan.flow_matching.flow_matching_pipeline_wan.thd_split_inputs_cp") as mock_split:
-            
+        with (
+            patch(
+                "dfm.src.automodel.flow_matching.flow_matching_pipeline.FlowMatchingPipeline.compute_loss"
+            ) as mock_super_loss,
+            patch("dfm.src.megatron.model.wan.flow_matching.flow_matching_pipeline_wan.parallel_state") as mock_ps,
+            patch(
+                "dfm.src.megatron.model.wan.flow_matching.flow_matching_pipeline_wan.thd_split_inputs_cp"
+            ) as mock_split,
+        ):
             mock_ps.get_context_parallel_world_size.return_value = 2
             mock_ps.get_context_parallel_group.return_value = "fake_group"
             mock_super_loss.return_value = (1, 2, 3, 4, 5, batch["loss_mask"])
-            
-            mock_split.side_effect = lambda x, *args: x # Identity for simplicity
-            
+
+            mock_split.side_effect = lambda x, *args: x  # Identity for simplicity
+
             pipeline.compute_loss(model_pred, target, sigma, batch)
-            
+
             # Check thd_split_inputs_cp calls
             # Should be called for target and split_loss_mask
             assert mock_split.call_count == 2
