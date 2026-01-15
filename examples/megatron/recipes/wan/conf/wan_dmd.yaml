@@ -1,0 +1,50 @@
+# DiT Pretraining Configuration
+# Generated from command-line parameters
+# Note: Replace variable placeholders with actual values as needed
+
+# Model configuration
+model:
+  tensor_model_parallel_size: 1  # tp (set based on your requirements)
+  pipeline_model_parallel_size: 1  # pp (set based on your requirements)
+  context_parallel_size: 1  # cp (set based on your requirements)
+  qkv_format: thd  # Must be 'thd' for sequence packing
+  vae_cache_folder: /opt/artifacts
+  max_img_h: 256
+  max_img_w: 448
+  max_frames: 48
+
+# Dataset configuration
+dataset:
+  task_encoder_seq_length: 33000
+  packing_buffer_size: 256
+  num_workers: 20
+  use_train_split_for_val: true
+
+optimizer:
+  lr: 5e-5
+  min_lr: 5e-5
+  weight_decay: 0.1
+  adam_beta2: 0.95
+  clip_grad: 2.0
+
+scheduler:
+  lr_decay_style: constant
+  lr_warmup_iters: 0
+
+# Checkpoint configuration
+checkpoint:
+  load_optim: true
+  save_interval: 250  # eval_step
+
+# Training configuration
+train:
+  eval_interval: 250  # eval_step
+  train_iters: 1000000  # num_train_step
+  eval_iters: 1
+  global_batch_size: 1  # Set this to num_gpus (update based on your GPU count)
+  micro_batch_size: 1
+
+# Logger configuration
+logger:
+  log_interval: 1
+  wandb_project: WanStepDistillation
