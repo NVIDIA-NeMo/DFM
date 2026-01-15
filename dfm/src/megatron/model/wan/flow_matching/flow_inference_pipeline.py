@@ -306,6 +306,24 @@ class FlowInferencePipeline:
         noise_pred_pp = broadcast_from_last_pipeline_stage(noise_pred_pp_shape, dtype=torch.float32)
         return noise_pred_pp
 
+    def _decode_latents(self, latents, sample=True):
+        latents = latents.to(self.vae.dtype)
+        latents_mean = (
+            torch.tensor(self.vae.config.latents_mean)
+            .view(1, self.vae.config.z_dim, 1, 1, 1)
+            .to(latents.device, latents.dtype)
+        )
+        latents_std = 1.0 / torch.tensor(self.vae.config.latents_std).view(1, self.vae.config.z_dim, 1, 1, 1).to(
+            latents.device, latents.dtype
+        )
+        latents = latents / latents_std + latents_mean
+        videos = self.vae.decode(latents)
+        if sample:
+            videos = videos.sample()
+        else:
+            videos = videos[0].clip_(-1.0, 1.0)
+        return videos
+
     def generate(
         self,
         prompts,
@@ -557,18 +575,7 @@ class FlowInferencePipeline:
                 self.model.cpu()
                 torch.cuda.empty_cache()
             if self.rank == 0:
-                # Diffusers' VAE decoding
-                latents = latents.to(self.vae.dtype)
-                latents_mean = (
-                    torch.tensor(self.vae.config.latents_mean)
-                    .view(1, self.vae.config.z_dim, 1, 1, 1)
-                    .to(latents.device, latents.dtype)
-                )
-                latents_std = 1.0 / torch.tensor(self.vae.config.latents_std).view(
-                    1, self.vae.config.z_dim, 1, 1, 1
-                ).to(latents.device, latents.dtype)
-                latents = latents / latents_std + latents_mean
-                videos = self.vae.decode(latents).sample
+                videos = self._decode_latents(latents, sample=True)
             else:
                 videos = None
 

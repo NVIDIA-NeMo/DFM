@@ -33,7 +33,6 @@ from megatron.core.utils import get_model_config, unwrap_model
 
 import wandb
 from dfm.src.fastgen.fastgen.methods.model import FastGenModel
-from dfm.src.fastgen.fastgen.networks.Wan.network import _decode
 from dfm.src.megatron.model.wan.flow_matching.flow_inference_pipeline import FlowInferencePipeline
 from dfm.src.megatron.model.wan.inference import SIZE_CONFIGS
 from dfm.src.megatron.model.wan.wan_step import wan_data_step
@@ -191,7 +190,7 @@ class WanDMDStep:
 
         gen_latent = single_step_outputs["gen_rand"]
         with torch.no_grad():
-            gen_videos = _decode(gen_latent, self._inference_pipeline.vae)
+            gen_videos = self._inference_pipeline._decode_latents(gen_latent, sample=False)
             fps = self.inference_cfg.sample_fps
 
         # Extract prompt from batch video_metadata
@@ -233,14 +232,14 @@ class WanDMDStep:
             # Use FastGenModel.generator_fn directly
             student_4step_latents = FastGenModel.generator_fn(
                 net=wrapped_student,
-                latents=input_rand,  # [B, C, T, H, W] unit Gaussian
+                noise=input_rand,  # [B, C, T, H, W] unit Gaussian
                 condition=condition,
                 student_sample_steps=student_steps,
                 student_sample_type="sde",  # stochastic sampling
             )
 
             # Decode latents to video
-            student_4step_videos = _decode(student_4step_latents, self._inference_pipeline.vae)
+            student_4step_videos = self._inference_pipeline._decode_latents(student_4step_latents, sample=False)
             self._log_videos_to_wandb(
                 videos=student_4step_videos,
                 video_name="student_4step_prediction",
@@ -428,6 +427,7 @@ class WanDMDStep:
             batch["real"] = unpatchify_compact(
                 batch["video_latents"], batch["grid_sizes"], z_dim, unwrapped_model.net.patch_size
             )
+            batch["condition"] = batch["context_embeddings"]
             # Debug: check pipeline parallel state
             if parallel_state.is_pipeline_last_stage():
                 loss_map, outputs_dict = model.forward(

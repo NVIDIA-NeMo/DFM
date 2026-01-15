@@ -7,7 +7,6 @@ from fastgen.methods.distribution_matching.dmd2 import DMD2Model
 from fastgen.networks.noise_schedule import get_noise_schedule
 from fastgen.networks.Wan.network import WanTextEncoder
 from fastgen.utils import instantiate
-from fastgen.utils.basic_utils import PRECISION_MAP
 from megatron.bridge.training.checkpointing import _load_model_weights_from_checkpoint
 from megatron.core import parallel_state
 from megatron.core.models.common.vision_module.vision_module import VisionModule
@@ -99,14 +98,9 @@ class WanDMDCombinedModelProvider(WanDMDModelProvider):
 
             def get_text_encoder(second_self) -> WanTextEncoder:
                 """Lazy-load the WAN text encoder for encoding prompts."""
-                print("dtype", PRECISION_MAP[self.t_precision])
                 if second_self._text_encoder is None:
-                    second_self._text_encoder = WanTextEncoder(
-                        model_id=second_self._model_id,
-                    )
-                    # Move to CUDA and set precision
-                    print("moving text encoder to cuda and setting precision", PRECISION_MAP[self.t_precision])
-                    second_self._text_encoder.to(device="cuda", dtype=PRECISION_MAP[self.t_precision])
+                    second_self._text_encoder = WanTextEncoder(second_self._model_id)
+                    second_self._text_encoder.to(device="cuda", dtype=self.params_dtype)
                 return second_self._text_encoder
 
             def build_model(second_self):
@@ -178,7 +172,7 @@ class WanDMDCombinedModelProvider(WanDMDModelProvider):
                 if "packed_seq_params" in data:
                     fwd_kwargs["packed_seq_params"] = data["packed_seq_params"]
                 if "context_embeddings" in data:
-                    fwd_kwargs["context"] = data["context_embeddings"].to(PRECISION_MAP[self.t_precision])
+                    fwd_kwargs["context"] = data["context_embeddings"].to(self.params_dtype)
                 # Enable timestep scaling from [0, 1] to [0, 1000] for distillation
                 # DMD2Model generates timesteps in [0, 1] range, but WanModel expects [0, 1000]
                 fwd_kwargs["scale_t"] = True
