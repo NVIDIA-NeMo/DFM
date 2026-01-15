@@ -133,6 +133,7 @@ class TestWanAdapter:
         )
         assert out is not None
 
+
 class TestWanFlowMatchingPipeline:
     @pytest.fixture
     def pipeline(self):
