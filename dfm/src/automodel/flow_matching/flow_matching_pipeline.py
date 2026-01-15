@@ -104,7 +104,7 @@ class FlowMatchingPipeline:
         )
 
         # Training step
-        loss, metrics = pipeline.step(model, batch, device, dtype, global_step)
+        weighted_loss, average_weighted_loss, loss_mask, metrics = pipeline.step(model, batch, device, dtype, global_step)
     """
 
     def __init__(
@@ -402,7 +402,9 @@ class FlowMatchingPipeline:
         # ====================================================================
         # Loss Computation
         # ====================================================================
-        weighted_loss, average_weighted_loss, unweighted_loss, average_unweighted_loss, loss_weight, loss_mask = self.compute_loss(model_pred, target, sigma, batch)
+        weighted_loss, average_weighted_loss, unweighted_loss, average_unweighted_loss, loss_weight, loss_mask = (
+            self.compute_loss(model_pred, target, sigma, batch)
+        )
 
         # Safety check
         if torch.isnan(average_weighted_loss) or average_weighted_loss > 100:
@@ -411,7 +413,14 @@ class FlowMatchingPipeline:
 
         # Logging
         if detailed_log or debug_mode:
-            self._log_loss_detailed(global_step, model_pred, target, loss_weight, average_unweighted_loss, average_weighted_loss)
+            self._log_loss_detailed(
+                global_step,
+                model_pred,
+                target,
+                loss_weight,
+                average_unweighted_loss,
+                average_weighted_loss,
+            )
         elif summary_log:
             logger.info(
                 f"[STEP {global_step}] Loss: {average_weighted_loss.item():.6f} | "

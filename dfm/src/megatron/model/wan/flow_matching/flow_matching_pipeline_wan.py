@@ -41,7 +41,6 @@ class WanAdapter(ModelAdapter):
         timesteps = context.timesteps
         packed_seq_params = context.batch["packed_seq_params"]
 
-        # DEBUGGING
         # tranpose back to have shape "sbhd"
         # (before we reshaped to "bshd" to be compatible with flow matching pipeline)
         noisy_latents = noisy_latents.transpose(0, 1)
@@ -131,11 +130,9 @@ class WanFlowMatchingPipeline(FlowMatchingPipeline):
         sigma: torch.Tensor,
         batch: Dict[str, Any],
     ) -> Tuple[torch.Tensor, torch.Tensor, torch.Tensor]:
-
         loss_mask = batch["loss_mask"]
         packed_seq_params = batch["packed_seq_params"]
 
-        # DEBUGGING
         # tranpose back to have shape "sbhd"
         # (before we reshaped to "bshd" to be compatible with flow matching pipeline)
         target = target.transpose(0, 1)
@@ -158,7 +155,9 @@ class WanFlowMatchingPipeline(FlowMatchingPipeline):
         else:
             target = target
             split_loss_mask = loss_mask
-        
+
         batch["loss_mask"] = split_loss_mask
-        weighted_loss, average_weighted_loss, unweighted_loss, average_unweighted_loss, loss_weight, loss_mask = super().compute_loss(model_pred, target, sigma, batch)
+        weighted_loss, average_weighted_loss, unweighted_loss, average_unweighted_loss, loss_weight, loss_mask = (
+            super().compute_loss(model_pred, target, sigma, batch)
+        )
         return weighted_loss, average_weighted_loss, unweighted_loss, average_unweighted_loss, loss_weight, loss_mask
