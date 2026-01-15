@@ -12,12 +12,17 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-import pytest
-import torch
 from unittest.mock import MagicMock, patch
 
-from dfm.src.megatron.model.wan.flow_matching.flow_matching_pipeline_wan import WanAdapter, WanFlowMatchingPipeline
+import pytest
+import torch
+
 from dfm.src.automodel.flow_matching.adapters.base import FlowMatchingContext
+from dfm.src.megatron.model.wan.flow_matching.flow_matching_pipeline_wan import (
+    WanAdapter,
+    WanFlowMatchingPipeline,
+)
+
 
 class TestWanAdapter:
     @pytest.fixture
@@ -28,25 +33,25 @@ class TestWanAdapter:
     def context(self):
         # Create a mock context with necessary attributes
         ctx = MagicMock(spec=FlowMatchingContext)
-        
+
         # Setup inputs
         batch_size = 2
         seq_len = 8
         hidden_dim = 16
-        
+
         # Input latents are typically (B, S, H) before adapter
         ctx.noisy_latents = torch.randn(batch_size, seq_len, hidden_dim)
         ctx.video_latents = torch.randn(batch_size, seq_len, hidden_dim)
         ctx.timesteps = torch.tensor([0.5, 0.5])
-        
+
         ctx.batch = {
             "grid_sizes": [(4, 4, 4)] * batch_size,
             "loss_mask": torch.ones(batch_size, seq_len),
-            "context_embeddings": torch.randn(batch_size, seq_len, hidden_dim), # B, S, H
+            "context_embeddings": torch.randn(batch_size, seq_len, hidden_dim),  # B, S, H
             "packed_seq_params": {
                 "self_attention": MagicMock(cu_seqlens_q_padded=None),
                 "cross_attention": MagicMock(cu_seqlens_kv_padded=None),
-            }
+            },
         }
         return ctx
 
@@ -136,25 +141,28 @@ class TestWanFlowMatchingPipeline:
         assert pipeline.determine_task_type("any") == "t2v"
 
     def test_compute_loss_no_cp(self, pipeline):
-        model_pred = torch.randn(8, 2, 16) # S, B, H
-        target = torch.randn(2, 8, 16) # B, S, H
+        model_pred = torch.randn(8, 2, 16)  # S, B, H
+        target = torch.randn(2, 8, 16)  # B, S, H
         sigma = torch.randn(2)
-        
+
         batch = {
             "loss_mask": torch.ones(2, 8),
-            "packed_seq_params": {
-                "self_attention": MagicMock(cu_seqlens_q_padded=None)
-            }
+            "packed_seq_params": {"self_attention": MagicMock(cu_seqlens_q_padded=None)},
         }
-        
-        with patch("dfm.src.automodel.flow_matching.flow_matching_pipeline.FlowMatchingPipeline.compute_loss") as mock_super_loss, \
-             patch("dfm.src.megatron.model.wan.flow_matching.flow_matching_pipeline_wan.parallel_state") as mock_ps:
-            
+
+        with (
+            patch(
+                "dfm.src.automodel.flow_matching.flow_matching_pipeline.FlowMatchingPipeline.compute_loss"
+            ) as mock_super_loss,
+            patch(
+                "dfm.src.megatron.model.wan.flow_matching.flow_matching_pipeline_wan.parallel_state"
+            ) as mock_ps,
+        ):
             mock_ps.get_context_parallel_world_size.return_value = 1
             mock_super_loss.return_value = (1, 2, 3, 4, 5, batch["loss_mask"])
-            
+
             pipeline.compute_loss(model_pred, target, sigma, batch)
-            
+
             # target should be transposed to (S, B, H) before passing to super
             # Input target was (2, 8, 16), so expected is (8, 2, 16)
             args, _ = mock_super_loss.call_args
@@ -165,19 +173,21 @@ class TestWanFlowMatchingPipeline:
         model_pred = torch.randn(8, 2, 16)
         target = torch.randn(2, 8, 16)
         sigma = torch.randn(2)
-        
+
         batch = {
             "loss_mask": torch.ones(2, 8),
             "packed_seq_params": {
                 "self_attention": MagicMock(cu_seqlens_q_padded="dummy_seq_len")
-            }
+            },
         }
-        
+
         with (
             patch(
                 "dfm.src.automodel.flow_matching.flow_matching_pipeline.FlowMatchingPipeline.compute_loss"
             ) as mock_super_loss,
-            patch("dfm.src.megatron.model.wan.flow_matching.flow_matching_pipeline_wan.parallel_state") as mock_ps,
+            patch(
+                "dfm.src.megatron.model.wan.flow_matching.flow_matching_pipeline_wan.parallel_state"
+            ) as mock_ps,
             patch(
                 "dfm.src.megatron.model.wan.flow_matching.flow_matching_pipeline_wan.thd_split_inputs_cp"
             ) as mock_split,

@@ -31,7 +31,6 @@ class WanAdapter(ModelAdapter):
     """
 
     def prepare_inputs(self, context: FlowMatchingContext) -> Dict[str, Any]:
-
         grid_sizes = context.batch["grid_sizes"]
         noisy_latents = context.noisy_latents
         video_latents = context.video_latents
