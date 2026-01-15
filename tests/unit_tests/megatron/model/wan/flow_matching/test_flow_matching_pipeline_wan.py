@@ -58,75 +58,78 @@ class TestWanAdapter:
     def test_prepare_inputs_no_cp(self, adapter, context):
         with patch("dfm.src.megatron.model.wan.flow_matching.flow_matching_pipeline_wan.parallel_state") as mock_ps:
             mock_ps.get_context_parallel_world_size.return_value = 1
-            
+
             inputs = adapter.prepare_inputs(context)
-            
+
             # Check keys
             assert "noisy_latents" in inputs
             assert "grid_sizes" in inputs
             assert "timesteps" in inputs
             assert "context_embeddings" in inputs
             assert "packed_seq_params" in inputs
-            
+
             # Check shapes and types
             # noisy_latents should be transposed to (S, B, H) from (B, S, H) and cast to bf16
             # Input was (2, 8, 16), so expected is (8, 2, 16)
             assert inputs["noisy_latents"].shape == (8, 2, 16)
             assert inputs["noisy_latents"].dtype == torch.bfloat16
-            
+
             # context_embeddings should be (B, S, H) (2, 8, 16) and cast to bf16
             assert inputs["context_embeddings"].shape == (2, 8, 16)
             assert inputs["context_embeddings"].dtype == torch.bfloat16
-            
+
             # Timesteps should be bf16
             assert inputs["timesteps"].dtype == torch.bfloat16
 
     def test_prepare_inputs_with_cp(self, adapter, context):
-        with patch("dfm.src.megatron.model.wan.flow_matching.flow_matching_pipeline_wan.parallel_state") as mock_ps, \
-             patch("dfm.src.megatron.model.wan.flow_matching.flow_matching_pipeline_wan.thd_split_inputs_cp") as mock_split:
-            
+        with (
+            patch("dfm.src.megatron.model.wan.flow_matching.flow_matching_pipeline_wan.parallel_state") as mock_ps,
+            patch(
+                "dfm.src.megatron.model.wan.flow_matching.flow_matching_pipeline_wan.thd_split_inputs_cp"
+            ) as mock_split,
+        ):
             mock_ps.get_context_parallel_world_size.return_value = 2
             mock_ps.get_context_parallel_group.return_value = "fake_group"
-            
+
             # Mock split to return a dummy value so we know it was processed
             # We return the input as is, but we check the call arguments
-            mock_split.side_effect = lambda x, *args: x 
-            
+            mock_split.side_effect = lambda x, *args: x
+
             inputs = adapter.prepare_inputs(context)
-            
+
             # Verify thd_split_inputs_cp was called for noisy_latents and context_embeddings
             assert mock_split.call_count == 2
-            
+
             # Verify args for the calls
             # We can't easily distinguish order without checking args, but we know both should be called.
-            
+
             # Check types are correct (bf16)
             assert inputs["noisy_latents"].dtype == torch.bfloat16
             assert inputs["context_embeddings"].dtype == torch.bfloat16
 
     def test_forward(self, adapter):
         model = MagicMock()
-        model.return_value = torch.randn(8, 2, 16) # S, B, H
-        
+        model.return_value = torch.randn(8, 2, 16)  # S, B, H
+
         inputs = {
             "noisy_latents": torch.randn(8, 2, 16),
             "grid_sizes": [],
             "timesteps": torch.tensor([1.0]),
             "context_embeddings": torch.randn(2, 8, 16),
-            "packed_seq_params": {}
+            "packed_seq_params": {},
         }
-        
+
         # Mock post_process_prediction inherited from ModelAdapter
         adapter.post_process_prediction = MagicMock(side_effect=lambda x: x)
-        
+
         out = adapter.forward(model, inputs)
-        
+
         model.assert_called_once_with(
             x=inputs["noisy_latents"],
             grid_sizes=inputs["grid_sizes"],
             t=inputs["timesteps"],
             context=inputs["context_embeddings"],
-            packed_seq_params=inputs["packed_seq_params"]
+            packed_seq_params=inputs["packed_seq_params"],
         )
         assert out is not None
 
@@ -154,9 +157,7 @@ class TestWanFlowMatchingPipeline:
             patch(
                 "dfm.src.automodel.flow_matching.flow_matching_pipeline.FlowMatchingPipeline.compute_loss"
             ) as mock_super_loss,
-            patch(
-                "dfm.src.megatron.model.wan.flow_matching.flow_matching_pipeline_wan.parallel_state"
-            ) as mock_ps,
+            patch("dfm.src.megatron.model.wan.flow_matching.flow_matching_pipeline_wan.parallel_state") as mock_ps,
         ):
             mock_ps.get_context_parallel_world_size.return_value = 1
             mock_super_loss.return_value = (1, 2, 3, 4, 5, batch["loss_mask"])
@@ -176,18 +177,14 @@ class TestWanFlowMatchingPipeline:
 
         batch = {
             "loss_mask": torch.ones(2, 8),
-            "packed_seq_params": {
-                "self_attention": MagicMock(cu_seqlens_q_padded="dummy_seq_len")
-            },
+            "packed_seq_params": {"self_attention": MagicMock(cu_seqlens_q_padded="dummy_seq_len")},
         }
 
         with (
             patch(
                 "dfm.src.automodel.flow_matching.flow_matching_pipeline.FlowMatchingPipeline.compute_loss"
             ) as mock_super_loss,
-            patch(
-                "dfm.src.megatron.model.wan.flow_matching.flow_matching_pipeline_wan.parallel_state"
-            ) as mock_ps,
+            patch("dfm.src.megatron.model.wan.flow_matching.flow_matching_pipeline_wan.parallel_state") as mock_ps,
             patch(
                 "dfm.src.megatron.model.wan.flow_matching.flow_matching_pipeline_wan.thd_split_inputs_cp"
             ) as mock_split,
@@ -203,4 +200,3 @@ class TestWanFlowMatchingPipeline:
             # Check thd_split_inputs_cp calls
             # Should be called for target and split_loss_mask
             assert mock_split.call_count == 2
-
