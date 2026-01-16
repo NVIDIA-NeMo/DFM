@@ -26,27 +26,24 @@ import json
 import tempfile
 from pathlib import Path
 from typing import Dict, List
-from unittest.mock import MagicMock, patch
 
 import pytest
 import torch
 
 from dfm.src.automodel.datasets.multiresolutionDataloader.dataloader import (
     SequentialBucketSampler,
-    collate_fn_production,
     build_multiresolution_dataloader,
+    collate_fn_production,
 )
 from dfm.src.automodel.datasets.multiresolutionDataloader.text_to_image_dataset import (
     TextToImageDataset,
-)
-from dfm.src.automodel.datasets.multiresolutionDataloader.multi_tier_bucketing import (
-    MultiTierBucketCalculator,
 )
 
 
 # ============================================================================
 # Fixtures and Helpers
 # ============================================================================
+
 
 class MockCacheBuilder:
     """Helper class to create mock cache directories for testing."""
@@ -176,6 +173,7 @@ def large_dataset():
 # ============================================================================
 # CPU Tests - SequentialBucketSampler
 # ============================================================================
+
 
 class TestSequentialBucketSamplerCPU:
     """CPU tests for SequentialBucketSampler."""
@@ -369,9 +367,9 @@ class TestSequentialBucketSamplerCPU:
 
         # At least one pair of epochs should have different ordering
         assert (
-            indices_epoch_0 != indices_epoch_1 or
-            indices_epoch_1 != indices_epoch_2 or
-            indices_epoch_0 != indices_epoch_2
+            indices_epoch_0 != indices_epoch_1
+            or indices_epoch_1 != indices_epoch_2
+            or indices_epoch_0 != indices_epoch_2
         ), "Expected different ordering across epochs when shuffling is enabled"
 
         # Verify all epochs cover the same samples (just in different order)
@@ -427,10 +425,10 @@ class TestSequentialBucketSamplerCPU:
         info = sampler.get_batch_info(0)
 
         if info:  # May be empty if batch_idx is out of range
-            assert 'bucket_key' in info or info == {}
-            if 'bucket_key' in info:
-                assert 'resolution' in info
-                assert 'batch_size' in info
+            assert "bucket_key" in info or info == {}
+            if "bucket_key" in info:
+                assert "resolution" in info
+                assert "batch_size" in info
 
 
 class TestSequentialBucketSamplerDistributedCPU:
@@ -504,6 +502,7 @@ class TestSequentialBucketSamplerDistributedCPU:
 # CPU Tests - collate_fn_production
 # ============================================================================
 
+
 class TestCollateFnProductionCPU:
     """CPU tests for collate_fn_production."""
 
@@ -515,8 +514,8 @@ class TestCollateFnProductionCPU:
         batch = collate_fn_production(items)
 
         assert isinstance(batch, dict)
-        assert 'latent' in batch
-        assert 'crop_resolution' in batch
+        assert "latent" in batch
+        assert "crop_resolution" in batch
 
     def test_collate_stacks_tensors(self, simple_dataset):
         """Test collate function stacks tensors correctly."""
@@ -524,10 +523,10 @@ class TestCollateFnProductionCPU:
 
         batch = collate_fn_production(items)
 
-        assert batch['latent'].shape[0] == 4
-        assert batch['crop_resolution'].shape[0] == 4
-        assert batch['original_resolution'].shape[0] == 4
-        assert batch['crop_offset'].shape[0] == 4
+        assert batch["latent"].shape[0] == 4
+        assert batch["crop_resolution"].shape[0] == 4
+        assert batch["original_resolution"].shape[0] == 4
+        assert batch["crop_offset"].shape[0] == 4
 
     def test_collate_preserves_metadata(self, simple_dataset):
         """Test collate function preserves metadata lists."""
@@ -535,10 +534,10 @@ class TestCollateFnProductionCPU:
 
         batch = collate_fn_production(items)
 
-        assert len(batch['prompt']) == 4
-        assert len(batch['image_path']) == 4
-        assert len(batch['bucket_id']) == 4
-        assert len(batch['aspect_ratio']) == 4
+        assert len(batch["prompt"]) == 4
+        assert len(batch["image_path"]) == 4
+        assert len(batch["bucket_id"]) == 4
+        assert len(batch["aspect_ratio"]) == 4
 
     def test_collate_handles_embeddings(self, simple_dataset):
         """Test collate with embedding mode."""
@@ -546,10 +545,10 @@ class TestCollateFnProductionCPU:
 
         batch = collate_fn_production(items)
 
-        if 'clip_hidden' in items[0]:
-            assert batch['clip_hidden'].shape[0] == 4
-            assert batch['clip_pooled'].shape[0] == 4
-            assert batch['t5_hidden'].shape[0] == 4
+        if "clip_hidden" in items[0]:
+            assert batch["clip_hidden"].shape[0] == 4
+            assert batch["clip_pooled"].shape[0] == 4
+            assert batch["t5_hidden"].shape[0] == 4
 
     def test_collate_same_resolution_required(self, multi_resolution_dataset):
         """Test collate requires same resolution in batch."""
@@ -558,7 +557,7 @@ class TestCollateFnProductionCPU:
         res_set = set()
         for i in range(len(multi_resolution_dataset)):
             item = multi_resolution_dataset[i]
-            res = tuple(item['crop_resolution'].tolist())
+            res = tuple(item["crop_resolution"].tolist())
             if res not in res_set:
                 items.append(item)
                 res_set.add(res)
@@ -573,6 +572,7 @@ class TestCollateFnProductionCPU:
 # ============================================================================
 # CPU Tests - build_multiresolution_dataloader
 # ============================================================================
+
 
 class TestBuildMultiresolutionDataloaderCPU:
     """CPU tests for build_multiresolution_dataloader."""
@@ -604,7 +604,7 @@ class TestBuildMultiresolutionDataloaderCPU:
         batch_count = 0
         for batch in dataloader:
             assert isinstance(batch, dict)
-            assert 'latent' in batch
+            assert "latent" in batch
             batch_count += 1
             if batch_count >= 2:
                 break
@@ -622,8 +622,8 @@ class TestBuildMultiresolutionDataloaderCPU:
         )
 
         for batch in dataloader:
-            assert batch['latent'].dim() == 4  # [B, C, H, W]
-            assert len(batch['prompt']) == batch['latent'].shape[0]
+            assert batch["latent"].dim() == 4  # [B, C, H, W]
+            assert len(batch["prompt"]) == batch["latent"].shape[0]
             break
 
     def test_dataloader_with_shuffle(self, simple_dataset):
@@ -677,6 +677,7 @@ class TestBuildMultiresolutionDataloaderCPU:
 # GPU Tests - SequentialBucketSampler
 # ============================================================================
 
+
 @pytest.mark.skipif(not torch.cuda.is_available(), reason="Requires CUDA")
 class TestSequentialBucketSamplerGPU:
     """GPU tests for SequentialBucketSampler."""
@@ -698,7 +699,7 @@ class TestSequentialBucketSamplerGPU:
         for batch_indices in batches[:1]:
             items = [simple_dataset[i] for i in batch_indices]
             for item in items:
-                latent_gpu = item['latent'].cuda()
+                latent_gpu = item["latent"].cuda()
                 assert latent_gpu.is_cuda
             break
 
@@ -706,6 +707,7 @@ class TestSequentialBucketSamplerGPU:
 # ============================================================================
 # GPU Tests - collate_fn_production
 # ============================================================================
+
 
 @pytest.mark.skipif(not torch.cuda.is_available(), reason="Requires CUDA")
 class TestCollateFnProductionGPU:
@@ -724,13 +726,10 @@ class TestCollateFnProductionGPU:
         batch = collate_fn_production(items)
 
         # Move batch to GPU
-        batch_gpu = {
-            k: v.cuda() if isinstance(v, torch.Tensor) else v
-            for k, v in batch.items()
-        }
+        batch_gpu = {k: v.cuda() if isinstance(v, torch.Tensor) else v for k, v in batch.items()}
 
-        assert batch_gpu['latent'].is_cuda
-        assert batch_gpu['crop_resolution'].is_cuda
+        assert batch_gpu["latent"].is_cuda
+        assert batch_gpu["crop_resolution"].is_cuda
 
     def test_collate_then_transfer_to_gpu(self, simple_dataset):
         """Test collating on CPU then transferring to GPU."""
@@ -740,16 +739,17 @@ class TestCollateFnProductionGPU:
         device = torch.device("cuda:0")
 
         # Transfer tensors to GPU
-        latent_gpu = batch['latent'].to(device)
-        assert latent_gpu.device.type == 'cuda'
+        latent_gpu = batch["latent"].to(device)
+        assert latent_gpu.device.type == "cuda"
 
-        crop_res_gpu = batch['crop_resolution'].to(device)
-        assert crop_res_gpu.device.type == 'cuda'
+        crop_res_gpu = batch["crop_resolution"].to(device)
+        assert crop_res_gpu.device.type == "cuda"
 
 
 # ============================================================================
 # GPU Tests - build_multiresolution_dataloader
 # ============================================================================
+
 
 @pytest.mark.skipif(not torch.cuda.is_available(), reason="Requires CUDA")
 class TestBuildMultiresolutionDataloaderGPU:
@@ -769,7 +769,7 @@ class TestBuildMultiresolutionDataloaderGPU:
 
         for batch in dataloader:
             # Transfer to GPU (should be faster with pinned memory)
-            latent_gpu = batch['latent'].cuda(non_blocking=True)
+            latent_gpu = batch["latent"].cuda(non_blocking=True)
             assert latent_gpu.is_cuda
             break
 
@@ -787,10 +787,10 @@ class TestBuildMultiresolutionDataloaderGPU:
 
         for batch in dataloader:
             # Transfer all tensors to GPU
-            latent_gpu = batch['latent'].to(device)
-            crop_res_gpu = batch['crop_resolution'].to(device)
-            orig_res_gpu = batch['original_resolution'].to(device)
-            crop_offset_gpu = batch['crop_offset'].to(device)
+            latent_gpu = batch["latent"].to(device)
+            crop_res_gpu = batch["crop_resolution"].to(device)
+            orig_res_gpu = batch["original_resolution"].to(device)
+            crop_offset_gpu = batch["crop_offset"].to(device)
 
             assert latent_gpu.is_cuda
             assert crop_res_gpu.is_cuda
@@ -798,10 +798,10 @@ class TestBuildMultiresolutionDataloaderGPU:
             assert crop_offset_gpu.is_cuda
 
             # Check embeddings if present
-            if 'clip_hidden' in batch:
-                clip_hidden_gpu = batch['clip_hidden'].to(device)
-                clip_pooled_gpu = batch['clip_pooled'].to(device)
-                t5_hidden_gpu = batch['t5_hidden'].to(device)
+            if "clip_hidden" in batch:
+                clip_hidden_gpu = batch["clip_hidden"].to(device)
+                clip_pooled_gpu = batch["clip_pooled"].to(device)
+                t5_hidden_gpu = batch["t5_hidden"].to(device)
 
                 assert clip_hidden_gpu.is_cuda
                 assert clip_pooled_gpu.is_cuda
@@ -826,7 +826,7 @@ class TestBuildMultiresolutionDataloaderGPU:
 
         # Process some batches
         for i, batch in enumerate(dataloader):
-            latent_gpu = batch['latent'].to(device)
+            latent_gpu = batch["latent"].to(device)
             del latent_gpu
             if i >= 2:
                 break
@@ -859,7 +859,7 @@ class TestBuildMultiresolutionDataloaderGPU:
         for rank, dl in enumerate(dataloaders):
             batch_count = 0
             for batch in dl:
-                assert batch['latent'] is not None
+                assert batch["latent"] is not None
                 batch_count += 1
                 if batch_count >= 2:
                     break
@@ -878,7 +878,7 @@ class TestBuildMultiresolutionDataloaderGPU:
         device = torch.device("cuda:0")
 
         for batch in dataloader:
-            latent_gpu = batch['latent'].to(device)
+            latent_gpu = batch["latent"].to(device)
 
             # Perform some operations
             latent_normalized = latent_gpu / latent_gpu.std()
@@ -896,6 +896,7 @@ class TestBuildMultiresolutionDataloaderGPU:
 # Integration Tests
 # ============================================================================
 
+
 class TestDataloaderIntegration:
     """Integration tests for full dataloader pipeline."""
 
@@ -911,7 +912,7 @@ class TestDataloaderIntegration:
 
         batch_count = 0
         for batch in dataloader:
-            assert batch['latent'] is not None
+            assert batch["latent"] is not None
             batch_count += 1
 
         assert batch_count == len(sampler)
@@ -949,7 +950,7 @@ class TestDataloaderIntegration:
         batch_count = 0
 
         for batch in dataloader:
-            latent_gpu = batch['latent'].to(device, non_blocking=True)
+            latent_gpu = batch["latent"].to(device, non_blocking=True)
             assert latent_gpu.is_cuda
             batch_count += 1
 

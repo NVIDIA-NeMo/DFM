@@ -12,13 +12,14 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-from .text_to_image_dataset import TextToImageDataset
-from .multi_tier_bucketing import MultiTierBucketCalculator
 from .dataloader import (
     SequentialBucketSampler,
     build_multiresolution_dataloader,
     collate_fn_production,
 )
+from .multi_tier_bucketing import MultiTierBucketCalculator
+from .text_to_image_dataset import TextToImageDataset
+
 
 __all__ = [
     "TextToImageDataset",

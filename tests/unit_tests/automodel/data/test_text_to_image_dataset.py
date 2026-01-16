@@ -15,7 +15,6 @@
 """Unit tests for TextToImageDataset."""
 
 import json
-import os
 import tempfile
 from pathlib import Path
 from typing import Dict, List
@@ -141,9 +140,9 @@ class TestTextToImageDatasetInit:
         dataset = TextToImageDataset(str(simple_cache_dir))
 
         assert len(dataset) == 5
-        assert hasattr(dataset, 'metadata')
-        assert hasattr(dataset, 'bucket_groups')
-        assert hasattr(dataset, 'calculator')
+        assert hasattr(dataset, "metadata")
+        assert hasattr(dataset, "bucket_groups")
+        assert hasattr(dataset, "calculator")
 
     def test_init_missing_cache_dir(self):
         """Test initialization with non-existent cache directory raises error."""
@@ -194,16 +193,14 @@ class TestBucketGrouping:
         """Test that all samples are assigned to buckets."""
         dataset = TextToImageDataset(str(simple_cache_dir))
 
-        total_in_buckets = sum(
-            len(group['indices']) for group in dataset.bucket_groups.values()
-        )
+        total_in_buckets = sum(len(group["indices"]) for group in dataset.bucket_groups.values())
         assert total_in_buckets == len(dataset)
 
     def test_bucket_group_structure(self, simple_cache_dir):
         """Test bucket group has required fields."""
         dataset = TextToImageDataset(str(simple_cache_dir))
 
-        required_fields = {'indices', 'aspect_name', 'aspect_ratio', 'resolution', 'pixels'}
+        required_fields = {"indices", "aspect_name", "aspect_ratio", "resolution", "pixels"}
         for bucket_key, group in dataset.bucket_groups.items():
             assert required_fields.issubset(group.keys())
 
@@ -211,10 +208,7 @@ class TestBucketGrouping:
         """Test bucket keys are sorted by pixel count."""
         dataset = TextToImageDataset(str(multi_resolution_cache_dir))
 
-        pixels_list = [
-            dataset.bucket_groups[key]['pixels']
-            for key in dataset.sorted_bucket_keys
-        ]
+        pixels_list = [dataset.bucket_groups[key]["pixels"] for key in dataset.sorted_bucket_keys]
         assert pixels_list == sorted(pixels_list)
 
     def test_aspect_ratio_classification(self, multi_resolution_cache_dir):
@@ -247,9 +241,17 @@ class TestDatasetGetItem:
         item = dataset[0]
 
         required_fields = {
-            'latent', 'crop_resolution', 'original_resolution',
-            'crop_offset', 'prompt', 'image_path', 'bucket_id', 'aspect_ratio',
-            'clip_hidden', 'clip_pooled', 't5_hidden'
+            "latent",
+            "crop_resolution",
+            "original_resolution",
+            "crop_offset",
+            "prompt",
+            "image_path",
+            "bucket_id",
+            "aspect_ratio",
+            "clip_hidden",
+            "clip_pooled",
+            "t5_hidden",
         }
         assert required_fields.issubset(item.keys())
 
@@ -260,9 +262,16 @@ class TestDatasetGetItem:
         item = dataset[0]
 
         required_fields = {
-            'latent', 'crop_resolution', 'original_resolution',
-            'crop_offset', 'prompt', 'image_path', 'bucket_id', 'aspect_ratio',
-            'clip_tokens', 't5_tokens'
+            "latent",
+            "crop_resolution",
+            "original_resolution",
+            "crop_offset",
+            "prompt",
+            "image_path",
+            "bucket_id",
+            "aspect_ratio",
+            "clip_tokens",
+            "t5_tokens",
         }
         assert required_fields.issubset(item.keys())
 
@@ -271,16 +280,16 @@ class TestDatasetGetItem:
         dataset = TextToImageDataset(str(simple_cache_dir))
 
         item = dataset[0]
-        assert isinstance(item['latent'], torch.Tensor)
+        assert isinstance(item["latent"], torch.Tensor)
 
     def test_getitem_resolutions_are_tensors(self, simple_cache_dir):
         """Test resolutions are tensors."""
         dataset = TextToImageDataset(str(simple_cache_dir))
 
         item = dataset[0]
-        assert isinstance(item['crop_resolution'], torch.Tensor)
-        assert isinstance(item['original_resolution'], torch.Tensor)
-        assert isinstance(item['crop_offset'], torch.Tensor)
+        assert isinstance(item["crop_resolution"], torch.Tensor)
+        assert isinstance(item["original_resolution"], torch.Tensor)
+        assert isinstance(item["crop_offset"], torch.Tensor)
 
     def test_getitem_index_range(self, simple_cache_dir):
         """Test __getitem__ works for all valid indices."""
@@ -297,14 +306,14 @@ class TestDatasetGetItem:
         item = dataset[0]
 
         # CLIP hidden should be [77, 768]
-        assert item['clip_hidden'].dim() == 2
-        assert item['clip_hidden'].shape[0] == 77
+        assert item["clip_hidden"].dim() == 2
+        assert item["clip_hidden"].shape[0] == 77
 
         # CLIP pooled should be [768]
-        assert item['clip_pooled'].dim() == 1
+        assert item["clip_pooled"].dim() == 1
 
         # T5 hidden should be [256, 4096]
-        assert item['t5_hidden'].dim() == 2
+        assert item["t5_hidden"].dim() == 2
 
     def test_getitem_tokens_shapes(self, simple_cache_dir):
         """Test token shapes when train_text_encoder=True."""
@@ -313,11 +322,11 @@ class TestDatasetGetItem:
         item = dataset[0]
 
         # CLIP tokens should be [77]
-        assert item['clip_tokens'].dim() == 1
-        assert item['clip_tokens'].shape[0] == 77
+        assert item["clip_tokens"].dim() == 1
+        assert item["clip_tokens"].shape[0] == 77
 
         # T5 tokens should be [256]
-        assert item['t5_tokens'].dim() == 1
+        assert item["t5_tokens"].dim() == 1
 
 
 class TestGetBucketInfo:
@@ -329,10 +338,10 @@ class TestGetBucketInfo:
 
         info = dataset.get_bucket_info()
 
-        assert 'total_buckets' in info
-        assert 'buckets' in info
-        assert isinstance(info['total_buckets'], int)
-        assert isinstance(info['buckets'], dict)
+        assert "total_buckets" in info
+        assert "buckets" in info
+        assert isinstance(info["total_buckets"], int)
+        assert isinstance(info["buckets"], dict)
 
     def test_bucket_info_total_matches(self, multi_resolution_cache_dir):
         """Test total_buckets matches bucket_groups count."""
@@ -340,7 +349,7 @@ class TestGetBucketInfo:
 
         info = dataset.get_bucket_info()
 
-        assert info['total_buckets'] == len(dataset.bucket_groups)
+        assert info["total_buckets"] == len(dataset.bucket_groups)
 
     def test_bucket_info_sample_counts(self, multi_resolution_cache_dir):
         """Test bucket sample counts sum to total dataset size."""
@@ -348,7 +357,7 @@ class TestGetBucketInfo:
 
         info = dataset.get_bucket_info()
 
-        total_samples = sum(info['buckets'].values())
+        total_samples = sum(info["buckets"].values())
         assert total_samples == len(dataset)
 
 
@@ -374,13 +383,15 @@ class TestMultiShardLoading:
                     "t5_hidden": torch.randn(1, 256, 4096),
                 }
                 torch.save(data, cache_file)
-                shard1_data.append({
-                    "cache_file": str(cache_file),
-                    "crop_resolution": [512, 512],
-                    "original_resolution": [1024, 768],
-                    "aspect_ratio": 1.0,
-                    "bucket_id": idx,
-                })
+                shard1_data.append(
+                    {
+                        "cache_file": str(cache_file),
+                        "crop_resolution": [512, 512],
+                        "original_resolution": [1024, 768],
+                        "aspect_ratio": 1.0,
+                        "bucket_id": idx,
+                    }
+                )
 
             # Create samples for shard 2
             shard2_data = []
@@ -396,13 +407,15 @@ class TestMultiShardLoading:
                     "t5_hidden": torch.randn(1, 256, 4096),
                 }
                 torch.save(data, cache_file)
-                shard2_data.append({
-                    "cache_file": str(cache_file),
-                    "crop_resolution": [512, 768],
-                    "original_resolution": [1024, 1536],
-                    "aspect_ratio": 0.67,
-                    "bucket_id": idx + 3,
-                })
+                shard2_data.append(
+                    {
+                        "cache_file": str(cache_file),
+                        "crop_resolution": [512, 768],
+                        "original_resolution": [1024, 1536],
+                        "aspect_ratio": 0.67,
+                        "bucket_id": idx + 3,
+                    }
+                )
 
             # Write shard files
             with open(cache_dir / "shard_0000.json", "w") as f:
