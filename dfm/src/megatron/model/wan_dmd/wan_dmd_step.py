@@ -32,7 +32,6 @@ from megatron.core.models.common.vision_module.vision_module import VisionModule
 from megatron.core.utils import get_model_config, unwrap_model
 
 import wandb
-from dfm.src.fastgen.fastgen.methods.model import FastGenModel
 from dfm.src.megatron.model.wan.flow_matching.flow_inference_pipeline import FlowInferencePipeline
 from dfm.src.megatron.model.wan.inference import SIZE_CONFIGS
 from dfm.src.megatron.model.wan.wan_step import wan_data_step
@@ -128,11 +127,11 @@ class WanDMDStep:
     def _get_neg_condition(self, unwrapped_model):
         """
         Get the negative condition embedding, computing and caching it on first call.
-        The negative condition is the embedding of an empty string "".
+        The negative condition uses the prompt from self.inference_cfg.english_sample_neg_prompt.
         """
         if self._neg_condition is None:
             logger.info("Computing and caching negative condition embedding...")
-            neg_prompt = [""]
+            neg_prompt = [self.inference_cfg.english_sample_neg_prompt]
             neg_condition = unwrapped_model.get_text_encoder().encode(neg_prompt, precision=torch.bfloat16)
             self._neg_condition = neg_condition.transpose(0, 1).contiguous()
             logger.info(f"Negative condition cached with shape: {self._neg_condition.shape}")
@@ -176,7 +175,7 @@ class WanDMDStep:
 
     def on_validation_start(self, single_step_outputs, batch, student, teacher, state: GlobalState):
         """
-        Generate validation videos from teacher (50 steps) and student (1 step).
+        Generate validation videos from teacher (50 steps) and student (N steps based on config).
         Logs videos to Weights & Biases.
         """
         if self._inference_pipeline is None:
@@ -187,8 +186,10 @@ class WanDMDStep:
         torch.cuda.empty_cache()
 
         # Create pipeline with teacher model (we'll swap for student later)
-
         gen_latent = single_step_outputs["gen_rand"]
+        if callable(gen_latent):
+            logger.info("gen_rand is callable (multi-step generation), invoking it to get latents...")
+            gen_latent = gen_latent()
         with torch.no_grad():
             gen_videos = self._inference_pipeline._decode_latents(gen_latent, sample=False)
             fps = self.inference_cfg.sample_fps
@@ -205,10 +206,11 @@ class WanDMDStep:
             prompt = "The video captures a series of images showing a group of children seated in an outdoor setting, possibly at a sports event. The children are dressed in casual attire, with one wearing a red top and another in a white top with a rainbow design. The background is filled with other spectators, some of whom are wearing baseball caps. The lighting suggests it's either late afternoon or early evening, and the atmosphere appears to be casual and relaxed."
 
         print("prompt", prompt)
+        student_steps = student.config.student_sample_steps
         self._log_videos_to_wandb(
             videos=gen_videos,
-            video_name="student_prediction",
-            caption=f"Student (1 step): {prompt}",
+            video_name=f"student_{student_steps}step_prediction",
+            caption=f"{prompt}",
             fps=fps,
             state=state,
         )
@@ -218,50 +220,13 @@ class WanDMDStep:
         gc.collect()
         torch.cuda.empty_cache()
 
-        student_steps = 4
-        input_rand = single_step_outputs.get("input_rand", None)
-        logger.info(f"Generating validation video from student with {student_steps} steps using generator_fn...")
-
-        # Get condition from batch
-        condition = batch.get("context_embeddings", None)
-        # Extract prompt for caption
-
-        with torch.no_grad():
-            # Wrap student to adapt interface for FastGenModel.generator_fn
-            wrapped_student = MegatronFastGenInferenceWrapper(student, batch)
-            # Use FastGenModel.generator_fn directly
-            student_4step_latents = FastGenModel.generator_fn(
-                net=wrapped_student,
-                noise=input_rand,  # [B, C, T, H, W] unit Gaussian
-                condition=condition,
-                student_sample_steps=student_steps,
-                student_sample_type="sde",  # stochastic sampling
-            )
-
-            # Decode latents to video
-            student_4step_videos = self._inference_pipeline._decode_latents(student_4step_latents, sample=False)
-            self._log_videos_to_wandb(
-                videos=student_4step_videos,
-                video_name="student_4step_prediction",
-                caption=f"Student ({student_steps} steps): {prompt}",
-                fps=fps,
-                state=state,
-            )
-
-            del student_4step_videos, student_4step_latents
-            gc.collect()
-            torch.cuda.empty_cache()
-
         # Generation parameters
         size_key = "832*480"
         size = SIZE_CONFIGS[size_key]
         frame_num = 81
         shift = 5.0
         guide_scale = 5.0
-
         seed = parallel_state.get_data_parallel_rank()
-
-        # Get the same initial noise that was used by the student
         # input_rand is the unit Gaussian noise (input_student / max_sigma)
         input_rand = single_step_outputs.get("input_rand", None)
         if input_rand is not None:

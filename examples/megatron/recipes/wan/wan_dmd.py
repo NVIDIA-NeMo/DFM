@@ -94,6 +94,11 @@ def parse_cli_args() -> Tuple[argparse.Namespace, list[str]]:
         help="Set training mode, 'pretrain' or 'finetune'.",
     )
     parser.add_argument(
+        "--use-fastgen-dataset",
+        action="store_true",
+        help="Use WanLatentTaskEncoder for precomputed latents instead of WanTaskEncoder.",
+    )
+    parser.add_argument(
         "--config-file",
         type=str,
         default=str(DEFAULT_CONFIG_FILE_PATH),
@@ -138,7 +143,11 @@ def main() -> None:
     logger.info("------------------------------------------------------------------")
 
     # Load base configuration from the recipe as a Python dataclass
-    cfg: ConfigContainer = wan_dmd_config(mock=args.mock, training_mode=args.training_mode)
+    cfg: ConfigContainer = wan_dmd_config(
+        mock=args.mock,
+        training_mode=args.training_mode,
+        use_fastgen_dataset=args.use_fastgen_dataset,
+    )
     logger.info("Loaded base configuration")
 
     # Print configuration on rank 0

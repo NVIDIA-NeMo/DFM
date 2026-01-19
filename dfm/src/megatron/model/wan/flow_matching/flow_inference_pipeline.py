@@ -164,7 +164,8 @@ class FlowInferencePipeline:
 
         if dist.is_initialized():
             dist.barrier()
-        self.model.to(self.device)
+        # Move model to device and convert to correct dtype in one call
+        self.model.to(device=self.device, dtype=self.param_dtype)
 
         self.sample_neg_prompt = inference_cfg.english_sample_neg_prompt
 
@@ -317,11 +318,7 @@ class FlowInferencePipeline:
             latents.device, latents.dtype
         )
         latents = latents / latents_std + latents_mean
-        videos = self.vae.decode(latents)
-        if sample:
-            videos = videos.sample()
-        else:
-            videos = videos[0].clip_(-1.0, 1.0)
+        videos = self.vae.decode(latents).sample
         return videos
 
     def generate(

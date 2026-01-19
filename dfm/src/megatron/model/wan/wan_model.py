@@ -350,3 +350,27 @@ class WanModel(VisionModule):
             replica_id=replica_id,
             allow_shape_mismatch=False,
         )
+
+    def load_state_dict(self, state_dict, strict=True):
+        """Load state dict with automatic handling of 'module.' prefix mismatch.
+
+        This method handles the case where checkpoints saved with DistributedDataParallel
+        have a 'module.' prefix that needs to be removed when loading.
+
+        Args:
+            state_dict (dict): The state dictionary to load
+            strict (bool): Whether to strictly enforce that the keys match
+
+        Returns:
+            NamedTuple: with 'missing_keys' and 'unexpected_keys' fields
+        """
+        # Check if state_dict has 'module.' prefix but model doesn't
+        has_module_prefix = any(k.startswith("module.") for k in state_dict.keys())
+        if has_module_prefix:
+            new_state_dict = {}
+            for key, value in state_dict.items():
+                new_key = key.replace("module.", "", 1) if key.startswith("module.") else key
+                new_state_dict[new_key] = value
+            state_dict = new_state_dict
+
+        return super().load_state_dict(state_dict, strict=strict)

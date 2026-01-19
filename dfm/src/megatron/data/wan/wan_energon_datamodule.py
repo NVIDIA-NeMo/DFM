@@ -17,31 +17,35 @@
 from dataclasses import dataclass
 
 from megatron.bridge.data.utils import DatasetBuildContext
-from torch import int_repr
 
 from dfm.src.megatron.data.common.diffusion_energon_datamodule import DiffusionDataModule, DiffusionDataModuleConfig
+from dfm.src.megatron.data.wan.wan_latent_taskencoder import WanLatentTaskEncoder
 from dfm.src.megatron.data.wan.wan_taskencoder import WanTaskEncoder
 
 
 @dataclass(kw_only=True)
 class WanDataModuleConfig(DiffusionDataModuleConfig):
-    path: str
-    seq_length: int
-    packing_buffer_size: int
-    micro_batch_size: int
-    global_batch_size: int
-    num_workers: int_repr
-    dataloader_type: str = "external"
+    # Only define new fields here; inherited fields come from DiffusionDataModuleConfig
+    use_fastgen_dataset: bool = False  # Flag to determine which task encoder to use
 
     def __post_init__(self):
+        # Instantiate the appropriate task encoder based on the flag
+        if self.use_fastgen_dataset:
+            task_encoder = WanLatentTaskEncoder(
+                seq_length=self.task_encoder_seq_length,
+                packing_buffer_size=self.packing_buffer_size,
+            )
+        else:
+            task_encoder = WanTaskEncoder(
+                seq_length=self.task_encoder_seq_length,
+                packing_buffer_size=self.packing_buffer_size,
+            )
+
         self.dataset = DiffusionDataModule(
             path=self.path,
             seq_length=self.seq_length,
             packing_buffer_size=self.packing_buffer_size,
-            task_encoder=WanTaskEncoder(
-                seq_length=self.task_encoder_seq_length,  # Use task_encoder_seq_length for packing
-                packing_buffer_size=self.packing_buffer_size,
-            ),
+            task_encoder=task_encoder,
             micro_batch_size=self.micro_batch_size,
             global_batch_size=self.global_batch_size,
             num_workers=self.num_workers,

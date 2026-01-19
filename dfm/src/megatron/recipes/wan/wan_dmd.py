@@ -179,6 +179,7 @@ def wan_dmd_config(
     test_data_path: Optional[List[str]] = None,
     per_split_data_args_path: Optional[str] = None,
     mock: bool = False,
+    use_fastgen_dataset: bool = False,
     # Model configuration
     tensor_parallelism: int = 1,
     pipeline_parallelism: int = 1,
@@ -212,6 +213,8 @@ def wan_dmd_config(
         test_data_path (Optional[List[str]]): List of test data paths.
         per_split_data_args_path (Optional[str]): Path to JSON file with per-split data configuration.
         mock (bool): Whether to use mock data. If True, ignores data_paths.
+        use_fastgen_dataset (bool): Whether to use WanLatentTaskEncoder for precomputed latents (True)
+            or WanTaskEncoder for raw data (False). Defaults to False.
         tensor_parallelism (int): Degree of tensor model parallelism.
         pipeline_parallelism (int): Degree of pipeline model parallelism.
         pipeline_parallelism_dtype (Optional[torch.dtype]): Data type for pipeline parallelism.
@@ -295,6 +298,7 @@ def wan_dmd_config(
             num_workers=10,
             task_encoder_seq_length=None,
             packing_buffer_size=40,  # 131,072 = 2^17 tokens, each 5 secs of 832*480 is about 45k tokens
+            use_fastgen_dataset=use_fastgen_dataset,  # Pass flag instead of instance
         )
 
     # Config Container
