@@ -24,8 +24,10 @@ from megatron.core import parallel_state
 from megatron.core.dist_checkpointing.mapping import ShardedStateDict
 from megatron.core.dist_checkpointing.utils import replace_prefix_for_sharding
 from megatron.core.models.common.vision_module.vision_module import VisionModule
+from megatron.core.transformer.transformer_config import TransformerConfig
 from megatron.core.transformer.utils import sharded_state_dict_default
 from torch import nn
+from megatron.core.transformer.enums import ModelType
 
 from dfm.src.megatron.model.flux.flux_layer_spec import (
     AdaLNContinuous,
@@ -69,8 +71,27 @@ class Flux(VisionModule):
         proj_out: Output projection layer.
     """
 
-    def __init__(self, config: "FluxProvider"):
-        super().__init__(config)
+    def __init__(
+        self,
+        config: TransformerConfig,
+        pre_process: bool = True,
+        post_process: bool = True,
+        fp16_lm_cross_entropy: bool = False,
+        parallel_output: bool = True,
+        **kwargs,
+    ):
+        super(Flux, self).__init__(config=config)
+
+        self.config: TransformerConfig = config
+        self.pre_process = pre_process
+        self.post_process = post_process
+        self.fp16_lm_cross_entropy = fp16_lm_cross_entropy
+        self.parallel_output = parallel_output
+
+        # megatron core pipelining currently depends on model type
+        # TODO: remove this dependency ?
+        self.model_type = ModelType.encoder_or_decoder
+
         self.out_channels = config.in_channels
         self.hidden_size = config.hidden_size
         self.num_attention_heads = config.num_attention_heads
@@ -122,14 +143,6 @@ class Flux(VisionModule):
         self.norm_out = AdaLNContinuous(config=config, conditioning_embedding_dim=self.hidden_size)
         self.proj_out = nn.Linear(self.hidden_size, self.patch_size * self.patch_size * self.out_channels, bias=True)
 
-        # Load pretrained weights if specified
-        if self.config.ckpt_path is not None:
-            self.load_from_pretrained(
-                self.config.ckpt_path,
-                do_convert_from_hf=self.config.do_convert_from_hf,
-                load_dist_ckpt=self.config.load_dist_ckpt,
-                save_converted_model_to=self.config.save_converted_model_to,
-            )
 
     def get_fp8_context(self):
         """Get FP8 autocast context if FP8 is enabled."""
@@ -277,61 +290,6 @@ class Flux(VisionModule):
         output = self.proj_out(hidden_states)
 
         return output
-
-    def load_from_pretrained(
-        self, ckpt_path, do_convert_from_hf=False, save_converted_model_to=None, load_dist_ckpt=False
-    ):
-        """
-        Load model weights from a pretrained checkpoint.
-
-        Args:
-            ckpt_path: Path to checkpoint file or directory.
-            do_convert_from_hf: Whether to convert from HuggingFace format.
-            save_converted_model_to: Path to save converted model.
-            load_dist_ckpt: Whether to load as distributed checkpoint.
-        """
-        if load_dist_ckpt:
-            from megatron.core import dist_checkpointing
-
-            sharded_sd_metadata = dist_checkpointing.load_content_metadata(ckpt_path)
-            if sharded_sd_metadata is None:
-                sharded_sd_metadata = {}  # backward-compatibility
-            sharded_state_dict = dict(
-                state_dict=self.sharded_state_dict(prefix="module.", metadata=sharded_sd_metadata)
-            )
-            loaded_state_dict = dist_checkpointing.load(
-                sharded_state_dict=sharded_state_dict, checkpoint_dir=ckpt_path
-            )
-            ckpt = {k.removeprefix("module."): v for k, v in loaded_state_dict["state_dict"].items()}
-        else:
-            if do_convert_from_hf:
-                # Import converter if needed
-                try:
-                    from dfm.src.megatron.model.flux.flux_ckpt_converter import flux_transformer_converter
-                    ckpt = flux_transformer_converter(ckpt_path, self.config)
-                except ImportError:
-                    raise ImportError("flux_ckpt_converter not found. Please implement the converter.")
-
-                if save_converted_model_to is not None:
-                    from safetensors.torch import save_file as save_safetensors
-                    os.makedirs(save_converted_model_to, exist_ok=True)
-                    save_path = os.path.join(save_converted_model_to, 'nemo_flux_transformer.safetensors')
-                    save_safetensors(ckpt, save_path)
-                    print(f'Saved converted transformer checkpoint to {save_path}')
-            else:
-                from safetensors.torch import load_file as load_safetensors
-                ckpt = load_safetensors(ckpt_path)
-
-        missing, unexpected = self.load_state_dict(ckpt, strict=False)
-        missing = [k for k in missing if not k.endswith('_extra_state')]
-
-        if len(missing) > 0:
-            print(
-                f"The following keys are missing during checkpoint loading, "
-                f"please check the ckpt provided or the image quality may be compromised.\n {missing}"
-            )
-            print(f"Found unexpected keys: \n {unexpected}")
-        print(f"Restored flux model weights from {ckpt_path}")
 
     def sharded_state_dict(self, prefix='', sharded_offsets: tuple = (), metadata: dict = None) -> ShardedStateDict:
         """

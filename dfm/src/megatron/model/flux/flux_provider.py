@@ -104,6 +104,12 @@ class FluxProvider(TransformerConfig, ModelProviderMixin[VisionModule]):
     do_convert_from_hf: bool = False
     save_converted_model_to: Optional[str] = None
 
+    # these attributes are unused for images/videos, we just set because bridge training requires for LLMs
+    seq_length: int = 1024
+    share_embeddings_and_output_weights: bool = False
+    vocab_size: int = 25256 * 8
+    make_vocab_size_divisible_by: int = 128
+
     def provide(self, pre_process=None, post_process=None, vp_stage=None) -> Flux:
         """
         Create and return a Flux model with this configuration.

@@ -62,7 +62,7 @@ class FluxBridge(MegatronModelBridge):
             bf16=False,
             params_dtype=torch.float32,
         )
-
+        self.hidden_size = provider.hidden_size
         return provider
 
     def maybe_modify_loaded_hf_weight(
@@ -85,10 +85,10 @@ class FluxBridge(MegatronModelBridge):
         if isinstance(hf_param, str):
             if hf_param.endswith('weight_1'):
                 hf_weights = hf_state_dict[hf_param.replace('weight_1', 'weight')]
-                hf_weights = hf_weights[:, 3072:]
+                hf_weights = hf_weights[:, self.hidden_size:]
             elif hf_param.endswith('weight_2'):
                 hf_weights = hf_state_dict[hf_param.replace('weight_2', 'weight')]
-                hf_weights = hf_weights[:, :3072]
+                hf_weights = hf_weights[:, :self.hidden_size]
             else:
                 hf_weights = hf_state_dict[hf_param]
         else:
