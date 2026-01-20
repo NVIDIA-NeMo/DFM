@@ -34,11 +34,11 @@ scheduler:
 # Checkpoint configuration
 checkpoint:
   load_optim: true
-  save_interval: 250  # eval_step
+  save_interval: 50
 
 # Training configuration
 train:
-  eval_interval: 250  # eval_step
+  eval_interval: 50
   train_iters: 1000000  # num_train_step
   eval_iters: 1
   global_batch_size: 1  # Set this to num_gpus (update based on your GPU count)
