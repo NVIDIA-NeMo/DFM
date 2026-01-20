@@ -12,4 +12,4 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-CUDA_VISIBLE_DEVICES="0,1" uv run coverage run -a --data-file=/opt/DFM/.coverage --source=/opt/DFM/ -m pytest tests/functional_tests/automodel/wan21 -m "not pleasefixme" --with_downloads
+CUDA_VISIBLE_DEVICES="0,1" uv run --group automodel coverage run -a --data-file=/opt/DFM/.coverage --source=/opt/DFM/ -m pytest tests/functional_tests/automodel/wan21 -m "not pleasefixme" --with_downloads

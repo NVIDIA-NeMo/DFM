@@ -65,6 +65,29 @@ class HunyuanAdapter(ModelAdapter):
         self.default_image_embed_shape = default_image_embed_shape
         self.use_condition_latents = use_condition_latents
 
+    def get_condition_latents(self, latents: torch.Tensor, task_type: str) -> torch.Tensor:
+        """
+        Generate conditional latents based on task type.
+
+        Args:
+            latents: Input latents [B, C, F, H, W]
+            task_type: Task type ("t2v" or "i2v")
+
+        Returns:
+            Conditional latents [B, C+1, F, H, W]
+        """
+        b, c, f, h, w = latents.shape
+        cond = torch.zeros([b, c + 1, f, h, w], device=latents.device, dtype=latents.dtype)
+
+        if task_type == "t2v":
+            return cond
+        elif task_type == "i2v":
+            cond[:, :-1, :1] = latents[:, :, :1]
+            cond[:, -1, 0] = 1
+            return cond
+        else:
+            raise ValueError(f"Unsupported task type: {task_type}")
+
     def prepare_inputs(self, context: FlowMatchingContext) -> Dict[str, Any]:
         """
         Prepare inputs for HunyuanVideo model.

@@ -37,6 +37,8 @@ optim:
 
 
 flow_matching:
+  adapter_type: "simple"  # Options: "hunyuan", "simple"
+  adapter_kwargs: {}
   use_sigma_noise: true
   timestep_sampling: uniform
   logit_mean: 0.0

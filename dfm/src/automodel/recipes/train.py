@@ -171,7 +171,7 @@ class TrainDiffusionRecipe(BaseRecipe):
         self.rng = StatefulRNG(seed=self.seed, ranked=True)
 
         self.model_id = self.cfg.get("model.pretrained_model_name_or_path")
-        self.attention_backend = self.cfg.get("model.attention_backend", "_flash_3_hub")
+        self.attention_backend = self.cfg.get("model.attention_backend")
         self.learning_rate = self.cfg.get("optim.learning_rate", 5e-6)
         self.bf16 = torch.bfloat16
 
@@ -250,8 +250,6 @@ class TrainDiffusionRecipe(BaseRecipe):
             raise ValueError(
                 "checkpoint config is required in YAML (enabled, checkpoint_dir, model_save_format, save_consolidated)"
             )
-        if not checkpoint_cfg.get("enabled", False):
-            raise ValueError("checkpoint.enabled must be true in YAML for diffusion training")
 
         # Build BaseRecipe-style checkpointing configuration (DCP/TORCH_SAVE) from YAML
         model_state_dict_keys = list(self.model.state_dict().keys())
