@@ -336,7 +336,9 @@ class TestLossComputation:
         batch = {}
 
         # Returns: weighted_loss, average_weighted_loss, unweighted_loss, average_unweighted_loss, loss_weight, loss_mask
-        _, scalar_weighted_loss, _, scalar_unweighted_loss, loss_weight, _ = pipeline.compute_loss(model_pred, target, sigma, batch)
+        _, scalar_weighted_loss, _, scalar_unweighted_loss, loss_weight, _ = pipeline.compute_loss(
+            model_pred, target, sigma, batch
+        )
 
         # Verify shapes
         assert scalar_weighted_loss.ndim == 0, "Weighted loss should be scalar"
@@ -361,7 +363,9 @@ class TestLossComputation:
         sigma = torch.tensor([0.3, 0.7])
         batch = {}
 
-        _, scalar_weighted_loss, _, scalar_unweighted_loss, loss_weight, _ = pipeline.compute_loss(model_pred, target, sigma, batch)
+        _, scalar_weighted_loss, _, scalar_unweighted_loss, loss_weight, _ = pipeline.compute_loss(
+            model_pred, target, sigma, batch
+        )
 
         # Without weighting, weighted loss should equal unweighted loss
         assert torch.allclose(scalar_weighted_loss, scalar_unweighted_loss, atol=1e-6)
@@ -402,7 +406,9 @@ class TestLossComputation:
         sigma = torch.rand(2)
         batch = {}
 
-        _, scalar_weighted_loss, _, scalar_unweighted_loss, _, _ = pipeline.compute_loss(model_pred, target, sigma, batch)
+        _, scalar_weighted_loss, _, scalar_unweighted_loss, _, _ = pipeline.compute_loss(
+            model_pred, target, sigma, batch
+        )
 
         assert scalar_weighted_loss >= 0, "Weighted loss should be non-negative"
         assert scalar_unweighted_loss >= 0, "Unweighted loss should be non-negative"
@@ -416,7 +422,9 @@ class TestLossComputation:
         sigma = torch.rand(2)
         batch = {}
 
-        _, scalar_weighted_loss, _, scalar_unweighted_loss, _, _ = pipeline.compute_loss(model_pred, target, sigma, batch)
+        _, scalar_weighted_loss, _, scalar_unweighted_loss, _, _ = pipeline.compute_loss(
+            model_pred, target, sigma, batch
+        )
 
         assert torch.isfinite(scalar_weighted_loss), "Weighted loss should be finite"
         assert torch.isfinite(scalar_unweighted_loss), "Unweighted loss should be finite"
@@ -763,7 +771,9 @@ class TestIntegration:
                 "text_embeddings": torch.randn(2, 77, 4096),
             }
 
-            _, loss, _, metrics = pipeline.step(mock_model, batch, torch.device("cpu"), torch.float32, global_step=step)
+            _, loss, _, metrics = pipeline.step(
+                mock_model, batch, torch.device("cpu"), torch.float32, global_step=step
+            )
             losses.append(loss.item())
 
             assert not torch.isnan(loss), f"Loss became NaN at step {step}"
