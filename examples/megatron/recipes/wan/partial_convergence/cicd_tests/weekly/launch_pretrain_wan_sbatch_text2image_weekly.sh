@@ -8,7 +8,7 @@
 #SBATCH --time=04:00:00
 
 
-EXP_NAME=sbatch_wan_1.3B_pretrain_text2image_cicd_3000vids_example
+EXP_NAME=sbatch_wan_1.3B_pretrain_text2image_cicd_3000vids_weekly_example
 CHECKPOINT_DIR=/lustre/fsw/coreai_dlalgo_genai/huvu/data/nemo_vfm/results/wan_finetune/${EXP_NAME}
 PROJECT=wan
 MBS=1
@@ -37,15 +37,6 @@ DFM_PATH=/lustre/fsw/coreai_dlalgo_genai/huvu/codes/nemo_vfm/DFM_wan_cicd
 MBRIDGE_PATH=/lustre/fsw/coreai_dlalgo_genai/huvu/codes/nemo_vfm/Megatron-Bridge_latest
 MLM_PATH=/lustre/fsw/coreai_dlalgo_genai/huvu/codes/nemo_vfm/megatron-lm_latest
 export PYTHONPATH=\$DFM_PATH/.:\$MBRIDGE_PATH/src/.:\$MLM_PATH/.:/opt/NeMo-Framework-Launcher/launcher_scripts
-
-
-# install dependencies
-python3 -m pip install --upgrade diffusers
-pip install easydict
-pip install imageio
-pip install imageio-ffmpeg
-[apt update; apt install ffmpeg -y] -> for data preparation
-
 
 cd \$DFM_PATH
 export HF_TOKEN=...
