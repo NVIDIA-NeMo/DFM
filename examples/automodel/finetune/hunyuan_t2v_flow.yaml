@@ -20,7 +20,6 @@ optim:
 
 # FSDP (Fully Sharded Data Parallel) configuration
 fsdp:
-  enable_fsdp: true
   dp_size: 8  # Auto-calculate based on world_size and other parallel dimensions
   dp_replicate_size: 1
   tp_size: 1  # Tensor parallelism size

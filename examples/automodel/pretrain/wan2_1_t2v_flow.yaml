@@ -22,7 +22,7 @@ step_scheduler:
 
 data:
   dataloader:
-    _target_: dfm.src.automodel.datasets.build_wan21_dataloader
+    _target_: dfm.src.automodel.datasets.build_dataloader
     meta_folder: /lustre/fsw/portfolios/coreai/users/linnanw/hdvilla_sample/pika/wan21_codes/1.3B_meta/
     num_workers: 2
     device: cpu

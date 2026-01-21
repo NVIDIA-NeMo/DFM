@@ -356,11 +356,11 @@ class FlowMatchingPipeline:
         # ====================================================================
         # Logging
         # ====================================================================
-        if detailed_log or debug_mode:
+        if debug_mode and detailed_log:
             self._log_detailed(
                 global_step, sampling_method, batch_size, sigma, timesteps, video_latents, noise, noisy_latents
             )
-        elif summary_log:
+        elif debug_mode and summary_log:
             logger.info(
                 f"[STEP {global_step}] σ=[{sigma.min():.3f},{sigma.max():.3f}] | "
                 f"t=[{timesteps.min():.1f},{timesteps.max():.1f}] | "
@@ -406,9 +406,9 @@ class FlowMatchingPipeline:
             raise ValueError(f"Loss exploded: {weighted_loss.item()}")
 
         # Logging
-        if detailed_log or debug_mode:
+        if debug_mode and detailed_log:
             self._log_loss_detailed(global_step, model_pred, target, loss_weight, unweighted_loss, weighted_loss)
-        elif summary_log:
+        elif debug_mode and summary_log:
             logger.info(
                 f"[STEP {global_step}] Loss: {weighted_loss.item():.6f} | "
                 f"w=[{loss_weight.min():.2f},{loss_weight.max():.2f}]"
