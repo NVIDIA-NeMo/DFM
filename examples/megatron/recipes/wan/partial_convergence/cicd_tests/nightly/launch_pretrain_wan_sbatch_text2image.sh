@@ -27,17 +27,9 @@ mkdir -p ${BARRIER_DIR}
 
 cmd="
 # compute rendezvous/master addresses and ports (avoid port collision)
-MASTER_ADDR=$(scontrol show hostnames "$SLURM_JOB_NODELIST" | head -n 1)
-RDZV_PORT=${RDZV_PORT:-29500}
-MASTER_PORT=${MASTER_PORT:-29600}
-
-# install dependencies
-python3 -m pip install --upgrade diffusers
-pip install easydict
-pip install imageio
-pip install imageio-ffmpeg
-[apt update; apt install ffmpeg -y] -> for data preparation
-
+MASTER_ADDR=\$(scontrol show hostnames "\$SLURM_JOB_NODELIST" | head -n 1)
+RDZV_PORT=\${RDZV_PORT:-29500}
+MASTER_PORT=\${MASTER_PORT:-29600}
 
 cd /opt/DFM
 export HF_TOKEN=${HF_TOKEN}
@@ -55,7 +47,7 @@ NVTE_FUSED_ATTN=1 MASTER_ADDR=${MASTER_ADDR} MASTER_PORT=${MASTER_PORT} torchrun
   --nnodes=${NUM_NODES} \
   --nproc_per_node=8 \
   --rdzv-backend=c10d \
-  --rdzv-endpoint=${MASTER_ADDR}:${RDZV_PORT} \
+  --rdzv-endpoint=\${MASTER_ADDR}:\${RDZV_PORT} \
   --rdzv-id=${SLURM_JOB_ID} \
   --rdzv-conf=timeout=6000 \
   examples/megatron/recipes/wan/pretrain_wan.py \
