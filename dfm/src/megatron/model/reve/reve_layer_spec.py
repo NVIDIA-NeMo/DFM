@@ -89,6 +89,7 @@ class Modulation(nn.Module):
             config=config,
             init_method=torch.nn.init.xavier_normal_,
             bias=True,
+            skip_bias_add=False,
             gather_output=True,
         )
         with torch.no_grad():
@@ -99,7 +100,7 @@ class Modulation(nn.Module):
     def forward(
         self, vec: torch.Tensor
     ) -> torch.Tensor:
-        scale, _ = self.lin(nn.functional.silu(vec))
+        scale, bias = self.lin(nn.functional.silu(vec))
         return scale + 1.0
 
 
@@ -121,18 +122,51 @@ class GateResiduals(nn.Module):
         residual: torch.Tensor,
         vec: torch.Tensor | None,
     ) -> torch.Tensor:
+
+        # # DEBUGGING (match forward pass in reve_pytorch/layers.py)
+        # if torch.distributed.get_rank() == 0:
+        #     print(f"[DEBUG]     (reve_layer_spec.py - before modulation) backbone.shape - backbone.mean() - backbone.std() - backbone.norm(): {backbone.shape} - {backbone.mean()} - {backbone.std()} - {backbone.norm()}")
+        #     print(f"[DEBUG]     (reve_layer_spec.py - before modulation) residual.shape - residual.mean() - residual.std() - residual.norm(): {residual.shape} - {residual.mean()} - {residual.std()} - {residual.norm()}")
+        #     if vec is not None:
+        #         print(f"[DEBUG]     (reve_layer_spec.py - before modulation) vec.shape - vec.mean() - vec.std() - vec.norm(): {vec.shape} - {vec.mean()} - {vec.std()} - {vec.norm()}")
+
         if self.do_modulation:
             gate = self.modulation(vec) + 2.9
         else:
             gate = self.gate + 3.9
             gate = gate.unsqueeze(0)
+
+        # # DEBUGGING (match forward pass in reve_pytorch/layers.py)
+        # if torch.distributed.get_rank() == 0:
+        #     print(f"[DEBUG]     (reve_layer_spec.py - after modulation) gate.shape - gate.mean() - gate.std() - gate.norm(): {gate.shape} - {gate.mean()} - {gate.std()} - {gate.norm()}")
+
         gate = torch.sigmoid(gate)
         gate = gate * (1 - 2 * self.epsilon) + self.epsilon
 
+
+        # # DEBUGGING (match forward pass in reve_pytorch/layers.py)
+        # if torch.distributed.get_rank() == 0:
+        #     print(f"[DEBUG]     (reve_layer_spec.py - before norm) residual.shape - residual.mean() - residual.std() - residual.norm(): {residual.shape} - {residual.mean()} - {residual.std()} - {residual.norm()}")
+
         normalized_residual = self.norm(residual)
 
+
+        # # DEBUGGING (match forward pass in reve_pytorch/layers.py)
+        # if torch.distributed.get_rank() == 0:
+        #     print(f"[DEBUG]     (reve_layer_spec.py - after norm) normalized_residual.shape - normalized_residual.mean() - normalized_residual.std() - normalized_residual.norm(): {normalized_residual.shape} - {normalized_residual.mean()} - {normalized_residual.std()} - {normalized_residual.norm()}")
+
         if gate.ndim == 2:
-            gate = gate.unsqueeze(1)  # to broadcast with the sequence
+            # NOTE: Need to unsqueeze(0) instead of unsqueeze(1) as in original Reve code to broadcast with the sequence
+            gate = gate.unsqueeze(0)  # to broadcast with the sequence
+
+        # # DEBUGGING (match forward pass in reve_pytorch/layers.py)
+        # if torch.distributed.get_rank() == 0:
+        #     print(f"[DEBUG]     (reve_layer_spec.py - before return) backbone.shape - backbone.mean() - backbone.std() - backbone.norm(): {backbone.shape} - {backbone.mean()} - {backbone.std()} - {backbone.norm()}")
+        #     print(f"[DEBUG]     (reve_layer_spec.py - before return) gate.shape - gate.mean() - gate.std() - gate.norm(): {gate.shape} - {gate.mean()} - {gate.std()} - {gate.norm()}")
+        #     print(f"[DEBUG]     (reve_layer_spec.py - before return) normalized_residual.shape - normalized_residual.mean() - normalized_residual.std() - normalized_residual.norm(): {normalized_residual.shape} - {normalized_residual.mean()} - {normalized_residual.std()} - {normalized_residual.norm()}")
+        #     print(f"[DEBUG]     (reve_layer_spec.py - before return) (backbone * gate).shape - (backbone * gate).mean() - (backbone * gate).std() - (backbone * gate).norm(): {(backbone * gate).shape} - {(backbone * gate).mean()} - {(backbone * gate).std()} - {(backbone * gate).norm()}")
+        #     print(f"[DEBUG]     (reve_layer_spec.py - before return) ((1 - gate) * normalized_residual).shape - ((1 - gate) * normalized_residual).mean() - ((1 - gate) * normalized_residual).std() - ((1 - gate) * normalized_residual).norm(): {((1 - gate) * normalized_residual).shape} - {((1 - gate) * normalized_residual).mean()} - {((1 - gate) * normalized_residual).std()} - {((1 - gate) * normalized_residual).norm()}")
+        #     print(f"[DEBUG]     (reve_layer_spec.py - before return) (backbone * gate + (1 - gate) * normalized_residual).shape - (backbone * gate + (1 - gate) * normalized_residual).mean() - (backbone * gate + (1 - gate) * normalized_residual).std() - (backbone * gate + (1 - gate) * normalized_residual).norm(): {(backbone * gate + (1 - gate) * normalized_residual).shape} - {(backbone * gate + (1 - gate) * normalized_residual).mean()} - {(backbone * gate + (1 - gate) * normalized_residual).std()} - {(backbone * gate + (1 - gate) * normalized_residual).norm()}")
 
         return backbone * gate + (1 - gate) * normalized_residual
 
@@ -231,18 +265,29 @@ class ReveLayerWithAdaLN(TransformerLayer):
     ):
         vector_emb = attention_mask
 
+        # # DEBUGGING (match forward pass in reve_pytorch/model.py)
+        # if torch.distributed.get_rank() == 0:
+        #     print(f"[DEBUG]     (reve_layer_spec.py) *** Transformer layer forward pass started.")
+
+
         ########################## Self attention #################################
+
+        # # DEBUGGING (match forward pass in reve_pytorch/model.py)
+        # if torch.distributed.get_rank() == 0:
+        #     print(f"[DEBUG]     (reve_layer_spec.py) *** Self attention started.")
+
+
         # Modulation
         if self.do_modulation:
             scaled_hidden_states = self.mod_self_attention(vector_emb) * hidden_states
         else:
             scaled_hidden_states = hidden_states
 
-        # DEBUGGING
-        if torch.distributed.get_rank() == 0:
-            print(f"[DEBUG] (reve_layer_spec.py) scaled_hidden_states.shape: {scaled_hidden_states.shape}")
-            print(f"[DEBUG] (reve_layer_spec.py) rotary_pos_emb.shape: {rotary_pos_emb.shape}")
-            print(f"[DEBUG] (reve_layer_spec.py) packed_seq_params['self_attention']: {packed_seq_params['self_attention']}")
+        # # DEBUGGING (match forward pass in reve_pytorch/model.py)
+        # if torch.distributed.get_rank() == 0:
+        #     print(f"[DEBUG]     (reve_layer_spec.py - before self attention) scaled_hidden_states.shape - scaled_hidden_states.mean() - scaled_hidden_states.std(): {scaled_hidden_states.shape} - {scaled_hidden_states.mean()} - {scaled_hidden_states.std()}")
+        #     # print(f"[DEBUG]     (reve_layer_spec.py - before self attention) rotary_pos_emb.shape - rotary_pos_emb.mean() - rotary_pos_emb.std(): {rotary_pos_emb.shape} - {rotary_pos_emb.mean()} - {rotary_pos_emb.std()}")
+        #     # print(f"[DEBUG]     (reve_layer_spec.py - before self attention) packed_seq_params['self_attention']: {packed_seq_params['self_attention']}")
 
         # Attention
         attention_output, _ = self.full_self_attention(
@@ -252,13 +297,28 @@ class ReveLayerWithAdaLN(TransformerLayer):
             packed_seq_params=None if packed_seq_params is None else packed_seq_params["self_attention"],
         )
 
+        # # DEBUGGING (match forward pass in reve_pytorch/model.py)
+        # if torch.distributed.get_rank() == 0:
+        #     print(f"[DEBUG]     (reve_layer_spec.py - after self attention) attention_output.shape - attention_output.mean() - attention_output.std(): {attention_output.shape} - {attention_output.mean()} - {attention_output.std()}")
+
         # Gate residuals
         if self.use_residual:
             hidden_states = self.gate_residual_self_attention(hidden_states, attention_output, vector_emb)
         else:
             hidden_states = attention_output
 
+        # # DEBUGGING (match forward pass in reve_pytorch/model.py)
+        # if torch.distributed.get_rank() == 0:
+        #     print(f"[DEBUG]     (reve_layer_spec.py - after gate residuals) hidden_states.shape - hidden_states.mean() - hidden_states.std(): {hidden_states.shape} - {hidden_states.mean()} - {hidden_states.std()}")
+
         ########################## Cross attention #################################
+
+        # # DEBUGGING (match forward pass in reve_pytorch/model.py)
+        # if torch.distributed.get_rank() == 0:
+        #     print(f"[DEBUG]     (reve_layer_spec.py) *** Cross attention started.")
+
+
+
         if self.do_cross_attn:
             # Modulation
             if self.do_modulation:
@@ -281,6 +341,12 @@ class ReveLayerWithAdaLN(TransformerLayer):
                 hidden_states = attention_output
 
         ########################## MLP #################################
+
+        # # DEBUGGING (match forward pass in reve_pytorch/model.py)
+        # if torch.distributed.get_rank() == 0:
+        #     print(f"[DEBUG]     (reve_layer_spec.py) *** MLP started.")
+
+
         # Modulation
         if self.do_modulation:
             scaled_hidden_states = self.mod_mlp(vector_emb) * hidden_states
@@ -367,7 +433,6 @@ def get_reve_adaln_text_block_with_transformer_engine_spec() -> ModuleSpec:
                 module=MLP,
                 submodules=MLPSubmodules(
                     linear_fc1=TEColumnParallelLinear,
-
                     linear_fc2=TERowParallelLinear,
                 ),
             ),

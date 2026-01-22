@@ -10,14 +10,15 @@ os.environ["WORLD_SIZE"] = "1"
 os.environ["LOCAL_RANK"] = "0"
 
 import sys
+from typing import Tuple
 sys.path.append(os.path.abspath("dfm/src/megatron/model/reve/reve_pytorch"))
 
 from megatron.core.transformer.transformer_config import TransformerConfig
-from dfm.src.megatron.model.reve.reve_provider import ReveFullModelProvider, ReveSmallModelProvider
+from dfm.src.megatron.model.reve.reve_provider import ReveFullModelProvider, ReveSmallModelProvider, Reve1BModelProvider
 from megatron.core import parallel_state, tensor_parallel
 from dfm.src.megatron.model.reve.reve_model import ReveModel
 from dfm.src.megatron.model.reve.reve_pytorch.model import ReveV2
-from dfm.src.megatron.model.reve.reve_pytorch.mock_train_reve import get_full_config, get_small_config
+from dfm.src.megatron.model.reve.reve_pytorch.mock_train_reve import get_full_config, get_small_config, get_1b_config
 
 def initialize_megatron():
     if not torch.distributed.is_initialized():
@@ -33,11 +34,11 @@ def main():
     initialize_megatron()
     
     # Config parameters
-    simple_config = get_small_config()
+    simple_config = get_1b_config()
     
     # Prepare MCore Config
     # ReveModel expects config to have standard TransformerConfig fields plus the custom ones
-    mcore_config = ReveSmallModelProvider(
+    mcore_config = Reve1BModelProvider(
             tensor_model_parallel_size=1,
             pipeline_model_parallel_size=1,
             pipeline_dtype=torch.bfloat16,
@@ -67,6 +68,96 @@ def main():
     torch.save(reve_simple.state_dict(), "synced_checkpoints/reve_simple_init.pt")
     print("Saved initialized state dicts to 'synced_checkpoints/reve_mcore_init.pt' and 'synced_checkpoints/reve_simple_init.pt'")
 
+
+def split_qkv_weights(
+    provider: TransformerConfig, qkv: torch.Tensor
+) -> Tuple[torch.Tensor, torch.Tensor, torch.Tensor]:
+    """Split Megatron's interleaved QKV tensor into separate Q, K, V matrices.
+
+    Args:
+        provider (TransformerConfig): Model configuration provider.
+        qkv (torch.Tensor): Interleaved QKV weights in Megatron format.
+
+    Returns:
+        Tuple[torch.Tensor, torch.Tensor, torch.Tensor]: Tuple of (Q, K, V)
+            weight matrices.
+    """
+    head_num = provider.num_attention_heads
+    num_query_groups = provider.num_query_groups
+    heads_per_group = head_num // num_query_groups
+    head_size = provider.kv_channels or (provider.hidden_size // head_num)
+    if getattr(provider, "attention_output_gate", False):
+        qkv_total_dim = 2 * head_num + 2 * num_query_groups
+        total_heads_per_group = 2 * heads_per_group + 2
+    else:
+        qkv_total_dim = head_num + 2 * num_query_groups
+        total_heads_per_group = heads_per_group + 2
+    is_bias = qkv.ndim == 1
+
+    if is_bias:
+        hidden_size = 1
+        qkv_reshaped = qkv.view(qkv_total_dim, head_size)
+    else:
+        hidden_size = qkv.shape[-1]
+        qkv_reshaped = qkv.view(qkv_total_dim, head_size, hidden_size)
+
+    # Extract Q, K, V from interleaved pattern
+    q_slice = torch.cat(
+        [
+            torch.arange(total_heads_per_group * i, total_heads_per_group * i + heads_per_group)
+            for i in range(num_query_groups)
+        ]
+    )
+    k_slice = torch.arange(total_heads_per_group - 2, qkv_total_dim, total_heads_per_group)
+    v_slice = torch.arange(total_heads_per_group - 1, qkv_total_dim, total_heads_per_group)
+
+    if getattr(provider, "attention_output_gate", False):
+        z_slice = torch.cat(
+            [
+                torch.arange(
+                    total_heads_per_group * i + heads_per_group,
+                    total_heads_per_group * i + heads_per_group * 2,
+                )
+                for i in range(num_query_groups)
+            ]
+        )
+        # In HF implementation, matrix Q and Z are mixed, so we need to concatenate them.
+        q = torch.cat([qkv_reshaped[q_slice], qkv_reshaped[z_slice]], dim=1)
+    else:
+        q = qkv_reshaped[q_slice]
+    k = qkv_reshaped[k_slice]
+    v = qkv_reshaped[v_slice]
+
+    assert q.numel() + k.numel() + v.numel() == qkv.numel(), (
+        f"QKV weights are not correctly merged, {q.shape=}, {k.shape=}, {v.shape=}, {qkv.shape=}"
+    )
+
+    if is_bias:
+        q = q.reshape(-1)
+        k = k.reshape(-1)
+        v = v.reshape(-1)
+    else:
+        q = q.reshape(-1, hidden_size)
+        k = k.reshape(-1, hidden_size)
+        v = v.reshape(-1, hidden_size)
+
+    return q, k, v
+
+def split_kv_weights(provider: TransformerConfig, kv: torch.Tensor) -> Tuple[torch.Tensor, torch.Tensor]:
+    """Split Megatron's interleaved KV weights (2D) into separate K and V matrices."""
+    num_query_groups = provider.num_query_groups
+    head_size = provider.kv_channels or (provider.hidden_size // provider.num_attention_heads)
+    hidden_size = kv.shape[-1]
+    kv_total_dim = 2 * num_query_groups
+
+    kv_reshaped = kv.view(kv_total_dim, head_size, hidden_size)
+
+    k_slice = torch.arange(0, kv_total_dim, 2)
+    v_slice = torch.arange(1, kv_total_dim, 2)
+
+    k = kv_reshaped[k_slice].reshape(-1, hidden_size)
+    v = kv_reshaped[v_slice].reshape(-1, hidden_size)
+    return k, v
 
 def copy_weights(mcore_model, simple_model):
     with torch.no_grad():
@@ -121,13 +212,7 @@ def copy_transformer_layer(mcore_layer, simple_layer, is_cross):
     # MCore linear_qkv weight is [3*h, h] (if not GQA)
     # Simple q [h, h], kv [2*h, h]
     
-    qkv = mcore_layer.full_self_attention.linear_qkv.weight
-    hidden_size = mcore_layer.config.hidden_size
-    
-    # Assuming MCore layout is [Q, K, V] concatenated
-    q = qkv[:hidden_size, :]
-    k = qkv[hidden_size:2*hidden_size, :]
-    v = qkv[2*hidden_size:, :]
+    q, k, v = split_qkv_weights(mcore_layer.config, mcore_layer.full_self_attention.linear_qkv.weight)
     
     simple_layer.self_attn.q.weight.copy_(q)
     # Simple KV is [k, v] concatenated output
@@ -143,7 +228,10 @@ def copy_transformer_layer(mcore_layer, simple_layer, is_cross):
     # Cross Attention
     if is_cross and simple_layer.do_cross_attn:
         copy_linear(mcore_layer.cross_attention.linear_q, simple_layer.cross_attn.q)
-        copy_linear(mcore_layer.cross_attention.linear_kv, simple_layer.cross_attn.kv)
+        
+        k, v = split_kv_weights(mcore_layer.config, mcore_layer.cross_attention.linear_kv.weight)
+        simple_layer.cross_attn.kv.weight.copy_(torch.cat([k, v], dim=0))
+        
         copy_linear(mcore_layer.cross_attention.linear_proj, simple_layer.cross_attn.proj)
         
         if simple_layer.cross_attn.do_modulation:

@@ -40,7 +40,7 @@ class ReveModelProvider(TransformerConfig, ModelProviderMixin[VisionModule]):
     layernorm_epsilon: float = 1e-6
     normalization: str = "RMSNorm"
     layernorm_zero_centered_gamma: bool = False
-    layernorm_across_heads: bool = True
+    layernorm_across_heads: bool = False
     rotary_interleaved: bool = True
     activation_func: Callable = F.silu
     hidden_dropout: float = 0
@@ -57,10 +57,12 @@ class ReveModelProvider(TransformerConfig, ModelProviderMixin[VisionModule]):
     vocab_size: int = 25256 * 8
     make_vocab_size_divisible_by: int = 128
 
+    # Reve model's specific architecture
     add_bias_linear: bool = False
     add_qkv_bias: bool = False
     gated_linear_unit: bool = False
     bias_activation_fusion: bool = False # M-LM: Only support fusion of gelu and swiglu
+    softmax_scale: float = 16.0
 
     # Reve model text transformer block
     text_dims: int = 4096
@@ -138,3 +140,13 @@ class ReveFullModelProvider(ReveModelProvider):
 @dataclass
 class ReveHalfFullModelProvider(ReveFullModelProvider):
     num_layers: int = 13
+    cross_num_layers: int = 4
+
+@dataclass
+class Reve1BModelProvider(ReveFullModelProvider):
+    num_layers: int = 13
+    hidden_size: int = 2048
+    ffn_hidden_size: int = 8192
+    num_attention_heads: int = 8
+    cross_num_layers: int = 4
+    cross_num_heads: int = 8

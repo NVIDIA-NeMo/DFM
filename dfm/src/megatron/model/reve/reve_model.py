@@ -137,6 +137,39 @@ class RoPEEmbed(nn.Module):
         # Interleave frequencies: [f1, f1, f2, f2, ...]
         return torch.repeat_interleave(full_freqs, 2, dim=-1)
 
+    def forward_half_split(
+        self, pos_indices: torch.Tensor
+    ) -> torch.Tensor:
+        assert pos_indices.shape[-1] == len(self.dims_per_axis), (
+            f"number of dims ({pos_indices.shape[-1]}) must match `dims_per_axis` ({len(self.dims_per_axis)})"
+        )
+        all_freqs = []
+        compute_dtype = torch.float64
+        output_dtype = torch.float32
+
+        for axis, dims in enumerate(self.dims_per_axis):
+            pos_idx = pos_indices[..., axis]
+            
+            # 1. Calculate base frequencies for this axis
+            half_dims = dims // 2
+            a = torch.tensor(1.0 / self.max_wavelength, device=pos_idx.device, dtype=compute_dtype)
+            exp = torch.arange(half_dims, dtype=compute_dtype, device=pos_idx.device) / half_dims
+            base_freqs = torch.pow(a, exp)
+            
+            # 2. Scale positions and compute angles (theta)
+            scaled_pos = pos_idx.to(dtype=compute_dtype) * self.scale
+            angles = torch.einsum("...,d->...d", scaled_pos, base_freqs)
+            
+            all_freqs.append(angles.to(dtype=output_dtype))
+
+        # 3. Concatenate all axes into one sequence of frequencies
+        # If axes are X and Y, full_freqs is [X_freqs, Y_freqs]
+        full_freqs = torch.concat(all_freqs, dim=-1)
+
+        # 4. MATCH THE HALF-SPLIT PATTERN
+        # Instead of repeat_interleave (which does [f1, f1, f2, f2]),
+        # we concatenate the block with itself to get [f1, f2, f1, f2].
+        return torch.concat([full_freqs, full_freqs], dim=-1)
 
 class CosineEmbed(nn.Module):
     def __init__(self, dims: int, max_wavelength: float, scale: float):
@@ -298,6 +331,9 @@ class ReveModel(VisionModule):
         self.text_config.hidden_size = self.config.cross_model_dims
         self.text_config.num_attention_heads = self.config.cross_num_heads
         self.text_config.num_layers = self.config.cross_num_layers
+        # # DEBUGGING (match forward pass in reve_pytorch/model.py)
+        # if torch.distributed.get_rank() == 0:
+        #     print(f"[DEBUG] (reve_model.py) text_config: {self.text_config}")
         self.text_decoder = TransformerBlock(
             config=self.text_config,
             spec=self.transformer_text_decoder_layer_spec,
@@ -332,17 +368,6 @@ class ReveModel(VisionModule):
 
              # Print model's parameters and their shapes, mean, std
              for name, param in self.named_parameters():
-                if "linear_qkv" in name:
-                    # Split linear_qkv parameter into linear_q and linear_kv by convention
-                    qkv_shape = param.shape
-                    # Assume shape is [3*hidden_size, hidden_size] or [3*heads*dim, ...]
-                    q_len = qkv_shape[0] // 3
-                    # Split weights (first q, then k, then v)
-                    linear_q = param[:q_len]
-                    linear_kv = param[q_len:]
-                    print(f"{name} (linear_q): {linear_q.shape}, dtype: {param.dtype}, mean: {linear_q.mean()}, std: {linear_q.std()}")
-                    print(f"{name} (linear_kv): {linear_kv.shape}, dtype: {param.dtype}, mean: {linear_kv.mean()}, std: {linear_kv.std()}")
-                else:
                     print(f"{name}: {param.shape}, dtype: {param.dtype}, mean: {param.mean()}, std: {param.std()}")
              # Also print total number of parameters
              total_params = sum(param.numel() for name, param in self.named_parameters())
@@ -396,81 +421,83 @@ class ReveModel(VisionModule):
         """Forward pass.
         """
 
-        # DEBUGGING (match forward pass in reve_pytorch/model.py)
-        # Mock values
-        device = self.img_in.weight.device
-        dtype = self.img_in.weight.dtype
-        number_packed_samples = 2
-        img_seq_len = 256
-        text_seq_len = 256
-        img_token_dim = self.img_in.in_features
-        txt_token_dim = self.txt_in.in_features
-        x = torch.randn(
-            number_packed_samples * img_seq_len,
-            1,
-            img_token_dim,
-            dtype=dtype,
-            device=device,
-        )
-        x_position_ids = torch.ones(
-            number_packed_samples, img_seq_len, 3, dtype=dtype, device=device
-        )
-        timestep = torch.tensor([0.5], dtype=dtype, device=device)
-        y = torch.randn(
-            number_packed_samples * text_seq_len,
-            1,
-            txt_token_dim,
-            dtype=dtype,
-            device=device,
-        )
-        conditioning_signal = torch.tensor([0.7], dtype=dtype, device=device)
-        zero = torch.zeros(1, dtype=torch.int32, device=device)
-        seq_len_q = torch.tensor([img_seq_len] * number_packed_samples, device=device)
-        cu_seqlens_q = seq_len_q.cumsum(dim=0).to(torch.int32)
-        cu_seqlens_q = torch.cat((zero, cu_seqlens_q))
-        seq_len_kv = torch.tensor([text_seq_len] * number_packed_samples, device=device)
-        cu_seqlens_kv = seq_len_kv.cumsum(dim=0).to(torch.int32)
-        cu_seqlens_kv = torch.cat((zero, cu_seqlens_kv))
-        text_packed_seq_params = {
-            "self_attention": PackedSeqParams(
-                cu_seqlens_q=cu_seqlens_kv,
-                cu_seqlens_q_padded=cu_seqlens_kv,
-                cu_seqlens_kv=cu_seqlens_kv,
-                cu_seqlens_kv_padded=cu_seqlens_kv,
-                qkv_format='thd',
-            ),
-        }
-        packed_seq_params = {
-            "self_attention": PackedSeqParams(
-                cu_seqlens_q=cu_seqlens_q,
-                cu_seqlens_q_padded=cu_seqlens_q,
-                cu_seqlens_kv=cu_seqlens_q,
-                cu_seqlens_kv_padded=cu_seqlens_q,
-                qkv_format='thd',
-            ),
-            "cross_attention": PackedSeqParams(
-                cu_seqlens_q=cu_seqlens_q,
-                cu_seqlens_q_padded=cu_seqlens_q,
-                cu_seqlens_kv=cu_seqlens_kv,
-                cu_seqlens_kv_padded=cu_seqlens_kv,
-                qkv_format='thd',
-            ),
-        }
+        # # DEBUGGING (match forward pass in reve_pytorch/model.py)
+        # # Mock values
+        # device = self.img_in.weight.device
+        # dtype = self.img_in.weight.dtype
+        # number_packed_samples = 2
+        # img_seq_len = 256
+        # text_seq_len = 256
+        # img_token_dim = self.img_in.in_features
+        # txt_token_dim = self.txt_in.in_features
+        # generator = torch.Generator(device=device)
+        # generator.manual_seed(42)
+        # x = torch.randn(
+        #     number_packed_samples,
+        #     img_seq_len,
+        #     img_token_dim,
+        #     dtype=dtype,
+        #     device=device,
+        #     generator=generator,
+        # ).reshape(number_packed_samples * img_seq_len, 1, img_token_dim)
+        # x_position_ids = torch.ones(
+        #     number_packed_samples, img_seq_len, 3, dtype=dtype, device=device
+        # )
+        # timestep = torch.tensor([0.5], dtype=dtype, device=device)
+        # y = torch.randn(
+        #     number_packed_samples, text_seq_len, txt_token_dim, dtype=dtype, device=device, generator=generator,
+        # ).reshape(number_packed_samples * text_seq_len, 1, txt_token_dim)
+        # conditioning_signal = torch.tensor([0.7], dtype=dtype, device=device)
+        # zero = torch.zeros(1, dtype=torch.int32, device=device)
+        # seq_len_q = torch.tensor([img_seq_len] * number_packed_samples, device=device)
+        # cu_seqlens_q = seq_len_q.cumsum(dim=0).to(torch.int32)
+        # cu_seqlens_q = torch.cat((zero, cu_seqlens_q))
+        # seq_len_kv = torch.tensor([text_seq_len] * number_packed_samples, device=device)
+        # cu_seqlens_kv = seq_len_kv.cumsum(dim=0).to(torch.int32)
+        # cu_seqlens_kv = torch.cat((zero, cu_seqlens_kv))
+        # text_packed_seq_params = {
+        #     "self_attention": PackedSeqParams(
+        #         cu_seqlens_q=cu_seqlens_kv,
+        #         cu_seqlens_q_padded=cu_seqlens_kv,
+        #         cu_seqlens_kv=cu_seqlens_kv,
+        #         cu_seqlens_kv_padded=cu_seqlens_kv,
+        #         qkv_format='thd',
+        #     ),
+        # }
+        # packed_seq_params = {
+        #     "self_attention": PackedSeqParams(
+        #         cu_seqlens_q=cu_seqlens_q,
+        #         cu_seqlens_q_padded=cu_seqlens_q,
+        #         cu_seqlens_kv=cu_seqlens_q,
+        #         cu_seqlens_kv_padded=cu_seqlens_q,
+        #         qkv_format='thd',
+        #     ),
+        #     "cross_attention": PackedSeqParams(
+        #         cu_seqlens_q=cu_seqlens_q,
+        #         cu_seqlens_q_padded=cu_seqlens_q,
+        #         cu_seqlens_kv=cu_seqlens_kv,
+        #         cu_seqlens_kv_padded=cu_seqlens_kv,
+        #         qkv_format='thd',
+        #     ),
+        # }
 
 
 
-        # DEBUGGING
-        if torch.distributed.get_rank() == 0:
-            print(f"[DEBUG] (reve_model.py) number_packed_samples: {number_packed_samples}")
-            print(f"[DEBUG] (reve_model.py) x: {x.shape}")
-            print(f"[DEBUG] (reve_model.py) x_position_ids: {x_position_ids.shape}")
-            print(f"[DEBUG] (reve_model.py) y: {y.shape}")
-            print(f"[DEBUG] (reve_model.py) text_seq_len: {text_seq_len}")
-            print(f"[DEBUG] (reve_model.py) timestep: {timestep.shape}")
-            print(f"[DEBUG] (reve_model.py) conditioning_signal: {conditioning_signal.shape}")
-            print(f"[DEBUG] (reve_model.py) text_packed_seq_params: {text_packed_seq_params}")
-            print(f"[DEBUG] (reve_model.py) packed_seq_params: {packed_seq_params}")
-            print(f"[DEBUG] (reve_model.py) --------------------------------")
+        # # DEBUGGING
+        # if torch.distributed.get_rank() == 0:
+        #     print(f"[DEBUG] (reve_model.py) number_packed_samples: {number_packed_samples}")
+        #     print(f"[DEBUG] (reve_model.py) x.shape: {x.shape}")
+        #     # print(f"[DEBUG] (reve_model.py) x.mean() - x.std(): {x.mean()} - {x.std()}")
+        #     # print(f"[DEBUG] (reve_model.py) x_position_ids: {x_position_ids.shape}")
+        #     # print(f"[DEBUG] (reve_model.py) x_position_ids.mean() - x_position_ids.std(): {x_position_ids.mean()} - {x_position_ids.std()}")
+        #     print(f"[DEBUG] (reve_model.py) y.shape: {y.shape}")
+        #     # print(f"[DEBUG] (reve_model.py) y.mean() - y.std(): {y.mean()} - {y.std()}")
+        #     # print(f"[DEBUG] (reve_model.py) text_seq_len: {text_seq_len}")
+        #     # print(f"[DEBUG] (reve_model.py) timestep: {timestep}")
+        #     # print(f"[DEBUG] (reve_model.py) conditioning_signal: {conditioning_signal}")
+        #     # print(f"[DEBUG] (reve_model.py) text_packed_seq_params: {text_packed_seq_params}")
+        #     # print(f"[DEBUG] (reve_model.py) packed_seq_params: {packed_seq_params}")
+        #     print(f"[DEBUG] (reve_model.py) --------------------------------")
 
         ### Text processing
         txt = y
@@ -484,9 +511,16 @@ class ReveModel(VisionModule):
         txt_nopos_ids = torch.zeros_like(txt_pos_ids)
         txt_pos_ids = torch.stack([txt_nopos_ids, txt_pos_ids], dim=-1)[None]
         txt_pos_ids = txt_pos_ids.repeat(number_packed_samples, 1, 1)
-        txt_rope_cis = self.txt_rope_emb.forward_interleaved(txt_pos_ids)
+        # txt_rope_cis = self.txt_rope_emb.forward_interleaved(txt_pos_ids)
+        txt_rope_cis = self.txt_rope_emb.forward_half_split(txt_pos_ids)
         txt_rope_cis = txt_rope_cis.reshape([-1, 1, txt_rope_cis.shape[-1]]) # (number_packed_samples, text_seq_len, hidden_size) -> ((number_packed_samples * text_seq_len), 1, hidden_size)
         txt_rope_cis = txt_rope_cis.unsqueeze(1) # ((number_packed_samples * text_seq_len), 1, hidden_size) -> (number_packed_samples, 1, 1, hidden_size)
+
+        # # DEBUGGING (match forward pass in reve_pytorch/model.py)
+        # if torch.distributed.get_rank() == 0:
+        #     print(f"[DEBUG] (reve_model.py - before transformer blocks) txt.shape - txt.mean() - txt.std() - txt.norm(): {txt.shape} - {txt.mean()} - {txt.std()} - {txt.norm()}")
+        #     print(f"[DEBUG] (reve_model.py - before transformer blocks) txt_rope_cis.shape - txt_rope_cis.mean() - txt_rope_cis.std() - txt_rope_cis.norm(): {txt_rope_cis.shape} - {txt_rope_cis.mean()} - {txt_rope_cis.std()} - {txt_rope_cis.norm()}")
+        #     print(f"[DEBUG] (reve_model.py - before transformer blocks) text_packed_seq_params: {text_packed_seq_params}")
 
         ### Text decoder
         txt = self.text_decoder(
@@ -497,8 +531,16 @@ class ReveModel(VisionModule):
             rotary_pos_emb=txt_rope_cis,
             packed_seq_params=text_packed_seq_params,
         )
+
+        # # DEBUGGING (match forward pass in reve_pytorch/model.py)
+        # if torch.distributed.get_rank() == 0:
+        #     print(f"[DEBUG] (reve_model.py - after transformer blocks) txt.shape - txt.mean() - txt.std() - txt.norm(): {txt.shape} - {txt.mean()} - {txt.std()} - {txt.norm()}")
+
         txt = self.txt_out(txt)
 
+        # # DEBUGGING (match forward pass in reve_pytorch/model.py)
+        # if torch.distributed.get_rank() == 0:
+        #     print(f"[DEBUG] (reve_model.py) *** Finished text transformer blocks processing.")
 
         ### Image processing
         patched_img, img_ids = x, x_position_ids
@@ -512,7 +554,8 @@ class ReveModel(VisionModule):
         position_scale = torch.ones((number_packed_samples, 1, 3), device=img_ids.device)
         position_scale[:, :, 0] = 1.0
         img_ids = img_ids * position_scale
-        img_rope_cis = self.img_rope_emb.forward_interleaved(img_ids)
+        # img_rope_cis = self.img_rope_emb.forward_interleaved(img_ids)
+        img_rope_cis = self.img_rope_emb.forward_half_split(img_ids)
         img_rope_cis = img_rope_cis.reshape([-1, 1, img_rope_cis.shape[-1]]) # ((number_packed_samples * img_seq_len), 1, hidden_size) -> ((number_packed_samples * img_seq_len), 1, hidden_size)
         img_rope_cis = img_rope_cis.unsqueeze(1) # ((number_packed_samples * img_seq_len), 1, hidden_size) -> (number_packed_samples, 1, 1, hidden_size)
 
@@ -524,6 +567,14 @@ class ReveModel(VisionModule):
         )
 
 
+        # # DEBUGGING (match forward pass in reve_pytorch/model.py)
+        # if torch.distributed.get_rank() == 0:
+        #     print(f"[DEBUG] (reve_model.py) patched_img.shape - patched_img.mean() - patched_img.std() - patched_img.norm(): {patched_img.shape} - {patched_img.mean()} - {patched_img.std()} - {patched_img.norm()}")
+        #     print(f"[DEBUG] (reve_model.py) txt.shape - txt.mean() - txt.std() - txt.norm(): {txt.shape} - {txt.mean()} - {txt.std()} - {txt.norm()}")
+        #     print(f"[DEBUG] (reve_model.py) condition_vector_emb.shape - condition_vector_emb.mean() - condition_vector_emb.std() - condition_vector_emb.norm(): {condition_vector_emb.shape} - {condition_vector_emb.mean()} - {condition_vector_emb.std()} - {condition_vector_emb.norm()}")
+        #     print(f"[DEBUG] (reve_model.py) img_rope_cis.shape - img_rope_cis.mean() - img_rope_cis.std() - img_rope_cis.norm(): {img_rope_cis.shape} - {img_rope_cis.mean()} - {img_rope_cis.std()} - {img_rope_cis.norm()}")
+        #     print(f"[DEBUG] (reve_model.py) packed_seq_params: {packed_seq_params}")
+
         ### Image decoder
         patched_img = self.decoder(
             hidden_states=patched_img,
@@ -534,16 +585,22 @@ class ReveModel(VisionModule):
             packed_seq_params=packed_seq_params,
         )
 
+        # # DEBUGGING (match forward pass in reve_pytorch/model.py)
+        # if torch.distributed.get_rank() == 0:
+        #     print(f"[DEBUG] (reve_model.py) *** Finished image transformer blocks processing.")
+
 
         ### Final layer
         patched_img = self.final_layer(patched_img)
 
 
-        # DEBUGGING (match forward pass in reve_pytorch/model.py)
-        if torch.distributed.get_rank() == 0:
-            patched_img_reshaped = patched_img.reshape(number_packed_samples, img_seq_len, img_token_dim)
-            print(f"[DEBUG] (reve_model.py) patched_img.shape - patched_img.mean() - patched_img.std(): {patched_img.shape} - {patched_img.mean()} - {patched_img.std()}")
-            print(f"[DEBUG] (reve_model.py) --------------------------------")
+        # # DEBUGGING (match forward pass in reve_pytorch/model.py)
+        # if torch.distributed.get_rank() == 0:
+        #     patched_img_reshaped = patched_img.reshape(number_packed_samples, img_seq_len, img_token_dim)
+        #     print(f"[DEBUG] (reve_model.py) patched_img_reshaped.shape - patched_img_reshaped.mean() - patched_img_reshaped.std() - patched_img_reshaped.norm(): {patched_img_reshaped.shape} - {patched_img_reshaped.mean()} - {patched_img_reshaped.std()} - {patched_img_reshaped.norm()}")
+        #     print(f"[DEBUG] (reve_model.py) patched_img_reshaped: {patched_img_reshaped}")
+        #     print(f"[DEBUG] (reve_model.py) --------------------------------")
+        #     print(stop_here)
 
         return patched_img
 

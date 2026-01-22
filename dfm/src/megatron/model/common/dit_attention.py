@@ -104,6 +104,11 @@ class DiTSelfAttention(SelfAttention):
         """
         Derives `query`, `key` and `value` tensors from `hidden_states`.
         """
+
+        # # DEBUGGING (match forward pass in reve_pytorch/model.py)
+        # if torch.distributed.get_rank() == 0:
+        #     print(f"[DEBUG]          (dit_attention.py - before compute q,k,v) hidden_states.dtype - hidden_states.shape - hidden_states.mean() - hidden_states.std(): {hidden_states.dtype} - {hidden_states.shape} - {hidden_states.mean()} - {hidden_states.std()}")
+
         # Attention heads [sq, b, h] --> [sq, b, ng * (np/ng + 2) * hn)]
         mixed_qkv, _ = self.linear_qkv(hidden_states)
 
@@ -127,6 +132,10 @@ class DiTSelfAttention(SelfAttention):
             self.hidden_size_per_attention_head,
         ]
 
+        # # DEBUGGING (match forward pass in reve_pytorch/model.py)
+        # if torch.distributed.get_rank() == 0:
+        #     print(f"[DEBUG]          (dit_attention.py - before split) mixed_qkv.dtype - mixed_qkv.shape - mixed_qkv.mean() - mixed_qkv.std() : {mixed_qkv.dtype} - {mixed_qkv.shape} - {mixed_qkv.mean()} - {mixed_qkv.std()}")
+
         if SplitAlongDim is not None:
             # [sq, b, ng, (np/ng + 2) * hn]
             # --> [sq, b, ng, np/ng * hn], [sq, b, ng, hn], [sq, b, ng, hn]
@@ -135,6 +144,13 @@ class DiTSelfAttention(SelfAttention):
             # [sq, b, ng, (np/ng + 2) * hn]
             # --> [sq, b, ng, np/ng * hn], [sq, b, ng, hn], [sq, b, ng, hn]
             (query, key, value) = torch.split(mixed_qkv, split_arg_list, dim=3)
+
+        # # DEBUGGING (match forward pass in reve_pytorch/model.py)
+        # if torch.distributed.get_rank() == 0:
+        #     print(f"[DEBUG]          (dit_attention.py - after split) query.dtype - query.shape - query.mean() - query.std() : {query.dtype} - {query.shape} - {query.mean()} - {query.std()}")
+        #     print(f"[DEBUG]          (dit_attention.py - after split) key.dtype - key.shape - key.mean() - key.std() : {key.dtype} - {key.shape} - {key.mean()} - {key.std()}")
+        #     print(f"[DEBUG]          (dit_attention.py - after split) value.dtype - value.shape - value.mean() - value.std() : {value.dtype} - {value.shape} - {value.mean()} - {value.std()}")
+
 
         # [sq, b, ng, np/ng * hn] -> [sq, b, np, hn]
         query = query.reshape(query.size(0), query.size(1), -1, self.hidden_size_per_attention_head)
@@ -147,6 +163,12 @@ class DiTSelfAttention(SelfAttention):
             key = tensor_parallel.gather_from_tensor_model_parallel_region(key)
             query = query.transpose(-2, -1)
             key = key.transpose(-2, -1)
+
+        # # DEBUGGING (match forward pass in reve_pytorch/model.py)
+        # if torch.distributed.get_rank() == 0:
+        #     print(f"[DEBUG]          (dit_attention.py - before q_layernorm) query.dtype - query.shape - query.mean() - query.std() : {query.dtype} - {query.shape} - {query.mean()} - {query.std()}")
+        #     print(f"[DEBUG]          (dit_attention.py - before k_layernorm) key.dtype - key.shape - key.mean() - key.std() : {key.dtype} - {key.shape} - {key.mean()} - {key.std()}")
+        #     print(f"[DEBUG]          (dit_attention.py - before k_layernorm) value.dtype - value.shape - value.mean() - value.std() : {value.dtype} - {value.shape} - {value.mean()} - {value.std()}")
 
         if self.q_layernorm is not None:
             if self.layernorm_across_heads:
@@ -165,6 +187,13 @@ class DiTSelfAttention(SelfAttention):
                 key = k_flat.view(key.size(0), key.size(1), -1, self.hidden_size_per_attention_head)
             else:
                 key = self.k_layernorm(key.contiguous())
+
+        # # DEBUGGING (match forward pass in reve_pytorch/model.py)
+        # if torch.distributed.get_rank() == 0:
+        #     print(f"[DEBUG]          (dit_attention.py - after q_layernorm) query.dtype - query.shape - query.mean() - query.std() : {query.dtype} - {query.shape} - {query.mean()} - {query.std()}")
+        #     print(f"[DEBUG]          (dit_attention.py - after k_layernorm) key.dtype - key.shape - key.mean() - key.std() : {key.dtype} - {key.shape} - {key.mean()} - {key.std()}")
+        #     print(f"[DEBUG]          (dit_attention.py - after k_layernorm) value.dtype - value.shape - value.mean() - value.std() : {value.dtype} - {value.shape} - {value.mean()} - {value.std()}")
+
 
         # scatter query and key heads across TP ranks if self.layernorm_across_heads is True
         if self.layernorm_across_heads and parallel_state.get_tensor_model_parallel_world_size() > 1:
@@ -257,9 +286,20 @@ class DiTCrossAttention(CrossAttention):
         from `key_value_states`.
         """
 
+        # # DEBUGGING (match forward pass in reve_pytorch/model.py)
+        # if torch.distributed.get_rank() == 0:
+        #     print(f"[DEBUG]          (dit_attention.py - before compute q,k,v) hidden_states.dtype - hidden_states.shape - hidden_states.mean() - hidden_states.std(): {hidden_states.dtype} - {hidden_states.shape} - {hidden_states.mean()} - {hidden_states.std()}")
+
+
         query, key, value = super().get_query_key_value_tensors(
             hidden_states, key_value_states, output_gate=output_gate, split_qkv=split_qkv
         )
+
+        # # DEBUGGING (match forward pass in reve_pytorch/model.py)
+        # if torch.distributed.get_rank() == 0:
+        #     print(f"[DEBUG]          (dit_attention.py - after compute q,k,v) query.dtype - query.shape - query.mean() - query.std(): {query.dtype} - {query.shape} - {query.mean()} - {query.std()}")
+        #     print(f"[DEBUG]          (dit_attention.py - after compute q,k,v) key.dtype - key.shape - key.mean() - key.std(): {key.dtype} - {key.shape} - {key.mean()} - {key.std()}")
+        #     print(f"[DEBUG]          (dit_attention.py - after compute q,k,v) value.dtype - value.shape - value.mean() - value.std(): {value.dtype} - {value.shape} - {value.mean()} - {value.std()}")
 
         # gather query and key heads across TP ranks if self.layernorm_across_heads is True
         if self.layernorm_across_heads and parallel_state.get_tensor_model_parallel_world_size() > 1:
@@ -269,6 +309,12 @@ class DiTCrossAttention(CrossAttention):
             key = tensor_parallel.gather_from_tensor_model_parallel_region(key)
             query = query.transpose(-2, -1)
             key = key.transpose(-2, -1)
+
+        # # DEBUGGING (match forward pass in reve_pytorch/model.py)
+        # if torch.distributed.get_rank() == 0:
+        #     print(f"[DEBUG]          (dit_attention.py - before q_layernorm) query.dtype - query.shape - query.mean() - query.std() : {query.dtype} - {query.shape} - {query.mean()} - {query.std()}")
+        #     print(f"[DEBUG]          (dit_attention.py - before k_layernorm) key.dtype - key.shape - key.mean() - key.std() : {key.dtype} - {key.shape} - {key.mean()} - {key.std()}")
+        #     print(f"[DEBUG]          (dit_attention.py - before k_layernorm) value.dtype - value.shape - value.mean() - value.std() : {value.dtype} - {value.shape} - {value.mean()} - {value.std()}")
 
         if self.q_layernorm is not None:
             if self.layernorm_across_heads:
@@ -287,6 +333,12 @@ class DiTCrossAttention(CrossAttention):
                 key = k_flat.view(key.size(0), key.size(1), -1, self.hidden_size_per_attention_head)
             else:
                 key = self.k_layernorm(key.contiguous())
+
+        # # DEBUGGING (match forward pass in reve_pytorch/model.py)
+        # if torch.distributed.get_rank() == 0:
+        #     print(f"[DEBUG]          (dit_attention.py - after q_layernorm) query.dtype - query.shape - query.mean() - query.std() : {query.dtype} - {query.shape} - {query.mean()} - {query.std()}")
+        #     print(f"[DEBUG]          (dit_attention.py - after k_layernorm) key.dtype - key.shape - key.mean() - key.std() : {key.dtype} - {key.shape} - {key.mean()} - {key.std()}")
+        #     print(f"[DEBUG]          (dit_attention.py - after k_layernorm) value.dtype - value.shape - value.mean() - value.std() : {value.dtype} - {value.shape} - {value.mean()} - {value.std()}")
 
         # scatter query and key heads across TP ranks if self.layernorm_across_heads is True
         if self.layernorm_across_heads and parallel_state.get_tensor_model_parallel_world_size() > 1:
