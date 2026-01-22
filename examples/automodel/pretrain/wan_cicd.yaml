@@ -14,41 +14,41 @@ model:
   mode: pretrain
 
 step_scheduler:
-  global_batch_size: 256   
-  local_batch_size: 1        
-  ckpt_every_steps: 1000     
-  num_epochs: 100             
-  log_every: 1               
+  global_batch_size: 2560
+  local_batch_size: 1
+  ckpt_every_steps: 1000
+  num_epochs: 100
+  log_every: 1
 
 data:
   dataloader:
     _target_: dfm.src.automodel.datasets.build_dataloader
     meta_folder: /lustre/fsw/portfolios/coreai/users/pthombre/Automodel/H21/DFM/Wan_text_to_image/
-    num_workers: 10          
+    num_workers: 10
     device: cpu
 
 optim:
-  learning_rate: 5e-5       
-  clip_grad: 2.0            
+  learning_rate: 5e-5
+  clip_grad: 2.0
   optimizer:
-    weight_decay: 0.1        
-    betas: [0.9, 0.95]       
+    weight_decay: 0.1
+    betas: [0.9, 0.95]
 
 ddp:
   activation_checkpointing: true
   backend: nccl
 
 flow_matching:
-  adapter_type: "simple"     
+  adapter_type: "simple"
   adapter_kwargs: {}
   use_sigma_noise: true
-  timestep_sampling: logit_normal  
+  timestep_sampling: logit_normal
   logit_mean: 0.0
-  logit_std: 1.5             
-  flow_shift: 2.5           
-  mix_uniform_ratio: 0.2     
-  sigma_min: 0.0             
-  sigma_max: 1.0            
+  logit_std: 1.5
+  flow_shift: 2.5
+  mix_uniform_ratio: 0.2
+  sigma_min: 0.0
+  sigma_max: 1.0
 
 
 checkpoint:
