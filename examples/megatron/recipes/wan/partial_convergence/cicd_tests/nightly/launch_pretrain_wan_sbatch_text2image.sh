@@ -43,12 +43,12 @@ while [ \$(ls -1 \"${BARRIER_DIR}\"/node_*.ready | wc -l) -lt ${NUM_NODES} ]; do
 done
 echo \"All nodes ready. Starting training...\"
 
-NVTE_FUSED_ATTN=1 MASTER_ADDR=${MASTER_ADDR} MASTER_PORT=${MASTER_PORT} torchrun \
+NVTE_FUSED_ATTN=1 MASTER_ADDR=\${MASTER_ADDR} MASTER_PORT=\${MASTER_PORT} torchrun \
   --nnodes=${NUM_NODES} \
   --nproc_per_node=8 \
   --rdzv-backend=c10d \
   --rdzv-endpoint=\${MASTER_ADDR}:\${RDZV_PORT} \
-  --rdzv-id=${SLURM_JOB_ID} \
+  --rdzv-id=\${SLURM_JOB_ID} \
   --rdzv-conf=timeout=6000 \
   examples/megatron/recipes/wan/pretrain_wan.py \
   --training-mode pretrain \
