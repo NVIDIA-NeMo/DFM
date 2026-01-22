@@ -40,6 +40,46 @@ def get_small_config():
     }
 
 
+def get_1b_config():
+    """Half full config."""
+    return {
+        "latent_dims": 768,
+        "text_dims": 4096,
+        "dims_per_head": 256,
+        "num_heads": 8,
+        "cross_dims_per_head": 256,
+        "cross_num_heads": 8,
+        "mlp_ratio": 4.0,
+        "num_layers": 13,
+        "cross_num_layers": 4,
+        "rope_dims": [64, 64],
+        "cross_rope_dims": 128,
+        "rope_max_wavelength": 512.0,
+        "attn_scale": 16.0,
+        "patch_size": 1,
+    }
+
+
+def get_half_full_config():
+    """Half full config."""
+    return {
+        "latent_dims": 768,
+        "text_dims": 4096,
+        "dims_per_head": 256,
+        "num_heads": 24,
+        "cross_dims_per_head": 256,
+        "cross_num_heads": 24,
+        "mlp_ratio": 4.0,
+        "num_layers": 13,
+        "cross_num_layers": 4,
+        "rope_dims": [64, 64],
+        "cross_rope_dims": 128,
+        "rope_max_wavelength": 512.0,
+        "attn_scale": 16.0,
+        "patch_size": 1,
+    }
+
+
 def get_full_config():
     """Full production config."""
     return {
@@ -101,12 +141,18 @@ def mock_train(config):
     # num_txt_tokens = 256
     # txt_token_dim = text_dims
     ## config 3 (highest runnable)
-    # bs = 12
-    bs = 8
+    # bs = 8
+    # num_img_tokens = 256
+    # img_token_dim = latent_dims * (patch_size ** 2)
+    # num_txt_tokens = 128
+    # txt_token_dim = text_dims
+
+    ## testing config
+    bs = 16
     num_img_tokens = 256
     img_token_dim = latent_dims * (patch_size ** 2)
     num_txt_tokens = 128
-    txt_token_dim = text_dims
+    txt_token_dim = text_dims    
 
     # Initialize model
     if rank == 0:
@@ -136,34 +182,24 @@ def mock_train(config):
         transformer_layer_cls={TransformerBlock},
     )
 
-    if world_size <= 1: 
-        # For single GPU, just use DDP or NO FSDP at all to check baseline.
-        # But if we must use FSDP API, we can skip wrapping if desired, 
-        # but user likely wants to test FSDP path.
-        # NO_SHARD in FSDP still has overhead (parameter flattening/unflattening, hooks).
-        # To get pure PyTorch speed, we should skip FSDP wrapping entirely for world_size=1
-        if rank == 0:
-            print("Running in Single GPU mode: Skipping FSDP wrapping for pure PyTorch baseline speed.", flush=True)
-        model = model.to(device).to(torch.bfloat16)
+    if world_size <= 8: 
+            # If running on fewer devices than expected for a node (e.g. debugging with 1 GPU),
+            # FULL_SHARD is equivalent (or NO_SHARD if world_size=1) but safer.
+            sharding_strategy = ShardingStrategy.FULL_SHARD
     else:
-        if world_size <= 8: 
-             # If running on fewer devices than expected for a node (e.g. debugging with 1 GPU),
-             # FULL_SHARD is equivalent (or NO_SHARD if world_size=1) but safer.
-             sharding_strategy = ShardingStrategy.FULL_SHARD
-        else:
-             sharding_strategy = ShardingStrategy.HYBRID_SHARD
+            sharding_strategy = ShardingStrategy.HYBRID_SHARD
 
-        model = FSDP(
-            model,
-            auto_wrap_policy=auto_wrap_policy,
-            mixed_precision=mp_policy,
-            device_id=device,
-            sharding_strategy=sharding_strategy,
-            limit_all_gathers=True,
-            use_orig_params=False,
-        )
-        if rank == 0:
-            print("FSDP wrapping done.", flush=True)
+    model = FSDP(
+        model,
+        auto_wrap_policy=auto_wrap_policy,
+        mixed_precision=mp_policy,
+        device_id=device,
+        sharding_strategy=sharding_strategy,
+        limit_all_gathers=True,
+        use_orig_params=False,
+    )
+    if rank == 0:
+        print("FSDP wrapping done.", flush=True)
 
     # Optimizer
     if rank == 0:
@@ -174,7 +210,7 @@ def mock_train(config):
     criterion = nn.MSELoss()
 
     if rank == 0:
-        print("Starting training loop for 200 steps...", flush=True)
+        print("Starting training loop for a number of steps...", flush=True)
     
     step_times = []
     
@@ -185,7 +221,8 @@ def mock_train(config):
     if rank == 0:
         print("Barrier passed. Entering loop.", flush=True)
     
-    for step in range(1, 201):
+    num_steps = 20000
+    for step in range(1, num_steps + 1):
         step_start = time.time()
         
         optimizer.zero_grad()
@@ -205,14 +242,15 @@ def mock_train(config):
         target = torch.randn_like(x)
 
         # Forward pass
-        output = model(
-            x=x,
-            x_position_ids=x_position_ids,
-            timestep=timestep,
-            y=y,
-            y_mask=y_mask,
-            conditioning_signal=conditioning_signal
-        )
+        with torch.autocast(device_type="cuda", dtype=torch.bfloat16):
+            output = model(
+                x=x,
+                x_position_ids=x_position_ids,
+                timestep=timestep,
+                y=y,
+                y_mask=y_mask,
+                conditioning_signal=conditioning_signal
+            )
 
         # Compute loss
         loss = criterion(output, target)
@@ -220,6 +258,27 @@ def mock_train(config):
         # Backward pass
         loss.backward()
         
+        # # Check optimizer
+        # def check_optimizer_full(optimizer):
+        #     # 1. Get the first parameter
+        #     p = optimizer.param_groups[0]['params'][0]
+        #     print(f"--- Standard Tensors ---")
+        #     print(f"Model Weights:   {p.dtype}")
+        #     print(f"Gradients:       {p.grad.dtype if p.grad is not None else 'None'}")
+            
+        #     # 2. Check the State Dictionary
+        #     if not optimizer.state:
+        #         print("\n[!] Run optimizer.step() first to see states.")
+        #         return
+
+        #     p_state = optimizer.state[p]
+        #     print(f"\n--- Optimizer States ---")
+        #     for key, value in p_state.items():
+        #         # Check if the value is a tensor (states like 'step' are often just ints)
+        #         dtype = value.dtype if torch.is_tensor(value) else type(value)
+        #         print(f"{key:<15}: {dtype}")
+        # check_optimizer_full(optimizer)
+
         # Optimization step
         optimizer.step()
         
@@ -229,7 +288,7 @@ def mock_train(config):
 
         if step % 10 == 0 and rank == 0:
             avg_step_time = sum(step_times[-10:]) / 10
-            print(f"Step {step}/200 | Loss: {loss.item():.6f} | Avg Step Time (last 10): {avg_step_time:.4f}s")
+            print(f"Step {step}/{num_steps} | Loss: {loss.item():.6f} | Avg Step Time (last 10): {avg_step_time:.4f}s")
 
     if rank == 0:
         print(f"Training finished. Overall Average Step Time: {sum(step_times) / len(step_times):.4f}s")
@@ -240,13 +299,13 @@ if __name__ == "__main__":
     parser = argparse.ArgumentParser()
     parser.add_argument(
         "--config",
-        choices=["small", "full"],
+        choices=["small", "1b", "half_full", "full"],
         default="small",
         help="Config size to use",
     )
     args = parser.parse_args()
 
-    config = get_small_config() if args.config == "small" else get_full_config()
+    config = get_small_config() if args.config == "small" else get_1b_config() if args.config == "1b" else get_half_full_config() if args.config == "half_full" else get_full_config()
     
     # Check if run with torchrun
     if "RANK" not in os.environ:

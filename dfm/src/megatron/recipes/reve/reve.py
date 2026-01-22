@@ -31,7 +31,7 @@ from megatron.bridge.training.mixed_precision import MixedPrecisionConfig, get_m
 from megatron.core.distributed import DistributedDataParallelConfig
 
 from dfm.src.megatron.data.reve.reve_mock_datamodule import ReveMockDataModuleConfig
-from dfm.src.megatron.model.reve.reve_provider import ReveModelProvider, ReveSmallModelProvider, ReveFullModelProvider, ReveHalfFullModelProvider
+from dfm.src.megatron.model.reve.reve_provider import ReveModelProvider, ReveSmallModelProvider, ReveFullModelProvider, ReveHalfFullModelProvider, Reve1BModelProvider
 
 
 def model_config(
@@ -81,6 +81,16 @@ def model_config(
         )
     elif model_size == "half_full":
         return ReveHalfFullModelProvider(
+            tensor_model_parallel_size=tensor_parallelism,
+            pipeline_model_parallel_size=pipeline_parallelism,
+            pipeline_dtype=pipeline_parallelism_dtype,
+            virtual_pipeline_model_parallel_size=None,
+            context_parallel_size=context_parallelism,
+            sequence_parallel=sequence_parallelism,
+            seq_length=seq_length,
+        )
+    elif model_size == "1b":
+        return Reve1BModelProvider(
             tensor_model_parallel_size=tensor_parallelism,
             pipeline_model_parallel_size=pipeline_parallelism,
             pipeline_dtype=pipeline_parallelism_dtype,
@@ -193,7 +203,7 @@ def pretrain_config(
             W_latents=16
             context_seq_len=256
             number_packed_samples=1
-        elif model_size == "full" or model_size == "half_full":
+        elif model_size == "full" or model_size == "half_full" or model_size == "1b":
             in_channels = 768
             context_embeddings_dim = 4096
 
@@ -211,12 +221,27 @@ def pretrain_config(
             # context_seq_len=256
             # number_packed_samples=4
 
-            ## config 3
+            # ## config 3
+            # F_latents=1
+            # H_latents=16
+            # W_latents=16
+            # context_seq_len=128
+            # number_packed_samples=8
+
+            ## testing config
             F_latents=1
             H_latents=16
             W_latents=16
             context_seq_len=128
-            number_packed_samples=8
+            number_packed_samples=16
+
+            # ## minimal testing config
+            # F_latents=1
+            # H_latents=2
+            # W_latents=2
+            # context_seq_len=8
+            # number_packed_samples=2
+
         else:
             assert False, "Invalid model size"
 
@@ -234,7 +259,7 @@ def pretrain_config(
             context_embeddings_dim=context_embeddings_dim,
             micro_batch_size=micro_batch_size,
             global_batch_size=global_batch_size,
-            num_workers=16,
+            num_workers=0,
             packing_buffer_size=None,
         )
     else:
