@@ -33,6 +33,7 @@ from torch.distributed.fsdp import MixedPrecisionPolicy
 from transformers.utils.hub import TRANSFORMERS_CACHE
 
 from dfm.src.automodel._diffusers.auto_diffusion_pipeline import NeMoAutoDiffusionPipeline, NeMoWanPipeline
+from dfm.src.automodel._diffusers.flux_pipeline import NeMoFluxPipeline
 from dfm.src.automodel.flow_matching.flow_matching_pipeline import FlowMatchingPipeline, create_adapter
 
 
@@ -84,9 +85,17 @@ def build_model_and_optimizer(
     if finetune_mode:
         kwargs["load_for_training"] = True
         kwargs["low_cpu_mem_usage"] = True
-    if "wan" in model_id:
+
+    # Select appropriate pipeline based on model type
+    model_id_lower = model_id.lower()
+    if "flux" in model_id_lower:
+        logging.info("[INFO] Detected FLUX model, using NeMoFluxPipeline")
+        init_fn = NeMoFluxPipeline.from_pretrained if finetune_mode else NeMoFluxPipeline.from_config
+    elif "wan" in model_id_lower:
+        logging.info("[INFO] Detected WAN model, using NeMoWanPipeline")
         init_fn = NeMoWanPipeline.from_pretrained if finetune_mode else NeMoWanPipeline.from_config
     else:
+        logging.info("[INFO] Using NeMoAutoDiffusionPipeline")
         init_fn = NeMoAutoDiffusionPipeline.from_pretrained
 
     pipe, created_managers = init_fn(

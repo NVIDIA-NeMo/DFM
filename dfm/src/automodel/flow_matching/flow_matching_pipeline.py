@@ -39,6 +39,7 @@ import torch.nn as nn
 # Import adapters from the adapters module
 from .adapters import (
     FlowMatchingContext,
+    FluxAdapter,
     HunyuanAdapter,
     ModelAdapter,
     SimpleAdapter,
@@ -114,6 +115,7 @@ class FlowMatchingPipeline:
         timestep_sampling: str = "logit_normal",
         flow_shift: float = 3.0,
         i2v_prob: float = 0.3,
+        cfg_dropout_prob: float = 0.1,
         # Logit-normal distribution parameters
         logit_mean: float = 0.0,
         logit_std: float = 1.0,
@@ -143,6 +145,7 @@ class FlowMatchingPipeline:
                 - "mix": Mix of lognorm and uniform
             flow_shift: Shift parameter for timestep transformation
             i2v_prob: Probability of using image-to-video conditioning
+            cfg_dropout_prob: Probability of dropping text embeddings for CFG training
             logit_mean: Mean for logit-normal distribution
             logit_std: Std for logit-normal distribution
             mix_uniform_ratio: Ratio of uniform samples when using mix
@@ -158,6 +161,7 @@ class FlowMatchingPipeline:
         self.timestep_sampling = timestep_sampling
         self.flow_shift = flow_shift
         self.i2v_prob = i2v_prob
+        self.cfg_dropout_prob = cfg_dropout_prob
         self.logit_mean = logit_mean
         self.logit_std = logit_std
         self.mix_uniform_ratio = mix_uniform_ratio
@@ -306,7 +310,9 @@ class FlowMatchingPipeline:
 
         Expected batch format:
         {
-            "video_latents": torch.Tensor,  # [B, C, F, H, W]
+            "video_latents": torch.Tensor,  # [B, C, F, H, W] for video
+            OR
+            "image_latents": torch.Tensor,  # [B, C, H, W] for image
             "text_embeddings": torch.Tensor,  # [B, seq_len, dim]
             "data_type": str,  # "video" or "image" (optional)
             # ... additional model-specific keys handled by adapter
@@ -327,14 +333,16 @@ class FlowMatchingPipeline:
         detailed_log = global_step % self.log_interval == 0
         summary_log = global_step % self.summary_log_interval == 0
 
-        # Extract and prepare batch data
-        video_latents = batch["video_latents"].to(device, dtype=dtype)
+        # Extract and prepare batch data (either image_latents or video_latents)
+        if "video_latents" in batch:
+            latents = batch["video_latents"].to(device, dtype=dtype)
+        elif "image_latents" in batch:
+            latents = batch["image_latents"].to(device, dtype=dtype)
+        else:
+            raise KeyError("Batch must contain either 'video_latents' or 'image_latents'")
 
-        # Handle tensor shapes
-        if video_latents.ndim == 4:
-            video_latents = video_latents.unsqueeze(0)
-
-        batch_size = video_latents.shape[0]
+        # latents can be 4D [B, C, H, W] for images or 5D [B, C, F, H, W] for videos
+        batch_size = latents.shape[0]
 
         # Determine task type
         data_type = batch.get("data_type", "video")
@@ -348,17 +356,17 @@ class FlowMatchingPipeline:
         # ====================================================================
         # Flow Matching: Add Noise
         # ====================================================================
-        noise = torch.randn_like(video_latents, dtype=torch.float32)
+        noise = torch.randn_like(latents, dtype=torch.float32)
 
         # x_t = (1 - σ) * x_0 + σ * ε
-        noisy_latents = self.noise_schedule.forward(video_latents.float(), noise, sigma)
+        noisy_latents = self.noise_schedule.forward(latents.float(), noise, sigma)
 
         # ====================================================================
         # Logging
         # ====================================================================
         if detailed_log or debug_mode:
             self._log_detailed(
-                global_step, sampling_method, batch_size, sigma, timesteps, video_latents, noise, noisy_latents
+                global_step, sampling_method, batch_size, sigma, timesteps, latents, noise, noisy_latents
             )
         elif summary_log:
             logger.info(
@@ -376,13 +384,14 @@ class FlowMatchingPipeline:
         # ====================================================================
         context = FlowMatchingContext(
             noisy_latents=noisy_latents,
-            video_latents=video_latents,
+            latents=latents,
             timesteps=timesteps,
             sigma=sigma,
             task_type=task_type,
             data_type=data_type,
             device=device,
             dtype=dtype,
+            cfg_dropout_prob=self.cfg_dropout_prob,
             batch=batch,
         )
 
@@ -393,7 +402,7 @@ class FlowMatchingPipeline:
         # Target: Flow Matching Velocity
         # ====================================================================
         # v = ε - x_0
-        target = noise - video_latents.float()
+        target = noise - latents.float()
 
         # ====================================================================
         # Loss Computation
@@ -441,7 +450,7 @@ class FlowMatchingPipeline:
         batch_size: int,
         sigma: torch.Tensor,
         timesteps: torch.Tensor,
-        video_latents: torch.Tensor,
+        latents: torch.Tensor,
         noise: torch.Tensor,
         noisy_latents: torch.Tensor,
     ):
@@ -463,15 +472,15 @@ class FlowMatchingPipeline:
         logger.info("")
         logger.info(f"[TIMESTEPS] Range: [{timesteps.min():.2f}, {timesteps.max():.2f}]")
         logger.info("")
-        logger.info(f"[RANGES] Clean latents: [{video_latents.min():.4f}, {video_latents.max():.4f}]")
+        logger.info(f"[RANGES] Clean latents: [{latents.min():.4f}, {latents.max():.4f}]")
         logger.info(f"[RANGES] Noise:         [{noise.min():.4f}, {noise.max():.4f}]")
         logger.info(f"[RANGES] Noisy latents: [{noisy_latents.min():.4f}, {noisy_latents.max():.4f}]")
 
         # Sanity check
         max_expected = (
             max(
-                abs(video_latents.max().item()),
-                abs(video_latents.min().item()),
+                abs(latents.max().item()),
+                abs(latents.min().item()),
                 abs(noise.max().item()),
                 abs(noise.min().item()),
             )
@@ -521,7 +530,7 @@ def create_adapter(adapter_type: str, **kwargs) -> ModelAdapter:
     Factory function to create a model adapter by name.
 
     Args:
-        adapter_type: Type of adapter ("hunyuan", "simple")
+        adapter_type: Type of adapter ("hunyuan", "simple", "flux")
         **kwargs: Additional arguments passed to the adapter constructor
 
     Returns:
@@ -530,6 +539,7 @@ def create_adapter(adapter_type: str, **kwargs) -> ModelAdapter:
     adapters = {
         "hunyuan": HunyuanAdapter,
         "simple": SimpleAdapter,
+        "flux": FluxAdapter,
     }
 
     if adapter_type not in adapters:

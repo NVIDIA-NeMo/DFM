@@ -1,0 +1,100 @@
+# FLUX.1 Text-to-Image Finetuning Configuration
+#
+# This configuration file is compatible with TrainDiffusionRecipe class
+# (dfm/src/automodel/recipes/train.py) using FlowMatchingPipeline with FluxAdapter
+#
+# Launch with:
+#   torchrun --nproc-per-node=8 examples/automodel/finetune/finetune.py \
+#     -c examples/automodel/finetune/flux_t2i_flow.yaml
+
+# Model configuration
+model:
+  pretrained_model_name_or_path: "black-forest-labs/FLUX.1-dev"
+  mode: "finetune"  # "finetune" loads pretrained weights, "pretrain" uses random init
+  cache_dir: null  # Optional: specify cache directory for model weights
+  attention_backend: null  # Flux uses its own attention implementation
+
+# Optimizer configuration
+optim:
+  learning_rate: 1e-5
+
+  optimizer:
+    weight_decay: 0.01
+    betas: [0.9, 0.999]
+
+# FSDP (Fully Sharded Data Parallel) configuration
+fsdp:
+  enable_fsdp: true
+  dp_size: null  # Auto-calculate based on world_size and other parallel dimensions
+  dp_replicate_size: 1
+  tp_size: 1  # Tensor parallelism size
+  cp_size: 1  # Context parallelism size
+  pp_size: 1  # Pipeline parallelism size
+  cpu_offload: false
+  activation_checkpointing: true
+  use_hf_tp_plan: false
+
+# Flow matching configuration - Flux specific
+flow_matching:
+  adapter_type: "flux"  # Use FluxAdapter
+  adapter_kwargs:
+    guidance_scale: 3.5
+    use_guidance_embeds: true
+  timestep_sampling: "logit_normal"  # Options: "uniform", "logit_normal", "lognorm", "mix", "mode"
+  logit_mean: 0.0
+  logit_std: 1.0
+  flow_shift: 3.0  # Flow shift for training
+  mix_uniform_ratio: 0.1  # For "mix" timestep sampling
+  sigma_min: 0.0
+  sigma_max: 1.0
+  num_train_timesteps: 1000
+  i2v_prob: 0.0  # Flux is image-only, no image-to-video
+  use_loss_weighting: true
+  log_interval: 100  # Steps between detailed logs
+  summary_log_interval: 10  # Steps between summary logs
+
+# Training step scheduler configuration
+step_scheduler:
+  num_epochs: 100
+  local_batch_size: 1  # Batch size per GPU
+  global_batch_size: 8  # Effective batch size across all GPUs (with gradient accumulation)
+  ckpt_every_steps: 500  # Save checkpoint every N steps
+  log_every: 10  # Log metrics every N steps
+
+# Data configuration - using multiresolution dataloader for Flux
+data:
+  dataloader:
+    _target_: dfm.src.automodel.datasets.multiresolutionDataloader.build_flux_multiresolution_dataloader
+    data_root: /path/to/your/image/dataset  # Directory with images and metadata
+    latent_dir: /path/to/precomputed/latents  # Pre-encoded VAE latents
+    text_encoding_dir: /path/to/precomputed/text_embeddings  # Pre-encoded text embeddings
+    caption_key: "caption"  # Key in metadata JSON for captions
+    max_pixels: 262144  # 512x512 max resolution
+    quantization: 64  # Resolution quantization for Flux VAE
+    num_workers: 4
+    base_resolution: [512, 512]
+    dynamic_batch_size: false
+    shuffle: true
+    drop_last: true
+
+# Checkpoint configuration
+checkpoint:
+  enabled: true
+  checkpoint_dir: /path/to/flux_finetune_outputs/
+  model_save_format: torch_save
+  save_consolidated: false
+  restore_from: null  # Path to checkpoint to resume from
+
+# Logging with Weights & Biases
+wandb:
+  project: flux-training
+  mode: online  # Options: online, offline, disabled
+  name: flux_finetune_run
+
+# Distributed environment configuration
+dist_env:
+  backend: "nccl"
+  init_method: "env://"
+
+# Random seed for reproducibility
+seed: 42

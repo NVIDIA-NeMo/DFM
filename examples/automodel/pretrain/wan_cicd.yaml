@@ -1,0 +1,69 @@
+seed: 42
+
+wandb:
+  project: wan-t2v-flow-matching-pretrain
+  mode: online
+  name: OpenVID_RUN_DDP_Flash3
+
+dist_env:
+  backend: nccl
+  timeout_minutes: 30
+
+model:
+  pretrained_model_name_or_path: Wan-AI/Wan2.1-T2V-1.3B-Diffusers
+  mode: pretrain
+  attention_backend: _flash_3_hub
+
+step_scheduler:
+  global_batch_size: 80      # Match Megatron: train.global_batch_size=80
+  local_batch_size: 1        # Match Megatron: train.micro_batch_size=1
+  ckpt_every_steps: 1000     # Match Megatron: checkpoint.save_interval=1000
+  num_epochs: 100             # ~100k iters with 120k samples and gbs=80
+  log_every: 1               # Match Megatron: logger.log_interval=1
+
+data:
+  dataloader:
+    _target_: dfm.src.automodel.datasets.build_dataloader
+    meta_folder: /lustre/fsw/portfolios/coreai/users/pthombre/Automodel/H21/DFM/Wan_text_to_image/
+    num_workers: 10          # Match Megatron: dataset.num_workers=10
+    device: cpu
+
+optim:
+  learning_rate: 5e-5        # Match Megatron: optimizer.lr=5e-5
+  clip_grad: 2.0             # Match Megatron: optimizer.clip_grad=2.0
+  optimizer:
+    weight_decay: 0.1        # Match Megatron: optimizer.weight_decay=0.1
+    betas: [0.9, 0.95]       # Match Megatron: optimizer.adam_beta2=0.95
+
+# LR Scheduler configuration (new)
+scheduler:
+  lr_decay_style: constant   # Match Megatron: scheduler.lr_decay_style=constant
+  warmup_steps: 1000         # Match Megatron: scheduler.lr_warmup_iters=1000
+  eta_min: 5e-5              # Match Megatron: optimizer.min_lr=5e-5
+
+flow_matching:
+  adapter_type: "simple"     # Options: "hunyuan", "simple"
+  adapter_kwargs: {}
+  use_sigma_noise: true
+  timestep_sampling: logit_normal  # Match Megatron pretrain mode
+  logit_mean: 0.0
+  logit_std: 1.5             # Match Megatron: logit_std=1.5
+  flow_shift: 2.5            # Match Megatron: flow_shift=2.5
+  mix_uniform_ratio: 0.2     # Match Megatron: mix_uniform_ratio=0.2
+  sigma_min: 0.0             # PRETRAIN: No clamping, full range
+  sigma_max: 1.0             # PRETRAIN: No clamping, full range
+
+fsdp:
+  # use_ddp: true           # Use pure DDP instead of FSDP2 sharding
+  tp_size: 1
+  cp_size: 1
+  pp_size: 1
+  dp_replicate_size: 10   # All 80 GPUs are replicas (no sharding)
+  dp_size: 80
+
+checkpoint:
+  enabled: true
+  checkpoint_dir: /opt/DFM/ovenVIDRun_DDP/
+  model_save_format: torch_save
+  save_consolidated: false
+  restore_from: null

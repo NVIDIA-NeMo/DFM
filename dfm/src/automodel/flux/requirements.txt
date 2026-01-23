@@ -1,0 +1,44 @@
+# FLUX Fine-tuning Requirements
+# Python 3.10+
+# CUDA 11.8
+
+# ==================== Core Deep Learning ====================
+# PyTorch (CUDA 11.8)
+# torch==2.6.0
+# torchvision==0.21.0
+# torchaudio==2.6.0
+triton==3.2.0
+
+# ==================== Diffusion Models ====================
+diffusers==0.35.2
+transformers==4.57.1
+accelerate==1.11.0
+peft==0.18.0
+
+# ==================== Image Processing ====================
+pillow==11.0.0
+opencv-python==4.12.0.88
+
+# ==================== Model & Data ====================
+huggingface-hub==0.36.0
+safetensors==0.7.0
+tokenizers==0.22.1
+sentencepiece==0.2.1
+
+# ==================== Utilities ====================
+numpy==2.2.6
+tqdm==4.67.1
+pyyaml==6.0.3
+omegaconf==2.3.0
+fsspec==2024.6.1
+
+# ==================== Monitoring (Optional) ====================
+tensorboard==2.19.0
+wandb==0.23.0  # Uncomment if you want to use Weights & Biases
+
+# ==================== Installation Notes ====================
+# For CUDA 11.8, install PyTorch first:
+# pip install torch==2.6.0 torchvision==0.21.0 torchaudio==2.6.0 --index-url https://download.pytorch.org/whl/cu118
+#
+# Then install other dependencies:
+# pip install -r requirements.txt
