@@ -40,8 +40,8 @@ def collate_fn_flux(batch: List[Dict]) -> Dict:
 
     Transforms:
     - latent [B, C, H, W] -> video_latents [B, C, 1, H, W]
-    - t5_hidden -> text_embeddings
-    - clip_pooled -> pooled_prompt_embeds
+    - prompt_embeds -> text_embeddings
+    - pooled_prompt_embeds -> pooled_prompt_embeds
     - Adds data_type: "image"
 
     Args:
@@ -73,10 +73,10 @@ def collate_fn_flux(batch: List[Dict]) -> Dict:
     }
 
     # Handle text embeddings (pre-encoded vs tokenized)
-    if "t5_hidden" in production_batch:
+    if "prompt_embeds" in production_batch:
         # Pre-encoded text embeddings
-        flux_batch["text_embeddings"] = production_batch["t5_hidden"]
-        flux_batch["pooled_prompt_embeds"] = production_batch["clip_pooled"]
+        flux_batch["text_embeddings"] = production_batch["prompt_embeds"]
+        flux_batch["pooled_prompt_embeds"] = production_batch["pooled_prompt_embeds"]
         # Also include CLIP hidden for models that need it
         if "clip_hidden" in production_batch:
             flux_batch["clip_hidden"] = production_batch["clip_hidden"]

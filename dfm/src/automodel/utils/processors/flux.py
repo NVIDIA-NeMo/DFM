@@ -106,11 +106,11 @@ class FluxProcessor(BaseModelProcessor):
             Latent tensor (C, H//8, W//8), FP16
         """
         vae = models['vae']
-        image_tensor = image_tensor.to(device)
+        image_tensor = image_tensor.to(device, dtype=torch.bfloat16)
         
         device_type = 'cuda' if 'cuda' in device else 'cpu'
         
-        with torch.no_grad(), autocast(device_type=device_type, dtype=torch.float32):
+        with torch.no_grad():
             latent = vae.encode(image_tensor).latent_dist.sample()
             
         
@@ -118,7 +118,8 @@ class FluxProcessor(BaseModelProcessor):
         latent = (latent - vae.config.shift_factor) * vae.config.scaling_factor
         
         # Return as FP16 to save space, remove batch dimension
-        return latent.cpu().to(torch.float16).squeeze(0)
+        # Use detach() to ensure tensor can be serialized across process boundaries
+        return latent.detach().cpu().to(torch.float16).squeeze(0)
     
     def encode_text(
         self,
@@ -138,9 +139,9 @@ class FluxProcessor(BaseModelProcessor):
             Dict containing:
                 - clip_tokens: Token IDs
                 - clip_hidden: Hidden states from CLIP
-                - clip_pooled: Pooled CLIP output
+                - pooled_prompt_embeds: Pooled CLIP output
                 - t5_tokens: T5 token IDs
-                - t5_hidden: T5 hidden states
+                - prompt_embeds: T5 hidden states
         """
         device_type = 'cuda' if 'cuda' in device else 'cpu'
         
@@ -152,33 +153,28 @@ class FluxProcessor(BaseModelProcessor):
             truncation=True,
             return_tensors="pt",
         )
-        clip_tokens = {k: v.to(device) for k, v in clip_tokens.items()}
         
-        with torch.no_grad(), autocast(device_type=device_type, dtype=torch.bfloat16):
-            clip_output = models['clip_encoder'](**clip_tokens, output_hidden_states=True)
-            clip_hidden = clip_output.hidden_states[-2]
-            clip_pooled = clip_output.pooler_output
+        clip_output = models['clip_encoder'](clip_tokens.input_ids.to(device_type), output_hidden_states=True)
+        clip_hidden = clip_output.hidden_states[-2]
+        pooled_prompt_embeds = clip_output.pooler_output
         
         # T5 encoding
         t5_tokens = models['t5_tokenizer'](
             prompt,
             padding="max_length",
-            max_length=512,
+            max_length=models['t5_tokenizer'].model_max_length,
             truncation=True,
             return_tensors="pt",
         )
-        t5_tokens = {k: v.to(device) for k, v in t5_tokens.items()}
-        
-        with torch.no_grad(), autocast(device_type=device_type, dtype=torch.bfloat16):
-            t5_output = models['t5_encoder'](**t5_tokens)
-            t5_hidden = t5_output.last_hidden_state
+        t5_output = models['t5_encoder'](t5_tokens.input_ids.to(device_type), output_hidden_states=False)
+        prompt_embeds = t5_output.last_hidden_state
         
         return {
             "clip_tokens": clip_tokens["input_ids"].cpu(),
-            "clip_hidden": clip_hidden.cpu().to(torch.float16),
-            "clip_pooled": clip_pooled.cpu().to(torch.float16),
+            "clip_hidden": clip_hidden.detach().cpu(),
+            "pooled_prompt_embeds": pooled_prompt_embeds.detach().cpu(),
             "t5_tokens": t5_tokens["input_ids"].cpu(),
-            "t5_hidden": t5_hidden.cpu().to(torch.float16),
+            "prompt_embeds": prompt_embeds.detach().cpu(),
         }
     
     def verify_latent(
@@ -249,11 +245,11 @@ class FluxProcessor(BaseModelProcessor):
             # CLIP embeddings
             "clip_tokens": text_encodings["clip_tokens"],
             "clip_hidden": text_encodings["clip_hidden"],
-            "clip_pooled": text_encodings["clip_pooled"],
+            "pooled_prompt_embeds": text_encodings["pooled_prompt_embeds"],
             
             # T5 embeddings
             "t5_tokens": text_encodings["t5_tokens"],
-            "t5_hidden": text_encodings["t5_hidden"],
+            "prompt_embeds": text_encodings["prompt_embeds"],
             
             # Metadata
             "original_resolution": metadata["original_resolution"],

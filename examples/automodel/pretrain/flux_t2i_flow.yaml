@@ -67,7 +67,7 @@ step_scheduler:
 data:
   dataloader:
     _target_: dfm.src.automodel.datasets.multiresolutionDataloader.build_flux_multiresolution_dataloader
-    cache_dir: /lustre/fsw/portfolios/coreai/users/pthombre/Automodel/CICDNEW/DFM/FluxData8Examples
+    cache_dir: /lustre/fsw/portfolios/coreai/users/pthombre/Automodel/CICDNEW/DFM/FluxData8ExamplesNEW
     train_text_encoder: false
     num_workers: 2
     base_resolution: [512, 512]  # Match the 512p resolution preset used in preprocessing
@@ -78,7 +78,7 @@ data:
 # Checkpoint configuration
 checkpoint:
   enabled: true
-  checkpoint_dir: /lustre/fsw/portfolios/coreai/users/pthombre/Automodel/CICDNEW/DFM/flux_pretrain_outputs_8_example/
+  checkpoint_dir: /lustre/fsw/portfolios/coreai/users/pthombre/Automodel/CICDNEW/DFM/flux_pretrain_outputs_memorization/
   model_save_format: torch_save
   save_consolidated: false
   restore_from: null
