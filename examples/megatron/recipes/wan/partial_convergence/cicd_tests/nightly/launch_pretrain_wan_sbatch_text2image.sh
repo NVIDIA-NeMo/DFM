@@ -9,7 +9,6 @@
 
 EXP_NAME=${EXP_NAME:-sbatch_wan_1.3B_pretrain_text2image_cicd_3000vids_example}
 CHECKPOINT_DIR=${CHECKPOINT_BASE_DIR}/${EXP_NAME}
-CHECKPOINT_DIR=/lustre/fsw/coreai_dlalgo_genai/huvu/data/nemo_vfm/results/wan_finetune/${EXP_NAME}
 PROJECT=wan
 MBS=1
 GBS=8
