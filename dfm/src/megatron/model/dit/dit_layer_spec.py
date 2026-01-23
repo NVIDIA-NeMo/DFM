@@ -184,6 +184,7 @@ class DiTLayerWithAdaLN(TransformerLayer):
         sequence_len_offset=None,
         inference_context=None,
         rotary_pos_cos_sin=None,
+        **kwargs,
     ):
         timestep_emb = attention_mask
 

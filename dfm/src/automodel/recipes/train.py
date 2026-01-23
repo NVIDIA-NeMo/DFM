@@ -382,7 +382,7 @@ class TrainDiffusionRecipe(BaseRecipe):
                 micro_losses = []
                 for micro_batch in batch_group:
                     try:
-                        loss, metrics = self.flow_matching_pipeline.step(
+                        _, loss, _, metrics = self.flow_matching_pipeline.step(
                             model=self.model,
                             batch=micro_batch,
                             device=self.device,
