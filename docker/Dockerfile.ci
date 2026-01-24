@@ -63,4 +63,7 @@ RUN --mount=type=cache,target=/var/cache/apt,sharing=locked \
 FROM base AS release
 
 COPY . .
-RUN uv sync --link-mode copy --locked --all-extras --all-groups
+
+# Fix torchrun shebang to use venv python
+RUN sed -i '1s|#!/usr/bin/python|#!/usr/bin/env python|' /usr/local/bin/torchrun && \
+    uv sync --link-mode copy --locked --all-extras --all-groups
