@@ -11,7 +11,7 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
-FROM nvcr.io/nvidia/pytorch:25.09-py3
+FROM nvcr.io/nvidia/pytorch:25.09-py3 AS base
 
 WORKDIR /opt/DFM
 
@@ -60,4 +60,7 @@ RUN --mount=type=cache,target=/var/cache/apt,sharing=locked \
     uv sync --link-mode copy --locked --all-extras --all-groups --no-install-project && \
     uv cache prune
 
+FROM base AS release
+
 COPY . .
+RUN uv sync --link-mode copy --locked --all-extras --all-groups
