@@ -83,7 +83,7 @@ ERRFILE=$CHECKPOINT_DIR/error-%j.out
 export CUDA_DEVICE_MAX_CONNECTIONS=1
 
 echo "Running training script."
-srun -o ${OUTFILE} -e ${ERRFILE} --mpi=pmix \
+srun --mpi=pmix \
     --container-image="${CONTAINER_IMAGE}" --container-mounts="${MOUNT}" \
     --no-container-mount-home \
     --ntasks-per-node=1 \

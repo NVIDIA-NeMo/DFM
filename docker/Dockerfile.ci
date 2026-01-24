@@ -31,11 +31,14 @@ RUN uv venv ${UV_PROJECT_ENVIRONMENT} --system-site-packages
 
 # Copy dependency files and source code (needed for dynamic version resolution)
 COPY pyproject.toml uv.lock ./
-COPY dfm ./dfm
+COPY dfm/__init__.py ./dfm/
+COPY dfm/package_info.py ./dfm/
 
 # Copy 3rdparty dependencies with minimal files for metadata resolution
 # Copy Automodel
-COPY 3rdparty/Automodel ./3rdparty/Automodel
+COPY 3rdparty/Automodel/pyproject.toml ./3rdparty/Automodel/
+COPY 3rdparty/Automodel/nemo_automodel/__init__.py ./3rdparty/Automodel/nemo_automodel/
+COPY 3rdparty/Automodel/nemo_automodel/package_info.py ./3rdparty/Automodel/nemo_automodel/
 
 # Copy minimal Megatron-Bridge files for metadata (prevents full source build)
 COPY 3rdparty/Megatron-Bridge/pyproject.toml ./3rdparty/Megatron-Bridge/
@@ -56,3 +59,5 @@ RUN --mount=type=cache,target=/var/cache/apt,sharing=locked \
     uv sync --locked --only-group build && \
     uv sync --link-mode copy --locked --all-extras --all-groups --no-install-project && \
     uv cache prune
+
+COPY . .
