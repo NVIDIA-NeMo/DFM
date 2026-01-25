@@ -117,6 +117,7 @@ echo \"All nodes ready. Starting training...\"
 # Set environment variables for distributed training
 export MASTER_ADDR=${MASTER_ADDR}
 export MASTER_PORT=${MASTER_PORT}
+export RDZV_PORT=${RDZV_PORT}
 export CHECKPOINT_DIR=${CHECKPOINT_DIR}
 export CHECKPOINT_BASE_DIR=${CHECKPOINT_BASE_DIR}
 export DATASET_BASE_DIR=${DATASET_BASE_DIR}
