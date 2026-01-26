@@ -4,9 +4,8 @@
 NUM_NODES=1
 TIME=00:30:00
 
-
-EXP_NAME=sbatch_wan_1.3B_pretrain_text2video_cicd_3000vids_example
-CHECKPOINT_DIR=/lustre/fsw/coreai_dlalgo_genai/huvu/data/nemo_vfm/results/wan_finetune/${EXP_NAME}
+# Training parameters
+EXP_NAME=sbatch_wan_1.3B_pretrain_text2video_cicd_3000vids_nightly_example
 PROJECT=wan
 MBS=1
 GBS=2
@@ -30,7 +29,7 @@ NVTE_FUSED_ATTN=1 MASTER_ADDR=${MASTER_ADDR} MASTER_PORT=${MASTER_PORT} torchrun
   model.context_parallel_size=4 \
   model.sequence_parallel=false \
   model.qkv_format=thd \
-  dataset.path="${DATASET_BASE_DIR}/OpenVid-1M/OpenVidHD/OpenVidHD_part_1_3000vids_text2image_wds" \
+  dataset.path="${DATASET_BASE_DIR}/OpenVid-1M/OpenVidHD/OpenVidHD_part_1_3000vids_text2video_wds" \
   dataset.packing_buffer_size=50 \
   dataset.num_workers=10 \
   checkpoint.save=${CHECKPOINT_DIR} \
