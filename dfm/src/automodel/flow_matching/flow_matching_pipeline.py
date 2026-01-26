@@ -364,17 +364,17 @@ class FlowMatchingPipeline:
         # ====================================================================
         # Logging
         # ====================================================================
-        if detailed_log or debug_mode:
-            self._log_detailed(
-                global_step, sampling_method, batch_size, sigma, timesteps, latents, noise, noisy_latents
-            )
-        elif summary_log:
-            logger.info(
-                f"[STEP {global_step}] σ=[{sigma.min():.3f},{sigma.max():.3f}] | "
-                f"t=[{timesteps.min():.1f},{timesteps.max():.1f}] | "
-                f"noisy=[{noisy_latents.min():.1f},{noisy_latents.max():.1f}] | "
-                f"{sampling_method}"
-            )
+        # if detailed_log or debug_mode:
+        #     self._log_detailed(
+        #         global_step, sampling_method, batch_size, sigma, timesteps, latents, noise, noisy_latents
+        #     )
+        # elif summary_log:
+        #     logger.info(
+        #         f"[STEP {global_step}] σ=[{sigma.min():.3f},{sigma.max():.3f}] | "
+        #         f"t=[{timesteps.min():.1f},{timesteps.max():.1f}] | "
+        #         f"noisy=[{noisy_latents.min():.1f},{noisy_latents.max():.1f}] | "
+        #         f"{sampling_method}"
+        #     )
 
         # Convert to target dtype
         noisy_latents = noisy_latents.to(dtype)
@@ -414,14 +414,14 @@ class FlowMatchingPipeline:
             logger.error(f"[ERROR] Loss explosion! Loss={weighted_loss.item():.3f}")
             raise ValueError(f"Loss exploded: {weighted_loss.item()}")
 
-        # Logging
-        if detailed_log or debug_mode:
-            self._log_loss_detailed(global_step, model_pred, target, loss_weight, unweighted_loss, weighted_loss)
-        elif summary_log:
-            logger.info(
-                f"[STEP {global_step}] Loss: {weighted_loss.item():.6f} | "
-                f"w=[{loss_weight.min():.2f},{loss_weight.max():.2f}]"
-            )
+        # # Logging
+        # if detailed_log or debug_mode:
+        #     self._log_loss_detailed(global_step, model_pred, target, loss_weight, unweighted_loss, weighted_loss)
+        # elif summary_log:
+        #     logger.info(
+        #         f"[STEP {global_step}] Loss: {weighted_loss.item():.6f} | "
+        #         f"w=[{loss_weight.min():.2f},{loss_weight.max():.2f}]"
+        #     )
 
         # Collect metrics
         metrics = {

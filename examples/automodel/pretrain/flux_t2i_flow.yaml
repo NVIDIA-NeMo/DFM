@@ -16,9 +16,17 @@ model:
   cache_dir: null
   attention_backend: null
 
+  # Pipeline spec - required for pretraining (from_config)
+  # Specifies which transformer class to use from diffusers
+  pipeline_spec:
+    transformer_cls: "FluxTransformer2DModel"
+    subfolder: "transformer"
+    load_full_pipeline: false  
+    enable_gradient_checkpointing: false
+
 # Optimizer configuration
 optim:
-  learning_rate: 1e-4
+  learning_rate: 1e-5
 
   optimizer:
     weight_decay: 0.01
@@ -59,18 +67,18 @@ flow_matching:
 step_scheduler:
   num_epochs: 5000  # Pretraining typically requires many more epochs
   local_batch_size: 1
-  global_batch_size: 8
+  global_batch_size: 64
   ckpt_every_steps: 2000  # Save less frequently during pretraining
-  log_every: 10
+  log_every: 1  # Log every global step to see progress in wandb
 
 # Data configuration - using multiresolution dataloader for Flux
 data:
   dataloader:
     _target_: dfm.src.automodel.datasets.multiresolutionDataloader.build_flux_multiresolution_dataloader
-    cache_dir: /lustre/fsw/portfolios/coreai/users/pthombre/Automodel/CICDNEW/DFM/FluxData8ExamplesNEW
+    cache_dir: /lustre/fsw/portfolios/coreai/users/pthombre/Automodel/CICDNEW/DFM/FluxDataFull/
     train_text_encoder: false
-    num_workers: 2
-    base_resolution: [512, 512]  # Match the 512p resolution preset used in preprocessing
+    num_workers: 10
+    base_resolution: [256, 256]  # Match the 512p resolution preset used in preprocessing
     dynamic_batch_size: false
     shuffle: true
     drop_last: false
@@ -78,7 +86,7 @@ data:
 # Checkpoint configuration
 checkpoint:
   enabled: true
-  checkpoint_dir: /lustre/fsw/portfolios/coreai/users/pthombre/Automodel/CICDNEW/DFM/flux_pretrain_outputs_memorization/
+  checkpoint_dir: /lustre/fsw/portfolios/coreai/users/pthombre/Automodel/CICDNEW/DFM/flux_pretrain_outputs_full/
   model_save_format: torch_save
   save_consolidated: false
   restore_from: null
@@ -87,7 +95,7 @@ checkpoint:
 wandb:
   project: flux-pretraining
   mode: online
-  name: flux_pretrain_run_8_example
+  name: flux_pretrain_run_2
 
 # Distributed environment
 dist_env:

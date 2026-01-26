@@ -266,12 +266,15 @@ def main():
     # Load the full FLUX pipeline (includes text encoders, VAE, scheduler, and transformer)
     step_num = 1 if use_original else 2
     print(f"\n[{step_num}] Loading FLUX pipeline from: {args.model_id}")
+    print("[INFO] Loading with low_cpu_mem_usage=True to reduce memory footprint...")
     pipe = FluxPipeline.from_pretrained(
         args.model_id,
         torch_dtype=torch_dtype,
+        low_cpu_mem_usage=True,
     )
     
     # Load checkpoint into transformer (only if not using original)
+    # Must be done BEFORE enabling CPU offload for sharded checkpoints
     if not use_original:
         print(f"\n[3] Loading trained transformer weights...")
         
@@ -289,9 +292,10 @@ def main():
     else:
         print("[INFO] Using original FLUX model weights (no checkpoint loaded)")
     
-    # Move entire pipeline to device
-    pipe.transformer = pipe.transformer.to(device, dtype=torch_dtype)
-    pipe = pipe.to(device)
+    # Enable model CPU offloading to reduce GPU memory usage during inference
+    # This moves components to GPU only when needed
+    print("[INFO] Enabling model CPU offload for memory-efficient inference...")
+    pipe.enable_model_cpu_offload()
     
     # Set up output directory
     output_dir = Path(args.output_dir)
@@ -308,7 +312,8 @@ def main():
     print(f"  - Seed: {args.seed}")
     
     # Set random seed for reproducibility
-    generator = torch.Generator(device=device).manual_seed(args.seed)
+    # Use CPU generator when using model offloading for compatibility
+    generator = torch.Generator(device="cpu").manual_seed(args.seed)
     
     with torch.no_grad():
         output = pipe(

@@ -32,8 +32,7 @@ from nemo_automodel.recipes.llm.train_ft import build_distributed, build_wandb
 from torch.distributed.fsdp import MixedPrecisionPolicy
 from transformers.utils.hub import TRANSFORMERS_CACHE
 
-from dfm.src.automodel._diffusers.auto_diffusion_pipeline import NeMoAutoDiffusionPipeline, NeMoWanPipeline
-from dfm.src.automodel._diffusers.flux_pipeline import NeMoFluxPipeline
+from dfm.src.automodel._diffusers.auto_diffusion_pipeline import NeMoAutoDiffusionPipeline
 from dfm.src.automodel.flow_matching.flow_matching_pipeline import FlowMatchingPipeline, create_adapter
 
 
@@ -48,9 +47,29 @@ def build_model_and_optimizer(
     fsdp_cfg: Dict[str, Any] = {},
     attention_backend: Optional[str] = None,
     optimizer_cfg: Optional[Dict[str, Any]] = None,
-) -> tuple[NeMoWanPipeline, dict[str, Dict[str, Any]], torch.optim.Optimizer, Any]:
-    """Build the diffusion model, parallel scheme, and optimizer."""
+    pipeline_spec: Optional[Dict[str, Any]] = None,
+) -> tuple[Any, torch.optim.Optimizer, Any]:
+    """
+    Build the diffusion model, parallel scheme, and optimizer.
 
+    Args:
+        model_id: HuggingFace model ID or local path
+        finetune_mode: If True, loads pretrained weights (finetuning).
+                       If False, initializes with random weights (pretraining).
+        learning_rate: Learning rate for optimizer
+        device: Device to load model to
+        dtype: Data type for model parameters
+        cpu_offload: Whether to enable CPU offloading
+        fsdp_cfg: FSDP configuration dict
+        attention_backend: Optional attention backend to set
+        optimizer_cfg: Optimizer configuration dict
+        pipeline_spec: Required for pretraining (finetune_mode=False).
+                       Dict with transformer_cls, subfolder, etc.
+                       Not needed for finetuning.
+
+    Returns:
+        Tuple of (pipeline, optimizer, device_mesh)
+    """
     logging.info("[INFO] Building NeMoAutoDiffusionPipeline with transformer parallel scheme...")
 
     if not dist.is_initialized():
@@ -81,31 +100,36 @@ def build_model_and_optimizer(
 
     parallel_scheme = {"transformer": manager_args}
 
-    kwargs = {}
     if finetune_mode:
-        kwargs["load_for_training"] = True
-        kwargs["low_cpu_mem_usage"] = True
-
-    # Select appropriate pipeline based on model type
-    model_id_lower = model_id.lower()
-    if "flux" in model_id_lower:
-        logging.info("[INFO] Detected FLUX model, using NeMoFluxPipeline")
-        init_fn = NeMoFluxPipeline.from_pretrained if finetune_mode else NeMoFluxPipeline.from_config
-    elif "wan" in model_id_lower:
-        logging.info("[INFO] Detected WAN model, using NeMoWanPipeline")
-        init_fn = NeMoWanPipeline.from_pretrained if finetune_mode else NeMoWanPipeline.from_config
+        # Finetuning: use from_pretrained with auto-detection (no pipeline_spec needed)
+        logging.info("[INFO] Finetuning mode: using NeMoAutoDiffusionPipeline.from_pretrained")
+        pipe, created_managers = NeMoAutoDiffusionPipeline.from_pretrained(
+            model_id,
+            torch_dtype=dtype,
+            device=device,
+            parallel_scheme=parallel_scheme,
+            components_to_load=["transformer"],
+            load_for_training=True,
+        )
     else:
-        logging.info("[INFO] Using NeMoAutoDiffusionPipeline")
-        init_fn = NeMoAutoDiffusionPipeline.from_pretrained
-
-    pipe, created_managers = init_fn(
-        model_id,
-        torch_dtype=dtype,
-        device=device,
-        parallel_scheme=parallel_scheme,
-        components_to_load=["transformer"],
-        **kwargs,
-    )
+        # Pretraining: use from_config with YAML-specified transformer class
+        if pipeline_spec is None:
+            raise ValueError(
+                "pipeline_spec is required for pretraining (finetune_mode=False). "
+                "Add to your YAML config:\n"
+                "  pipeline_spec:\n"
+                "    transformer_cls: 'FluxTransformer2DModel'  # or WanTransformer3DModel, etc.\n"
+                "    subfolder: 'transformer'"
+            )
+        logging.info("[INFO] Pretraining mode: using NeMoAutoDiffusionPipeline.from_config")
+        pipe, created_managers = NeMoAutoDiffusionPipeline.from_config(
+            model_id,
+            pipeline_spec=pipeline_spec,
+            torch_dtype=dtype,
+            device=device,
+            parallel_scheme=parallel_scheme,
+            components_to_load=["transformer"],
+        )
     fsdp2_manager = created_managers["transformer"]
     transformer_module = pipe.transformer
     if attention_backend is not None:
@@ -234,9 +258,19 @@ class TrainDiffusionRecipe(BaseRecipe):
         logging.info(f"[INFO]   - Mix uniform ratio: {self.mix_uniform_ratio}")
         logging.info(f"[INFO]   - Use loss weighting: {self.use_loss_weighting}")
 
+        # Get pipeline_spec from config (required for pretraining, not needed for finetuning)
+        finetune_mode = self.cfg.get("model.mode", "finetune").lower() == "finetune"
+        pipeline_spec = None
+        if not finetune_mode:
+            # For pretraining, pipeline_spec is required
+            pipeline_spec_cfg = self.cfg.get("model.pipeline_spec", None)
+            if pipeline_spec_cfg is not None:
+                # Convert config node to dict if needed
+                pipeline_spec = pipeline_spec_cfg.to_dict() if hasattr(pipeline_spec_cfg, "to_dict") else dict(pipeline_spec_cfg)
+
         (self.pipe, self.optimizer, self.device_mesh) = build_model_and_optimizer(
             model_id=self.model_id,
-            finetune_mode=self.cfg.get("model.mode", "finetune").lower() == "finetune",
+            finetune_mode=finetune_mode,
             learning_rate=self.learning_rate,
             device=self.device,
             dtype=self.bf16,
@@ -244,6 +278,7 @@ class TrainDiffusionRecipe(BaseRecipe):
             fsdp_cfg=fsdp_cfg,
             optimizer_cfg=self.cfg.get("optim.optimizer", {}),
             attention_backend=self.attention_backend,
+            pipeline_spec=pipeline_spec,
         )
 
         self.model = self.pipe.transformer

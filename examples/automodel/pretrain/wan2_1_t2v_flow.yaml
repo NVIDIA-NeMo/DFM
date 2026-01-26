@@ -13,6 +13,15 @@ model:
   pretrained_model_name_or_path: Wan-AI/Wan2.1-T2V-1.3B-Diffusers
   mode: pretrain
 
+  # Pipeline spec - required for pretraining (from_config)
+  # Specifies which transformer class to use from diffusers
+  pipeline_spec:
+    transformer_cls: "WanTransformer3DModel"
+    pipeline_cls: "WanPipeline"
+    subfolder: "transformer"
+    load_full_pipeline: false  
+    enable_gradient_checkpointing: true
+
 step_scheduler:
   global_batch_size: 8
   local_batch_size: 1
