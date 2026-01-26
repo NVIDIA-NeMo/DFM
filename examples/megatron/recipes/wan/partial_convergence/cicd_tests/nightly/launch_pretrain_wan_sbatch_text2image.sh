@@ -2,7 +2,7 @@
 
 # Slurm parameters (parsed by run_example.sh)
 NUM_NODES=1
-TIME=01:00:00
+TIME=00:30:00
 
 # Training parameters
 EXP_NAME=sbatch_wan_1.3B_pretrain_text2image_cicd_3000vids_example
@@ -11,8 +11,8 @@ MBS=1
 GBS=8
 LR=5e-5
 WARMUP_ITERS=1000
-# set this PRETRAIN_CHECKPOINT_DIR to CHECKPOINT_DIR to train from scratch
 CHECKPOINT_DIR=${CHECKPOINT_BASE_DIR}/${EXP_NAME}
+# set this PRETRAIN_CHECKPOINT_DIR to CHECKPOINT_DIR to train from scratch
 PRETRAIN_CHECKPOINT_DIR=${CHECKPOINT_DIR}
 
 NVTE_FUSED_ATTN=1 torchrun \
