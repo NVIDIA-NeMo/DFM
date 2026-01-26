@@ -98,9 +98,11 @@ def build_model_and_optimizer(
         fsdp_cfg = fsdp_cfg or {}
         logging.info("[INFO] Using FSDP2 (Fully Sharded Data Parallel) for training")
 
-        if fsdp_cfg.get("dp_size", None) is None:
+        dp_size = fsdp_cfg.get("dp_size", None)
+
+        if dp_size is None:
             denom = max(1, fsdp_cfg.get("tp_size", 1) * fsdp_cfg.get("cp_size", 1) * fsdp_cfg.get("pp_size", 1))
-            fsdp_cfg["dp_size"] = max(1, world_size // denom)
+            dp_size = max(1, world_size // denom)
 
         manager_args: Dict[str, Any] = {
             "_manager_type": "fsdp2",

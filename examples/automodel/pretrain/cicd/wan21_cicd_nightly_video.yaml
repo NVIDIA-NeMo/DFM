@@ -1,9 +1,9 @@
 seed: 42
 
 wandb:
-  project: wan-t2v-flow-matching-pretrain
+  project: wan-t2v-cicd-nightly-pretrain
   mode: online
-  name: OpenVID_RUN_DDP_VERIFY
+  name: WAN21_OpenVID_Video
 
 dist_env:
   backend: nccl
@@ -14,16 +14,16 @@ model:
   mode: pretrain
 
 step_scheduler:
-  global_batch_size: 2560
+  global_batch_size: 8
   local_batch_size: 1
-  ckpt_every_steps: 1000
-  num_epochs: 100
+  ckpt_every_steps: 50
+  num_epochs: 8
   log_every: 1
 
 data:
   dataloader:
     _target_: dfm.src.automodel.datasets.build_dataloader
-    meta_folder: /lustre/fsw/portfolios/coreai/users/pthombre/Automodel/H21/DFM/Wan_text_to_image/
+    meta_folder: /lustre/fsw/portfolios/coreai/users/linnanw/CICD/Wan21/nightly/video
     num_workers: 10
     device: cpu
 
@@ -34,9 +34,12 @@ optim:
     weight_decay: 0.1
     betas: [0.9, 0.95]
 
-ddp:
-  activation_checkpointing: true
-  backend: nccl
+fsdp:
+  tp_size: 1
+  cp_size: 1
+  pp_size: 1
+  dp_replicate_size: 1
+  dp_size: none
 
 flow_matching:
   adapter_type: "simple"
@@ -50,10 +53,9 @@ flow_matching:
   sigma_min: 0.0
   sigma_max: 1.0
 
-
 checkpoint:
   enabled: true
-  checkpoint_dir: /opt/DFM/ovenVIDRun_DDP/
+  checkpoint_dir: /opt/DFM/wan21_fsdp_nightly_video/
   model_save_format: torch_save
   save_consolidated: false
-  restore_from: null
+  restore_from: /opt/DFM/wan21_fsdp_nightly_image/LATEST
