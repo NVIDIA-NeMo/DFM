@@ -14,18 +14,6 @@ WARMUP_ITERS=1000
 CHECKPOINT_DIR=${CHECKPOINT_BASE_DIR}/${EXP_NAME}
 PRETRAIN_CHECKPOINT_DIR=/lustre/fsw/coreai_dlalgo_genai/huvu/data/nemo_vfm/results/wan_finetune/sbatch_wan_1.3B_pretrain_text2image_cicd_3000vids_example
 
-# compute rendezvous/master addresses and ports (avoid port collision)
-MASTER_ADDR=$(scontrol show hostnames "$SLURM_JOB_NODELIST" | head -n 1)
-RDZV_PORT=${RDZV_PORT:-29500}
-MASTER_PORT=${MASTER_PORT:-29600}
-
-# create checkpoint directory
-mkdir -p ${CHECKPOINT_DIR}
-# create barrier directory for synchronization
-BARRIER_DIR=${CHECKPOINT_DIR}/setup_barrier
-rm -rf ${BARRIER_DIR}
-mkdir -p ${BARRIER_DIR}
-
 NVTE_FUSED_ATTN=1 MASTER_ADDR=${MASTER_ADDR} MASTER_PORT=${MASTER_PORT} torchrun \
   --nnodes=${SLURM_JOB_NUM_NODES} \
   --nproc_per_node=8 \
