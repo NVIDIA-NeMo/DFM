@@ -15,12 +15,13 @@
 import copy
 import logging
 import os
-from typing import Any, Dict, Iterable, Optional, Tuple
+from typing import Any, Dict, Iterable, Optional, Tuple, Union
 
 import torch
 import torch.nn as nn
 from diffusers import DiffusionPipeline, WanPipeline
 from nemo_automodel.components.distributed import parallelizer
+from nemo_automodel.components.distributed.ddp import DDPManager
 from nemo_automodel.components.distributed.fsdp2 import FSDP2Manager
 from nemo_automodel.shared.utils import dtype_from_str
 
@@ -28,6 +29,9 @@ from dfm.src.automodel.distributed.dfm_parallelizer import HunyuanParallelizatio
 
 
 logger = logging.getLogger(__name__)
+
+# Type alias for parallel managers
+ParallelManager = Union[FSDP2Manager, DDPManager]
 
 
 def _init_parallelizer():
@@ -94,17 +98,52 @@ def _ensure_params_trainable(module: nn.Module, module_name: Optional[str] = Non
     return num_trainable_parameters
 
 
+def _create_parallel_manager(manager_args: Dict[str, Any]) -> ParallelManager:
+    """
+    Factory function to create the appropriate parallel manager based on config.
+
+    The manager type is determined by the '_manager_type' key in manager_args:
+    - 'ddp': Creates a DDPManager for standard Distributed Data Parallel
+    - 'fsdp2' (default): Creates an FSDP2Manager for Fully Sharded Data Parallel
+
+    Args:
+        manager_args: Dictionary of arguments for the manager. Must include '_manager_type'
+                     key to specify which manager to create. The '_manager_type' key is
+                     removed before passing args to the manager constructor.
+
+    Returns:
+        Either an FSDP2Manager or DDPManager instance.
+
+    Raises:
+        ValueError: If an unknown manager type is specified.
+    """
+    # Make a copy to avoid modifying the original dict
+    args = manager_args.copy()
+    manager_type = args.pop("_manager_type", "fsdp2").lower()
+
+    if manager_type == "ddp":
+        logger.info("[Parallel] Creating DDPManager with args: %s", args)
+        return DDPManager(**args)
+    elif manager_type == "fsdp2":
+        logger.info("[Parallel] Creating FSDP2Manager with args: %s", args)
+        return FSDP2Manager(**args)
+    else:
+        raise ValueError(f"Unknown manager type: '{manager_type}'. Expected 'ddp' or 'fsdp2'.")
+
+
 class NeMoAutoDiffusionPipeline(DiffusionPipeline):
     """
-    Drop-in Diffusers pipeline that adds optional FSDP2/TP parallelization during from_pretrained.
+    Drop-in Diffusers pipeline that adds optional FSDP2/DDP parallelization during from_pretrained.
 
     Features:
-    - Accepts a per-component mapping from component name to FSDP2Manager init args
+    - Accepts a per-component mapping from component name to parallel manager init args
     - Moves all nn.Module components to the chosen device/dtype
     - Parallelizes only components present in the mapping by constructing a manager per component
+    - Supports both FSDP2Manager and DDPManager via '_manager_type' key in config
 
     parallel_scheme:
-    - Dict[str, Dict[str, Any]]: component name -> kwargs for FSDP2Manager(...)
+    - Dict[str, Dict[str, Any]]: component name -> kwargs for parallel manager
+    - Each component's kwargs should include '_manager_type': 'fsdp2' or 'ddp' (defaults to 'fsdp2')
     """
 
     @classmethod
@@ -119,7 +158,7 @@ class NeMoAutoDiffusionPipeline(DiffusionPipeline):
         load_for_training: bool = False,
         components_to_load: Optional[Iterable[str]] = None,
         **kwargs,
-    ) -> tuple[DiffusionPipeline, Dict[str, FSDP2Manager]]:
+    ) -> tuple[DiffusionPipeline, Dict[str, ParallelManager]]:
         pipe: DiffusionPipeline = DiffusionPipeline.from_pretrained(
             pretrained_model_name_or_path,
             *model_args,
@@ -143,8 +182,8 @@ class NeMoAutoDiffusionPipeline(DiffusionPipeline):
                     logger.info("[INFO] Ensuring params trainable: %s", name)
                     _ensure_params_trainable(module, module_name=name)
 
-        # Use per-component FSDP2Manager init-args to parallelize components
-        created_managers: Dict[str, FSDP2Manager] = {}
+        # Use per-component manager init-args to parallelize components
+        created_managers: Dict[str, ParallelManager] = {}
         if parallel_scheme is not None:
             assert torch.distributed.is_initialized(), "Expect distributed environment to be initialized"
             _init_parallelizer()
@@ -152,7 +191,7 @@ class NeMoAutoDiffusionPipeline(DiffusionPipeline):
                 manager_args = parallel_scheme.get(comp_name)
                 if manager_args is None:
                     continue
-                manager = FSDP2Manager(**manager_args)
+                manager = _create_parallel_manager(manager_args)
                 created_managers[comp_name] = manager
                 parallel_module = manager.parallelize(comp_module)
                 setattr(pipe, comp_name, parallel_module)
@@ -177,7 +216,7 @@ class NeMoWanPipeline:
         device: Optional[torch.device] = None,
         move_to_device: bool = True,
         components_to_load: Optional[Iterable[str]] = None,
-    ):
+    ) -> tuple[WanPipeline, Dict[str, ParallelManager]]:
         # Load just the config
         from diffusers import WanTransformer3DModel
 
@@ -211,8 +250,8 @@ class NeMoWanPipeline:
                     logger.info("[INFO] Moving module: %s to device/dtype", name)
                     _move_module_to_device(module, dev, torch_dtype)
 
-        # Use per-component FSDP2Manager init-args to parallelize components
-        created_managers: Dict[str, FSDP2Manager] = {}
+        # Use per-component manager init-args to parallelize components
+        created_managers: Dict[str, ParallelManager] = {}
         if parallel_scheme is not None:
             assert torch.distributed.is_initialized(), "Expect distributed environment to be initialized"
             _init_parallelizer()
@@ -220,7 +259,7 @@ class NeMoWanPipeline:
                 manager_args = parallel_scheme.get(comp_name)
                 if manager_args is None:
                     continue
-                manager = FSDP2Manager(**manager_args)
+                manager = _create_parallel_manager(manager_args)
                 created_managers[comp_name] = manager
                 parallel_module = manager.parallelize(comp_module)
                 setattr(pipe, comp_name, parallel_module)
