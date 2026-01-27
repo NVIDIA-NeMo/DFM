@@ -156,7 +156,7 @@ class TextToImageDataset(Dataset):
             output["t5_tokens"] = data["t5_tokens"].squeeze(0)
         else:
             output["clip_hidden"] = data["clip_hidden"].squeeze(0)
-            output["clip_pooled"] = data["clip_pooled"].squeeze(0)
-            output["t5_hidden"] = data["t5_hidden"].squeeze(0)
+            output["pooled_prompt_embeds"] = data["pooled_prompt_embeds"].squeeze(0)
+            output["prompt_embeds"] = data["prompt_embeds"].squeeze(0)
 
         return output

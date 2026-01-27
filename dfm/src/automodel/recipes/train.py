@@ -32,7 +32,7 @@ from nemo_automodel.recipes.llm.train_ft import build_distributed, build_wandb
 from torch.distributed.fsdp import MixedPrecisionPolicy
 from transformers.utils.hub import TRANSFORMERS_CACHE
 
-from dfm.src.automodel._diffusers.auto_diffusion_pipeline import NeMoAutoDiffusionPipeline, NeMoWanPipeline
+from dfm.src.automodel._diffusers.auto_diffusion_pipeline import NeMoAutoDiffusionPipeline
 from dfm.src.automodel.flow_matching.flow_matching_pipeline import FlowMatchingPipeline, create_adapter
 
 
@@ -48,12 +48,13 @@ def build_model_and_optimizer(
     ddp_cfg: Optional[Dict[str, Any]] = None,
     attention_backend: Optional[str] = None,
     optimizer_cfg: Optional[Dict[str, Any]] = None,
-) -> tuple[NeMoWanPipeline, dict[str, Dict[str, Any]], torch.optim.Optimizer, Any]:
+    pipeline_spec: Optional[Dict[str, Any]] = None,
+) -> tuple[NeMoAutoDiffusionPipeline, torch.optim.Optimizer, Any]:
     """Build the diffusion model, parallel scheme, and optimizer.
 
     Args:
         model_id: Pretrained model name or path.
-        finetune_mode: Whether to load for finetuning.
+        finetune_mode: Whether to load for finetuning (True) or pretraining (False).
         learning_rate: Learning rate for optimizer.
         device: Target device.
         dtype: Model dtype.
@@ -62,12 +63,18 @@ def build_model_and_optimizer(
         ddp_cfg: DDP configuration dict. Mutually exclusive with fsdp_cfg.
         attention_backend: Optional attention backend override.
         optimizer_cfg: Optional optimizer configuration.
+        pipeline_spec: Pipeline specification for pretraining (from_config).
+            Required when finetune_mode is False. Should contain:
+            - transformer_cls: str (e.g., "WanTransformer3DModel", "FluxTransformer2DModel")
+            - subfolder: str (e.g., "transformer")
+            - Optional: pipeline_cls, load_full_pipeline, enable_gradient_checkpointing
 
     Returns:
         Tuple of (pipeline, optimizer, device_mesh or None).
 
     Raises:
         ValueError: If both fsdp_cfg and ddp_cfg are provided.
+        ValueError: If finetune_mode is False and pipeline_spec is not provided.
     """
     # Validate mutually exclusive configs
     if fsdp_cfg is not None and ddp_cfg is not None:
@@ -124,23 +131,37 @@ def build_model_and_optimizer(
 
     parallel_scheme = {"transformer": manager_args}
 
-    kwargs = {}
     if finetune_mode:
-        kwargs["load_for_training"] = True
-        kwargs["low_cpu_mem_usage"] = True
-    if "wan" in model_id:
-        init_fn = NeMoWanPipeline.from_pretrained if finetune_mode else NeMoWanPipeline.from_config
+        # Finetuning: load from pretrained weights
+        logging.info("[INFO] Loading pretrained model for finetuning")
+        pipe, created_managers = NeMoAutoDiffusionPipeline.from_pretrained(
+            model_id,
+            torch_dtype=dtype,
+            device=device,
+            parallel_scheme=parallel_scheme,
+            components_to_load=["transformer"],
+            load_for_training=True,
+            low_cpu_mem_usage=True,
+        )
     else:
-        init_fn = NeMoAutoDiffusionPipeline.from_pretrained
-
-    pipe, created_managers = init_fn(
-        model_id,
-        torch_dtype=dtype,
-        device=device,
-        parallel_scheme=parallel_scheme,
-        components_to_load=["transformer"],
-        **kwargs,
-    )
+        # Pretraining: initialize with random weights using pipeline_spec
+        if pipeline_spec is None:
+            raise ValueError(
+                "pipeline_spec is required for pretraining (finetune_mode=False). "
+                "Please provide pipeline_spec in your YAML config with at least:\n"
+                "  pipeline_spec:\n"
+                "    transformer_cls: 'WanTransformer3DModel'  # or 'FluxTransformer2DModel', etc.\n"
+                "    subfolder: 'transformer'"
+            )
+        logging.info("[INFO] Initializing model with random weights for pretraining")
+        pipe, created_managers = NeMoAutoDiffusionPipeline.from_config(
+            model_id,
+            pipeline_spec=pipeline_spec,
+            torch_dtype=dtype,
+            device=device,
+            parallel_scheme=parallel_scheme,
+            components_to_load=["transformer"],
+        )
     fsdp2_manager = created_managers["transformer"]
     transformer_module = pipe.transformer
     if attention_backend is not None:
@@ -278,6 +299,10 @@ class TrainDiffusionRecipe(BaseRecipe):
         logging.info(f"[INFO]   - Mix uniform ratio: {self.mix_uniform_ratio}")
         logging.info(f"[INFO]   - Use loss weighting: {self.use_loss_weighting}")
 
+        # Get pipeline_spec for pretraining mode (required when mode != "finetune")
+        pipeline_spec_cfg = self.cfg.get("model.pipeline_spec", None)
+        pipeline_spec = pipeline_spec_cfg.to_dict() if pipeline_spec_cfg is not None else None
+
         (self.pipe, self.optimizer, self.device_mesh) = build_model_and_optimizer(
             model_id=self.model_id,
             finetune_mode=self.cfg.get("model.mode", "finetune").lower() == "finetune",
@@ -289,6 +314,7 @@ class TrainDiffusionRecipe(BaseRecipe):
             ddp_cfg=ddp_cfg,
             optimizer_cfg=self.cfg.get("optim.optimizer", {}),
             attention_backend=self.attention_backend,
+            pipeline_spec=pipeline_spec,
         )
 
         self.model = self.pipe.transformer
@@ -442,7 +468,7 @@ class TrainDiffusionRecipe(BaseRecipe):
                 micro_losses = []
                 for micro_batch in batch_group:
                     try:
-                        _, loss, _, metrics = self.flow_matching_pipeline.step(
+                        loss, metrics = self.flow_matching_pipeline.step(
                             model=self.model,
                             batch=micro_batch,
                             device=self.device,

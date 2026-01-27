@@ -17,6 +17,10 @@ from .dataloader import (
     build_multiresolution_dataloader,
     collate_fn_production,
 )
+from .flux_collate import (
+    build_flux_multiresolution_dataloader,
+    collate_fn_flux,
+)
 from .multi_tier_bucketing import MultiTierBucketCalculator
 from .text_to_image_dataset import TextToImageDataset
 
@@ -27,4 +31,7 @@ __all__ = [
     "SequentialBucketSampler",
     "build_multiresolution_dataloader",
     "collate_fn_production",
+    # Flux-specific
+    "build_flux_multiresolution_dataloader",
+    "collate_fn_flux",
 ]

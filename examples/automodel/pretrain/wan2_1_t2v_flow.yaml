@@ -11,7 +11,14 @@ dist_env:
 
 model:
   pretrained_model_name_or_path: Wan-AI/Wan2.1-T2V-1.3B-Diffusers
-  mode: pretrain
+  mode: pretrain  # "pretrain" initializes with random weights using pipeline_spec
+  # Pipeline specification for pretraining (required when mode: pretrain)
+  # This tells the unified pipeline which transformer class to instantiate
+  pipeline_spec:
+    transformer_cls: "WanTransformer3DModel"  # Diffusers transformer class name
+    subfolder: "transformer"  # Subfolder in HF repo containing config
+    enable_gradient_checkpointing: false
+    load_full_pipeline: false  # Only load transformer, not VAE/text encoders
 
 step_scheduler:
   global_batch_size: 8
