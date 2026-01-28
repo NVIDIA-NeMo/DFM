@@ -800,12 +800,12 @@ class TestBuildMultiresolutionDataloaderGPU:
             # Check embeddings if present
             if "clip_hidden" in batch:
                 clip_hidden_gpu = batch["clip_hidden"].to(device)
-                clip_pooled_gpu = batch["clip_pooled"].to(device)
-                t5_hidden_gpu = batch["t5_hidden"].to(device)
+                pooled_prompt_embeds_gpu = batch["pooled_prompt_embeds"].to(device)
+                prompt_embeds_gpu = batch["prompt_embeds"].to(device)
 
                 assert clip_hidden_gpu.is_cuda
-                assert clip_pooled_gpu.is_cuda
-                assert t5_hidden_gpu.is_cuda
+                assert pooled_prompt_embeds_gpu.is_cuda
+                assert prompt_embeds_gpu.is_cuda
 
             break
 
