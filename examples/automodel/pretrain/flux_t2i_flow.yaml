@@ -1,30 +1,15 @@
-# FLUX.1 Text-to-Image Pretraining Configuration
-#
-# This configuration file is compatible with TrainDiffusionRecipe class
-# (dfm/src/automodel/recipes/train.py) using FlowMatchingPipeline with FluxAdapter
-#
-# Pretraining initializes model with random weights (no pretrained loading)
-#
-# Launch with:
-#   torchrun --nproc-per-node=8 examples/automodel/pretrain/pretrain.py \
-#     -c examples/automodel/pretrain/flux_t2i_flow.yaml
-
-# Model configuration
 model:
-  pretrained_model_name_or_path: "black-forest-labs/FLUX.1-dev"  # Used for config only
-  mode: "pretrain"  # "pretrain" initializes with random weights
+  pretrained_model_name_or_path: "black-forest-labs/FLUX.1-dev"
+  mode: "pretrain"
   cache_dir: null
   attention_backend: "_flash_3_hub"
 
-  # Pipeline spec - required for pretraining (from_config)
-  # Specifies which transformer class to use from diffusers
   pipeline_spec:
     transformer_cls: "FluxTransformer2DModel"
     subfolder: "transformer"
-    load_full_pipeline: false  
+    load_full_pipeline: false
     enable_gradient_checkpointing: false
 
-# Optimizer configuration
 optim:
   learning_rate: 1e-5
 
@@ -32,17 +17,14 @@ optim:
     weight_decay: 0.01
     betas: [0.9, 0.999]
 
-# FSDP2 (Fully Sharded Data Parallel) configuration
-# Shards model, optimizer, and gradients across GPUs to reduce memory
 fsdp:
-  dp_size: 8  # Data parallel size (number of GPUs)
-  tp_size: 1  # Tensor parallel size
-  cp_size: 1  # Context parallel size
-  pp_size: 1  # Pipeline parallel size
+  dp_size: 8
+  tp_size: 1
+  cp_size: 1
+  pp_size: 1
   activation_checkpointing: false
-  cpu_offload: false  # Enable if still OOM
+  cpu_offload: false
 
-# Flow matching configuration - Flux specific
 flow_matching:
   adapter_type: "flux"
   adapter_kwargs:
@@ -56,32 +38,29 @@ flow_matching:
   sigma_min: 0.0
   sigma_max: 1.0
   num_train_timesteps: 1000
-  i2v_prob: 0.0  # Flux is image-only
+  i2v_prob: 0.0
   use_loss_weighting: true
   log_interval: 100
   summary_log_interval: 10
 
-# Training step scheduler configuration
 step_scheduler:
-  num_epochs: 5000  # Pretraining typically requires many more epochs
+  num_epochs: 5000
   local_batch_size: 1
   global_batch_size: 8
-  ckpt_every_steps: 2000  # Save less frequently during pretraining
-  log_every: 1  # Log every global step to see progress in wandb
+  ckpt_every_steps: 2000
+  log_every: 1
 
-# Data configuration - using multiresolution dataloader for Flux
 data:
   dataloader:
     _target_: dfm.src.automodel.datasets.multiresolutionDataloader.build_flux_multiresolution_dataloader
-    cache_dir: /lustre/fsw/portfolios/coreai/users/pthombre/Automodel/CICDNEW/DFM/FluxDataFull512p/
+    cache_dir: /lustre/fsw/portfolios/coreai/users/pthombre/Automodel/FluxTraining/DFM/FluxData512Full/
     train_text_encoder: false
     num_workers: 10
-    base_resolution: [512, 512]  
+    base_resolution: [512, 512]
     dynamic_batch_size: false
     shuffle: true
     drop_last: false
 
-# Checkpoint configuration
 checkpoint:
   enabled: true
   checkpoint_dir: /lustre/fsw/portfolios/coreai/users/pthombre/Automodel/FluxTraining/DFM/flux_ddp_test/
@@ -89,16 +68,13 @@ checkpoint:
   save_consolidated: false
   restore_from: null
 
-# Logging
 wandb:
   project: flux-pretraining
   mode: online
   name: flux_pretrain_ddp_test_run_1
 
-# Distributed environment
 dist_env:
   backend: "nccl"
   init_method: "env://"
 
-# Random seed
 seed: 42

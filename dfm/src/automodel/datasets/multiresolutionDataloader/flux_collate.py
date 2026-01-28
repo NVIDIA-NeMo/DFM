@@ -20,7 +20,6 @@ to match the FlowMatchingPipeline expected batch format.
 import logging
 from typing import Dict, List, Tuple
 
-import torch
 from torch.utils.data import DataLoader
 
 from dfm.src.automodel.datasets.multiresolutionDataloader.dataloader import (
@@ -38,12 +37,6 @@ def collate_fn_flux(batch: List[Dict]) -> Dict:
     Flux-compatible collate function that transforms multiresolution batch output
     to match FlowMatchingPipeline expected format.
 
-    Transforms:
-    - latent [B, C, H, W] -> video_latents [B, C, 1, H, W]
-    - prompt_embeds -> text_embeddings
-    - pooled_prompt_embeds -> pooled_prompt_embeds
-    - Adds data_type: "image"
-
     Args:
         batch: List of samples from TextToImageDataset
 
@@ -56,7 +49,6 @@ def collate_fn_flux(batch: List[Dict]) -> Dict:
     # Keep latent as 4D [B, C, H, W] for Flux (image model, not video)
     latent = production_batch["latent"]
 
-    # Build FlowMatchingPipeline-compatible batch
     # Use "image_latents" key for 4D tensors (FluxAdapter expects 4D)
     flux_batch = {
         "image_latents": latent,
@@ -85,8 +77,7 @@ def collate_fn_flux(batch: List[Dict]) -> Dict:
         flux_batch["t5_tokens"] = production_batch["t5_tokens"]
         flux_batch["clip_tokens"] = production_batch["clip_tokens"]
         raise NotImplementedError(
-            "On-the-fly text encoding not yet supported. "
-            "Please use pre-encoded text embeddings in your dataset."
+            "On-the-fly text encoding not yet supported. Please use pre-encoded text embeddings in your dataset."
         )
 
     return flux_batch
@@ -132,7 +123,7 @@ def build_flux_multiresolution_dataloader(
     Returns:
         Tuple of (DataLoader, SequentialBucketSampler)
     """
-    logger.info(f"Building Flux multiresolution dataloader:")
+    logger.info("Building Flux multiresolution dataloader:")
     logger.info(f"  cache_dir: {cache_dir}")
     logger.info(f"  train_text_encoder: {train_text_encoder}")
     logger.info(f"  batch_size: {batch_size}")

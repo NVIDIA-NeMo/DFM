@@ -1,11 +1,16 @@
-"""
-Production-Scale Multiprocessing Preprocessor for 100TB Datasets
-One process per GPU for optimal resource utilization.
-
-Caption Sources:
-    JSON file: {prefix}_internvl.json (JSONL format with file_name, internvl, usr fields)
-    Fallback: Image filename with underscores replaced by spaces
-"""
+# Copyright (c) 2025, NVIDIA CORPORATION. All rights reserved.
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+#     http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
 
 import argparse
 import hashlib
@@ -14,14 +19,14 @@ import os
 import traceback
 from multiprocessing import Pool
 from pathlib import Path
-from typing import Dict, List, Optional, Tuple, Any
+from typing import Any, Dict, List, Optional, Tuple
 
 import torch
 from PIL import Image
 from tqdm import tqdm
 
 from dfm.src.automodel.datasets.multiresolutionDataloader.multi_tier_bucketing import MultiTierBucketCalculator
-from dfm.src.automodel.utils.processors import ProcessorRegistry, BaseModelProcessor
+from dfm.src.automodel.utils.processors import BaseModelProcessor, ProcessorRegistry
 
 
 # Global worker state (initialized once per process)
@@ -34,16 +39,16 @@ _worker_device: Optional[str] = None
 def _init_worker(processor_name: str, model_name: str, gpu_id: int, max_pixels: int):
     """Initialize worker process with models on assigned GPU."""
     global _worker_models, _worker_processor, _worker_calculator, _worker_device
-    
+
     # Set CUDA_VISIBLE_DEVICES to isolate this GPU for the worker process.
     # After this, the selected GPU becomes cuda:0 (not cuda:{gpu_id}).
     os.environ["CUDA_VISIBLE_DEVICES"] = str(gpu_id)
     _worker_device = "cuda:0"
-    
+
     _worker_processor = ProcessorRegistry.get(processor_name)
     _worker_models = _worker_processor.load_models(model_name, _worker_device)
     _worker_calculator = MultiTierBucketCalculator(quantization=64, max_pixels=max_pixels)
-    
+
     print(f"Worker initialized on GPU {gpu_id}")
 
 
@@ -86,9 +91,7 @@ def _load_caption(image_path: Path, caption_field: str = "internvl") -> Optional
 
 
 def _load_all_captions(
-    image_files: List[Path],
-    caption_field: str = "internvl",
-    verbose: bool = True
+    image_files: List[Path], caption_field: str = "internvl", verbose: bool = True
 ) -> Dict[str, str]:
     """
     Pre-load all captions from JSONL files into memory.
@@ -130,11 +133,7 @@ def _load_all_captions(
     missing_files = 0
     total_captions = 0
 
-    for json_path, image_names in tqdm(
-        jsonl_to_images.items(),
-        desc="Loading JSONL files",
-        disable=not verbose
-    ):
+    for json_path, image_names in tqdm(jsonl_to_images.items(), desc="Loading JSONL files", disable=not verbose):
         if not json_path.exists():
             missing_files += 1
             # Images with missing JSONL will use filename fallback
@@ -173,10 +172,7 @@ def _load_all_captions(
     return caption_cache
 
 
-def _validate_caption_files(
-    image_files: List[Path],
-    caption_field: str
-) -> Tuple[int, int, List[str]]:
+def _validate_caption_files(image_files: List[Path], caption_field: str) -> Tuple[int, int, List[str]]:
     """
     Validate that caption files exist and are parseable.
 
@@ -187,7 +183,6 @@ def _validate_caption_files(
     Returns:
         (num_valid_files, num_missing_files, error_messages)
     """
-    from collections import defaultdict
 
     # Group images by their JSONL file
     jsonl_files = set()
@@ -251,10 +246,10 @@ def _process_image(args: Tuple) -> Optional[Dict]:
         orig_width, orig_height = image.size
 
         bucket = _worker_calculator.get_bucket_for_image(orig_width, orig_height)
-        target_width, target_height = bucket['resolution']
+        target_width, target_height = bucket["resolution"]
 
         resized_image, crop_offset = _worker_calculator.resize_and_crop(
-            image, target_width, target_height, crop_mode='center'
+            image, target_width, target_height, crop_mode="center"
         )
 
         image_tensor = _worker_processor.preprocess_image(resized_image)
@@ -269,40 +264,40 @@ def _process_image(args: Tuple) -> Optional[Dict]:
             caption = Path(image_path).stem.replace("_", " ")
 
         text_encodings = _worker_processor.encode_text(caption, _worker_models, _worker_device)
-        
+
         # Save cache file
         resolution = f"{target_width}x{target_height}"
         cache_subdir = Path(output_dir) / resolution
         cache_subdir.mkdir(parents=True, exist_ok=True)
-        
+
         cache_hash = hashlib.md5(f"{Path(image_path).absolute()}_{resolution}".encode()).hexdigest()
         cache_file = cache_subdir / f"{cache_hash}.pt"
-        
+
         metadata = {
             "original_resolution": (orig_width, orig_height),
             "crop_resolution": (target_width, target_height),
             "crop_offset": crop_offset,
             "prompt": caption,
             "image_path": str(Path(image_path).absolute()),
-            "bucket_id": bucket['id'],
-            "aspect_ratio": bucket['aspect_ratio'],
+            "bucket_id": bucket["id"],
+            "aspect_ratio": bucket["aspect_ratio"],
         }
-        
+
         cache_data = _worker_processor.get_cache_data(latent, text_encodings, metadata)
         torch.save(cache_data, cache_file)
-        
+
         return {
             "cache_file": str(cache_file),
             "image_path": str(Path(image_path).absolute()),
             "crop_resolution": [target_width, target_height],
             "original_resolution": [orig_width, orig_height],
             "prompt": caption,
-            "bucket_id": bucket['id'],
-            "aspect_ratio": bucket['aspect_ratio'],
+            "bucket_id": bucket["id"],
+            "aspect_ratio": bucket["aspect_ratio"],
             "pixels": target_width * target_height,
             "model_type": _worker_processor.model_type,
         }
-        
+
     except Exception as e:
         print(f"Error processing {image_path}: {e}")
         traceback.print_exc()
@@ -316,15 +311,15 @@ def _get_image_files(image_dir: Path) -> List[Path]:
     Uses os.walk() for better performance on large directories compared to rglob().
     """
     image_files = []
-    valid_extensions = {'jpg', 'jpeg', 'png', 'webp', 'bmp'}
+    valid_extensions = {"jpg", "jpeg", "png", "webp", "bmp"}
 
     # Use os.walk for better performance on large directories
     for root, dirs, files in os.walk(image_dir):
         root_path = Path(root)
         for file in files:
             # Extract extension and check if it's a valid image file
-            if '.' in file:
-                ext = file.lower().rsplit('.', 1)[-1]
+            if "." in file:
+                ext = file.lower().rsplit(".", 1)[-1]
                 if ext in valid_extensions:
                     image_files.append(root_path / file)
 
@@ -368,7 +363,7 @@ def preprocess_dataset(
 ):
     """
     Preprocess dataset with one process per GPU.
-    
+
     Args:
         image_dir: Directory containing images
         output_dir: Output directory for cache
@@ -383,21 +378,21 @@ def preprocess_dataset(
     image_dir = Path(image_dir)
     output_dir = Path(output_dir)
     output_dir.mkdir(parents=True, exist_ok=True)
-    
+
     # Get processor and resolve model name
     processor = ProcessorRegistry.get(processor_name)
     if model_name is None:
         model_name = processor.default_model_name
-    
+
     num_gpus = torch.cuda.device_count()
     if num_gpus == 0:
         raise RuntimeError("No GPUs available")
-    
+
     print(f"Processor: {processor_name} ({processor.model_type})")
     print(f"Model: {model_name}")
     print(f"GPUs: {num_gpus}")
     print(f"Max pixels: {max_pixels}")
-    
+
     # Get all image files
     print("\nScanning for images...")
     image_files = _get_image_files(image_dir)
@@ -436,50 +431,53 @@ def preprocess_dataset(
 
     with Pool(processes=num_gpus) as pool:
         args = [
-            (gpu_id, chunks[gpu_id], str(output_dir), processor_name,
-             model_name, verify, caption_cache, max_pixels)
+            (gpu_id, chunks[gpu_id], str(output_dir), processor_name, model_name, verify, caption_cache, max_pixels)
             for gpu_id in range(num_gpus)
         ]
 
         results = pool.starmap(_process_shard_on_gpu, args)
-        
+
         for gpu_results in results:
             all_metadata.extend(gpu_results)
-    
+
     # Save metadata in shards
     shard_files = []
     for shard_idx in range(0, len(all_metadata), shard_size):
-        shard_data = all_metadata[shard_idx:shard_idx + shard_size]
+        shard_data = all_metadata[shard_idx : shard_idx + shard_size]
         shard_file = output_dir / f"metadata_shard_{shard_idx // shard_size:04d}.json"
         with open(shard_file, "w") as f:
             json.dump(shard_data, f, indent=2)
         shard_files.append(shard_file.name)
-    
+
     # Save config metadata (references shards instead of duplicating items)
     metadata_file = output_dir / "metadata.json"
     with open(metadata_file, "w") as f:
-        json.dump({
-            "processor": processor_name,
-            "model_name": model_name,
-            "model_type": processor.model_type,
-            "caption_field": caption_field,
-            "max_pixels": max_pixels,
-            "total_images": len(all_metadata),
-            "num_shards": len(shard_files),
-            "shard_size": shard_size,
-            "shards": shard_files,
-        }, f, indent=2)
-    
+        json.dump(
+            {
+                "processor": processor_name,
+                "model_name": model_name,
+                "model_type": processor.model_type,
+                "caption_field": caption_field,
+                "max_pixels": max_pixels,
+                "total_images": len(all_metadata),
+                "num_shards": len(shard_files),
+                "shard_size": shard_size,
+                "shards": shard_files,
+            },
+            f,
+            indent=2,
+        )
+
     # Print summary
     print(f"\n{'=' * 50}")
     print(f"COMPLETE: {len(all_metadata)}/{len(image_files)} images")
     print(f"Output: {output_dir}")
-    
+
     bucket_counts: Dict[str, int] = {}
     for item in all_metadata:
         res = f"{item['crop_resolution'][0]}x{item['crop_resolution'][1]}"
         bucket_counts[res] = bucket_counts.get(res, 0) + 1
-    
+
     print("\nBucket distribution:")
     for res in sorted(bucket_counts.keys()):
         print(f"  {res}: {bucket_counts[res]}")
@@ -487,7 +485,7 @@ def preprocess_dataset(
 
 def main():
     parser = argparse.ArgumentParser(description="Preprocess images (one process per GPU)")
-    
+
     parser.add_argument("--list_processors", action="store_true", help="List available processors")
     parser.add_argument("--image_dir", type=str, help="Input image directory")
     parser.add_argument("--output_dir", type=str, help="Output cache directory")
@@ -498,31 +496,32 @@ def main():
     parser.add_argument("--caption_field", type=str, default="internvl", choices=["internvl", "usr"])
     parser.add_argument("--max_images", type=int, default=None, help="Max images to process")
     parser.add_argument("--max_pixels", type=int, default=None, help="Max pixels per image")
-    parser.add_argument("--resolution_preset", type=str, default=None,
-                        choices=["256p", "512p", "768p", "1024p", "1536p"])
-    
+    parser.add_argument(
+        "--resolution_preset", type=str, default=None, choices=["256p", "512p", "768p", "1024p", "1536p"]
+    )
+
     args = parser.parse_args()
-    
+
     if args.list_processors:
         print("Available processors:")
         for name in ProcessorRegistry.list_available():
             proc = ProcessorRegistry.get(name)
             print(f"  {name}: {proc.model_type}")
         return
-    
+
     if not args.image_dir or not args.output_dir:
         parser.error("--image_dir and --output_dir are required")
-    
+
     if args.resolution_preset and args.max_pixels:
         parser.error("Cannot specify both --resolution_preset and --max_pixels")
-    
+
     if args.resolution_preset:
         max_pixels = MultiTierBucketCalculator.RESOLUTION_PRESETS[args.resolution_preset]
     elif args.max_pixels:
         max_pixels = args.max_pixels
     else:
         max_pixels = 256 * 256
-    
+
     preprocess_dataset(
         args.image_dir,
         args.output_dir,

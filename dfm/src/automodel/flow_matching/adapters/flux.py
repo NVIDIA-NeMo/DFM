@@ -21,8 +21,9 @@ This adapter supports FLUX.1 style models with:
 - 2D image latents (treated as 1-frame video: [B, C, 1, H, W])
 """
 
-from typing import Any, Dict
 import random
+from typing import Any, Dict
+
 import torch
 import torch.nn as nn
 
@@ -77,9 +78,7 @@ class FluxAdapter(ModelAdapter):
         return latents
 
     @staticmethod
-    def _unpack_latents(
-        latents: torch.Tensor, height: int, width: int, vae_scale_factor: int = 8
-    ) -> torch.Tensor:
+    def _unpack_latents(latents: torch.Tensor, height: int, width: int, vae_scale_factor: int = 8) -> torch.Tensor:
         """
         Unpack latents from Flux format back to [B, C, H, W].
 
@@ -156,7 +155,7 @@ class FluxAdapter(ModelAdapter):
 
         if pooled_projections.ndim == 1:
             pooled_projections = pooled_projections.unsqueeze(0)
-        
+
         if random.random() < context.cfg_dropout_prob:
             text_embeddings = torch.zeros_like(text_embeddings)
             pooled_projections = torch.zeros_like(pooled_projections)
@@ -186,7 +185,7 @@ class FluxAdapter(ModelAdapter):
             "txt_ids": txt_ids,
             # Store original shape for unpacking
             "_original_shape": (batch_size, channels, height, width),
-            "guidance": guidance
+            "guidance": guidance,
         }
 
         return inputs

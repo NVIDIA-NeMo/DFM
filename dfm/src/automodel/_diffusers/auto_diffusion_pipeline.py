@@ -58,6 +58,7 @@ from dfm.src.automodel.distributed.dfm_parallelizer import (
     WanParallelizationStrategy,
 )
 
+
 logger = logging.getLogger(__name__)
 
 # Type alias for parallel managers
@@ -124,8 +125,7 @@ def _import_diffusers_class(class_name: str):
 
     if not hasattr(diffusers, class_name):
         raise ImportError(
-            f"Class '{class_name}' not found in diffusers. "
-            f"Check pipeline_spec.transformer_cls in your YAML config."
+            f"Class '{class_name}' not found in diffusers. Check pipeline_spec.transformer_cls in your YAML config."
         )
     return getattr(diffusers, class_name)
 
