@@ -14,8 +14,10 @@
 
 from .base import BaseModelProcessor
 from .registry import ProcessorRegistry
+from .flux import FluxProcessor
 
 __all__ = [
     "BaseModelProcessor",
     "ProcessorRegistry",
+    "FluxProcessor",
 ]
