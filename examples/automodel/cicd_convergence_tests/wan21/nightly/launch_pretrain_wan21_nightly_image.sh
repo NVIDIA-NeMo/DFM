@@ -23,7 +23,7 @@ export NCCL_NVLS_ENABLE=0
 
 # Experiment env
 # TODO: update the key
-export WANDB_API_KEY="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"
+export WANDB_API_KEY=""
 export HF_HOME="/linnanw/hdvilla_sample/cache"
 export HF_TOKEN=""
 
