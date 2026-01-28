@@ -336,9 +336,7 @@ class TestLossComputation:
         batch = {}
 
         # Returns: weighted_loss, unweighted_loss, loss_weight
-        weighted_loss, unweighted_loss, loss_weight = pipeline.compute_loss(
-            model_pred, target, sigma
-        )
+        weighted_loss, unweighted_loss, loss_weight = pipeline.compute_loss(model_pred, target, sigma)
 
         # Verify shapes
         assert weighted_loss.ndim == 0, "Weighted loss should be scalar"
@@ -363,9 +361,7 @@ class TestLossComputation:
         sigma = torch.tensor([0.3, 0.7])
         batch = {}
 
-        weighted_loss, unweighted_loss, loss_weight = pipeline.compute_loss(
-            model_pred, target, sigma
-        )
+        weighted_loss, unweighted_loss, loss_weight = pipeline.compute_loss(model_pred, target, sigma)
 
         # Without weighting, weighted loss should equal unweighted loss
         assert torch.allclose(weighted_loss, unweighted_loss, atol=1e-6)
@@ -406,9 +402,7 @@ class TestLossComputation:
         sigma = torch.rand(2)
         batch = {}
 
-        weighted_loss, unweighted_loss, _ = pipeline.compute_loss(
-            model_pred, target, sigma
-        )
+        weighted_loss, unweighted_loss, _ = pipeline.compute_loss(model_pred, target, sigma)
 
         assert weighted_loss >= 0, "Weighted loss should be non-negative"
         assert unweighted_loss >= 0, "Unweighted loss should be non-negative"
@@ -422,9 +416,7 @@ class TestLossComputation:
         sigma = torch.rand(2)
         batch = {}
 
-        weighted_loss, unweighted_loss, _ = pipeline.compute_loss(
-            model_pred, target, sigma
-        )
+        weighted_loss, unweighted_loss, _ = pipeline.compute_loss(model_pred, target, sigma)
 
         assert torch.isfinite(weighted_loss), "Weighted loss should be finite"
         assert torch.isfinite(unweighted_loss), "Unweighted loss should be finite"
@@ -771,9 +763,7 @@ class TestIntegration:
                 "text_embeddings": torch.randn(2, 77, 4096),
             }
 
-            loss, metrics = pipeline.step(
-                mock_model, batch, torch.device("cpu"), torch.float32, global_step=step
-            )
+            loss, metrics = pipeline.step(mock_model, batch, torch.device("cpu"), torch.float32, global_step=step)
             losses.append(loss.item())
 
             assert not torch.isnan(loss), f"Loss became NaN at step {step}"
