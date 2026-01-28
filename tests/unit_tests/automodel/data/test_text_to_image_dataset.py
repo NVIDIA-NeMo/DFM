@@ -52,8 +52,8 @@ class MockCacheBuilder:
             "prompt": f"Test prompt {idx}",
             "image_path": f"/fake/path/image_{idx}.jpg",
             "clip_hidden": torch.randn(1, 77, 768),
-            "clip_pooled": torch.randn(1, 768),
-            "t5_hidden": torch.randn(1, 256, 4096),
+            "pooled_prompt_embeds": torch.randn(1, 768),
+            "prompt_embeds": torch.randn(1, 256, 4096),
             "clip_tokens": torch.randint(0, 49408, (1, 77)),
             "t5_tokens": torch.randint(0, 32128, (1, 256)),
         }
@@ -250,8 +250,8 @@ class TestDatasetGetItem:
             "bucket_id",
             "aspect_ratio",
             "clip_hidden",
-            "clip_pooled",
-            "t5_hidden",
+            "pooled_prompt_embeds",
+            "prompt_embeds",
         }
         assert required_fields.issubset(item.keys())
 
@@ -309,11 +309,11 @@ class TestDatasetGetItem:
         assert item["clip_hidden"].dim() == 2
         assert item["clip_hidden"].shape[0] == 77
 
-        # CLIP pooled should be [768]
-        assert item["clip_pooled"].dim() == 1
+        # Pooled prompt embeds should be [768]
+        assert item["pooled_prompt_embeds"].dim() == 1
 
-        # T5 hidden should be [256, 4096]
-        assert item["t5_hidden"].dim() == 2
+        # Prompt embeds should be [256, 4096]
+        assert item["prompt_embeds"].dim() == 2
 
     def test_getitem_tokens_shapes(self, simple_cache_dir):
         """Test token shapes when train_text_encoder=True."""

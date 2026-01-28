@@ -70,8 +70,8 @@ class MockCacheBuilder:
             "prompt": f"Test prompt {idx}",
             "image_path": f"/fake/path/image_{idx}.jpg",
             "clip_hidden": torch.randn(1, 77, 768),
-            "clip_pooled": torch.randn(1, 768),
-            "t5_hidden": torch.randn(1, 256, 4096),
+            "pooled_prompt_embeds": torch.randn(1, 768),
+            "prompt_embeds": torch.randn(1, 256, 4096),
             "clip_tokens": torch.randint(0, 49408, (1, 77)),
             "t5_tokens": torch.randint(0, 32128, (1, 256)),
         }
@@ -547,8 +547,8 @@ class TestCollateFnProductionCPU:
 
         if "clip_hidden" in items[0]:
             assert batch["clip_hidden"].shape[0] == 4
-            assert batch["clip_pooled"].shape[0] == 4
-            assert batch["t5_hidden"].shape[0] == 4
+            assert batch["pooled_prompt_embeds"].shape[0] == 4
+            assert batch["prompt_embeds"].shape[0] == 4
 
     def test_collate_same_resolution_required(self, multi_resolution_dataset):
         """Test collate requires same resolution in batch."""
