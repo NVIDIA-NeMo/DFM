@@ -12,9 +12,10 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-from .flux import FluxProcessor
 from .base import BaseModelProcessor
+from .flux import FluxProcessor
 from .registry import ProcessorRegistry
+
 
 __all__ = [
     "BaseModelProcessor",
