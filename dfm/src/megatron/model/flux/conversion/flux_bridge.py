@@ -19,9 +19,7 @@ from megatron.bridge.models.conversion.model_bridge import MegatronModelBridge
 from megatron.bridge.models.conversion.param_mapping import (
     AutoMapping,
     RowParallelMapping,
-    KVMapping,
     QKVMapping,
-    ReplicatedMapping,
 )
 from megatron.bridge.models.conversion.utils import get_module_and_param_from_name
 

@@ -227,21 +227,18 @@ def pretrain_config(
             packing_buffer_size=None,
         )
     else:
-        # TODO: Add real dataset configuration when available
-        dataset = FluxMockDataModuleConfig(
-            path=None,
+        # Real dataset configuration using Energon WebDataset
+        from dfm.src.megatron.data.flux.flux_energon_datamodule import FluxDataModuleConfig        
+        dataset = FluxDataModuleConfig(
+            path=data_paths,  # Path to WebDataset shards directory
             seq_length=1024,
-            image_H=image_H,
-            image_W=image_W,
-            vae_channels=vae_channels,
             vae_scale_factor=vae_scale_factor,
-            prompt_seq_len=prompt_seq_len,
-            context_dim=context_dim,
-            pooled_prompt_dim=pooled_prompt_dim,
+            latent_channels=vae_channels,
             micro_batch_size=micro_batch_size,
             global_batch_size=global_batch_size,
             num_workers=16,
-            packing_buffer_size=None,
+            task_encoder_seq_length=None,
+            packing_buffer_size=None, # Disable Sequence Packing for now
         )
 
     # Config Container

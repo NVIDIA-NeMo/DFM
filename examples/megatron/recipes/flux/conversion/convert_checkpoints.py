@@ -119,50 +119,50 @@ def import_hf_to_megatron(
 
     # Import using the convenience method
     print(f"📥 Loading HuggingFace model: {hf_model}")
-    try:
-        AutoBridge.import_ckpt(
-            hf_model_id=hf_model,
-            megatron_path=megatron_path,
-            **kwargs,
-        )
-    except ValueError as e:
+    # try:
+    #     AutoBridge.import_ckpt(
+    #         hf_model_id=hf_model,
+    #         megatron_path=megatron_path,
+    #         **kwargs,
+    #     )
+    # except ValueError as e:
         # Fallback for Diffusers-based flux repos that do not provide a transformers config
-        msg = str(e)
-        is_flux_repo = ("flux" in hf_model.lower()) or ("diffusers" in hf_model.lower())
-        auto_config_failed = ("Unrecognized model" in msg) or ("Failed to load configuration" in msg)
-        if is_flux_repo or auto_config_failed:
-            print("ℹ️ AutoConfig path failed; falling back to flux Diffusers conversion.")
-            # Minimal single-rank env to satisfy provider init if needed
-            os.environ.setdefault("MASTER_ADDR", "127.0.0.1")
-            os.environ.setdefault("MASTER_PORT", str(29500 + random.randint(0, 1000)))
-            os.environ.setdefault("RANK", "0")
-            os.environ.setdefault("WORLD_SIZE", "1")
-            os.environ.setdefault("LOCAL_RANK", "0")
+    # msg = str(e)
+    is_flux_repo = ("flux" in hf_model.lower()) or ("diffusers" in hf_model.lower())
+    auto_config_failed = True # ("Unrecognized model" in msg) or ("Failed to load configuration" in msg)
+    if is_flux_repo or auto_config_failed:
+        print("ℹ️ AutoConfig path failed; falling back to flux Diffusers conversion.")
+        # Minimal single-rank env to satisfy provider init if needed
+        os.environ.setdefault("MASTER_ADDR", "127.0.0.1")
+        os.environ.setdefault("MASTER_PORT", str(29500 + random.randint(0, 1000)))
+        os.environ.setdefault("RANK", "0")
+        os.environ.setdefault("WORLD_SIZE", "1")
+        os.environ.setdefault("LOCAL_RANK", "0")
 
-            hf = PreTrainedFlux(hf_model)
-            bridge = FluxBridge()
-            provider = bridge.provider_bridge(hf)
-            provider.perform_initialization = False
-            megatron_models = provider.provide_distributed_model(wrap_with_ddp=False, use_cpu_initialization=True)
-            bridge.load_weights_hf_to_megatron(hf, megatron_models)
+        hf = PreTrainedFlux(hf_model)
+        bridge = FluxBridge()
+        provider = bridge.provider_bridge(hf)
+        provider.perform_initialization = False
+        megatron_models = provider.provide_distributed_model(wrap_with_ddp=False, use_cpu_initialization=True)
+        bridge.load_weights_hf_to_megatron(hf, megatron_models)
 
-            # Save all parameters in transformer with their norms to a file
-            param_norms_file = "megatron_bridge_param_norms.txt"
-            with open(param_norms_file, "w") as f:
-                f.write("=" * 80 + "\n")
-                f.write("Transformer Parameters and Norms\n")
-                f.write("=" * 80 + "\n")
-                for name, param in megatron_models[0].named_parameters():
-                    if param.requires_grad:
-                        norm = param.data.norm().item()
-                        f.write(f"{name:80s} | shape: {str(list(param.shape)):20s} | norm: {norm:.6f}\n")
-                f.write("=" * 80 + "\n")
-            print(f"Parameter norms saved to: {param_norms_file}")
-            breakpoint()
+        # Save all parameters in transformer with their norms to a file
+        param_norms_file = "megatron_bridge_param_norms.txt"
+        with open(param_norms_file, "w") as f:
+            f.write("=" * 80 + "\n")
+            f.write("Transformer Parameters and Norms\n")
+            f.write("=" * 80 + "\n")
+            for name, param in megatron_models[0].named_parameters():
+                if param.requires_grad:
+                    norm = param.data.norm().item()
+                    f.write(f"{name:80s} | shape: {str(list(param.shape)):20s} | norm: {norm:.6f}\n")
+            f.write("=" * 80 + "\n")
+        print(f"Parameter norms saved to: {param_norms_file}")
+        breakpoint()
 
-            save_megatron_model(megatron_models, megatron_path, hf_tokenizer_path=None)
-        else:
-            raise
+        save_megatron_model(megatron_models, megatron_path, hf_tokenizer_path=None)
+        # else:
+        #     raise
 
     print(f"✅ Successfully imported model to: {megatron_path}")
 
