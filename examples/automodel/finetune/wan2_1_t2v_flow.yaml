@@ -33,6 +33,10 @@ optim:
     weight_decay: 0.01
     betas: [0.9, 0.999]
 
+lr_scheduler:
+  lr_decay_style: cosine
+  min_lr: 1e-6
+
 # Flow matching V2 configuration
 flow_matching:
   adapter_type: "simple"  # Options: "hunyuan", "simple"
