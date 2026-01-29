@@ -26,6 +26,7 @@ from megatron.bridge.training.config import (
     RNGConfig,
     TokenizerConfig,
     TrainingConfig,
+    DistributedInitConfig,
 )
 from megatron.bridge.training.mixed_precision import MixedPrecisionConfig, get_mixed_precision_config
 from megatron.core.distributed import DistributedDataParallelConfig
@@ -121,7 +122,9 @@ def pretrain_config(
     virtual_pipeline_parallelism: Optional[int] = 1,
     context_parallelism: int = 1,
     sequence_parallelism: bool = False,
+    # DEBUGGING (use FSDP)
     use_megatron_fsdp: bool = False,
+    use_torch_fsdp2: bool = False,
     # Training hyperparameters
     train_iters: int = 10000,
     global_batch_size: int = 4,
@@ -216,31 +219,31 @@ def pretrain_config(
 
             # ## config 2
             # F_latents=1
-            # H_latents=64
-            # W_latents=64
+            # H_latents=32
+            # W_latents=32
             # context_seq_len=256
-            # number_packed_samples=4
+            # number_packed_samples=8
 
-            # ## config 3
+            ## config 3 (FA3 test)
+            F_latents=1
+            H_latents=16
+            W_latents=16
+            context_seq_len=128
+            number_packed_samples=72
+
+            # ## config 4 (FSDP test)
             # F_latents=1
             # H_latents=16
             # W_latents=16
             # context_seq_len=128
             # number_packed_samples=8
 
-            ## testing config
-            F_latents=1
-            H_latents=16
-            W_latents=16
-            context_seq_len=128
-            number_packed_samples=16
-
-            # ## minimal testing config
+            # ## testing config
             # F_latents=1
-            # H_latents=2
-            # W_latents=2
-            # context_seq_len=8
-            # number_packed_samples=2
+            # H_latents=160
+            # W_latents=160
+            # context_seq_len=128
+            # number_packed_samples=1
 
         else:
             assert False, "Invalid model size"
@@ -283,12 +286,19 @@ def pretrain_config(
         ddp=DistributedDataParallelConfig(
             check_for_nan_in_grad=True,
             grad_reduce_in_fp32=True,
-            overlap_grad_reduce=False,
-            overlap_param_gather=False,
+            # DEBUGGING (use FSDP)
+            # overlap_grad_reduce=False,
+            # overlap_param_gather=False,
+            overlap_grad_reduce=True if use_megatron_fsdp else False,
+            overlap_param_gather=True if use_megatron_fsdp else False,
             average_in_collective=True,
             use_distributed_optimizer=True,
+            # DEBUGGING (use FSDP)
             use_megatron_fsdp=use_megatron_fsdp,  # need use_distributed_optimizer=True
+            data_parallel_sharding_strategy="optim_grads_params",
         ),
+        # DEBUGGING (use FSDP)
+        dist=DistributedInitConfig(use_megatron_fsdp=use_megatron_fsdp, use_torch_fsdp2=use_torch_fsdp2),
         dataset=dataset,
         logger=LoggerConfig(
             log_interval=10,
@@ -300,7 +310,8 @@ def pretrain_config(
             save_interval=2000,
             save=checkpoint_dir,
             load=checkpoint_dir,
-            ckpt_format="torch_dist",
+            # DEBUGGING (use FSDP)
+            ckpt_format="fsdp_dtensor" if use_megatron_fsdp else "torch_dist",
             fully_parallel_save=True,
         ),
         rng=RNGConfig(seed=1234),

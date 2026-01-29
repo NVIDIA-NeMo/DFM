@@ -10,10 +10,11 @@ from layers import (
     RMSNorm,
     RoPEEmbed,
     TransformerBlock,
+    latency_tracker,
 )
 from torch import nn
 import os
-
+import time
 
 class ReveV2(nn.Module):
     def __init__(
@@ -148,19 +149,15 @@ class ReveV2(nn.Module):
         txt_pos_ids = txt_pos_ids.repeat(txt.shape[0], 1, 1)
         txt_rope_cis = self.txt_rope_emb(txt_pos_ids)
 
-        # # DEBUGGING (match forward pass in reve_model.py)
-        # if torch.distributed.get_rank() == 0:
-        #     print(f"[DEBUG] (reve_pytorch/model.py - before transformer blocks) txt.shape - txt.mean() - txt.std(): {txt.shape} - {txt.mean()} - {txt.std()}")
-        #     print(f"[DEBUG] (reve_pytorch/model.py - before transformer blocks) txt_rope_cis[0].shape - txt_rope_cis[0].mean() - txt_rope_cis[0].std(): {txt_rope_cis[0].shape} - {txt_rope_cis[0].mean()} - {txt_rope_cis[0].std()}")
-        #     print(f"[DEBUG] (reve_pytorch/model.py - before transformer blocks) txt_rope_cis[1].shape - txt_rope_cis[1].mean() - txt_rope_cis[1].std(): {txt_rope_cis[1].shape} - {txt_rope_cis[1].mean()} - {txt_rope_cis[1].std()}")
-        #     print(f"[DEBUG] (reve_pytorch/model.py - before transformer blocks) txt_mask.shape - txt_mask.mean() - txt_mask.std(): {txt_mask.shape} - {txt_mask.float().mean()} - {txt_mask.float().std()}")
+        # DEBUGGING (benchmarking)
+        text_decoder_start_time = time.time()
 
         for block in self.txt_blocks:
             txt = block(txt, None, None, txt_rope_cis, txt_mask, None)
 
-        # # DEBUGGING (match forward pass in reve_model.py)
-        # if torch.distributed.get_rank() == 0:
-        #     print(f"[DEBUG] (reve_pytorch/model.py - after transformer blocks) txt.shape - txt.mean() - txt.std(): {txt.shape} - {txt.mean()} - {txt.std()}")
+        # DEBUGGING (benchmarking)
+        text_decoder_end_time = time.time()
+        latency_tracker.update(f"[DEBUG] (reve_pytorch/model.py) - text decoder time: {text_decoder_end_time - text_decoder_start_time} seconds", now=text_decoder_end_time)
 
         txt = self.txt_out(txt)
         return txt, txt_mask
@@ -227,26 +224,37 @@ class ReveV2(nn.Module):
         # conditioning_signal = torch.tensor([0.7], dtype=dtype, device=device).repeat(bs)
 
 
-        # # DEBUGGING
-        # if torch.distributed.get_rank() == 0:
-        #     print(f"[DEBUG] (reve_pytorch/model.py) x.shape: {x.shape}")
-        #     # print(f"[DEBUG] (reve_pytorch/model.py) x.mean() - x.std(): {x.mean()} - {x.std()}")
-        #     # print(f"[DEBUG] (reve_pytorch/model.py) x_position_ids: {x_position_ids.shape}")
-        #     # print(f"[DEBUG] (reve_pytorch/model.py) x_position_ids.mean() - x_position_ids.std(): {x_position_ids.mean()} - {x_position_ids.std()}")
-        #     # print(f"[DEBUG] (reve_pytorch/model.py) timestep: {timestep}")
-        #     print(f"[DEBUG] (reve_pytorch/model.py) y.shape: {y.shape}")
-        #     # print(f"[DEBUG] (reve_pytorch/model.py) y.mean() - y.std(): {y.mean()} - {y.std()}")
-        #     # print(f"[DEBUG] (reve_pytorch/model.py) y_mask: {y_mask.shape}")
-        #     # print(f"[DEBUG] (reve_pytorch/model.py) y_mask: {y_mask}")
-        #     # print(f"[DEBUG] (reve_pytorch/model.py) conditioning_signal: {conditioning_signal}")
-        #     print(f"[DEBUG] (reve_pytorch/model.py) --------------------------------")
+        # DEBUGGING
+        if torch.distributed.get_rank() == 0:
+            print(f"[DEBUG] (reve_pytorch/model.py) x.shape: {x.shape}")
+            # print(f"[DEBUG] (reve_pytorch/model.py) x.mean() - x.std(): {x.mean()} - {x.std()}")
+            # print(f"[DEBUG] (reve_pytorch/model.py) x_position_ids: {x_position_ids.shape}")
+            # print(f"[DEBUG] (reve_pytorch/model.py) x_position_ids.mean() - x_position_ids.std(): {x_position_ids.mean()} - {x_position_ids.std()}")
+            # print(f"[DEBUG] (reve_pytorch/model.py) timestep: {timestep}")
+            print(f"[DEBUG] (reve_pytorch/model.py) y.shape: {y.shape}")
+            # print(f"[DEBUG] (reve_pytorch/model.py) y.mean() - y.std(): {y.mean()} - {y.std()}")
+            # print(f"[DEBUG] (reve_pytorch/model.py) y_mask: {y_mask.shape}")
+            # print(f"[DEBUG] (reve_pytorch/model.py) y_mask: {y_mask}")
+            # print(f"[DEBUG] (reve_pytorch/model.py) conditioning_signal: {conditioning_signal}")
+            print(f"[DEBUG] (reve_pytorch/model.py) --------------------------------")
+
+
+        # DEBUGGING (benchmarking)
+        full_forward_start_time = time.time()
+        latency_tracker.update(f"[DEBUG] (reve_pytorch/model.py) --------------------------------", now=full_forward_start_time)
+
+        # DEBUGGING (benchmarking)
+        text_processing_start_time = time.time()
 
         txt, txt_mask = self._encode_text(y, y_mask)
 
-        # # DEBUGGING (match forward pass in reve_pytorch/model.py)
-        # if torch.distributed.get_rank() == 0:
-        #     print(f"[DEBUG] (reve_pytorch/model.py) *** Finished text transformer blocks processing.")
+        # DEBUGGING (benchmarking)
+        text_processing_end_time = time.time()
+        latency_tracker.update(f"[DEBUG] (reve_pytorch/model.py) - text processing time: {text_processing_end_time - text_processing_start_time} seconds", now=text_processing_end_time)
 
+
+        # DEBUGGING (benchmarking)
+        image_processing_start_time = time.time()
 
         patched_img, img_ids = x, x_position_ids
         batch_size = patched_img.shape[0]
@@ -268,17 +276,8 @@ class ReveV2(nn.Module):
             conditioning_signal,
         )
 
-
-        # # DEBUGGING (match forward pass in reve_model.py)
-        # if torch.distributed.get_rank() == 0:
-        #     print(f"[DEBUG] (reve_pytorch/model.py) patched_img.shape - patched_img.mean() - patched_img.std() - patched_img.norm(): {patched_img.shape} - {patched_img.mean()} - {patched_img.std()} - {patched_img.norm()}")
-        #     print(f"[DEBUG] (reve_pytorch/model.py) txt.shape - txt.mean() - txt.std() - txt.norm(): {txt.shape} - {txt.mean()} - {txt.std()} - {txt.norm()}")
-        #     print(f"[DEBUG] (reve_pytorch/model.py) condition_vector_emb.shape - condition_vector_emb.mean() - condition_vector_emb.std() - condition_vector_emb.norm(): {condition_vector_emb.shape} - {condition_vector_emb.mean()} - {condition_vector_emb.std()} - {condition_vector_emb.norm()}")
-        #     print(f"[DEBUG] (reve_pytorch/model.py) img_rope_cis[0].shape - img_rope_cis[0].mean() - img_rope_cis[0].std() - img_rope_cis[0].norm(): {img_rope_cis[0].shape} - {img_rope_cis[0].mean()} - {img_rope_cis[0].std()} - {img_rope_cis[0].norm()}")
-        #     print(f"[DEBUG] (reve_pytorch/model.py) img_rope_cis[1].shape - img_rope_cis[1].mean() - img_rope_cis[1].std() - img_rope_cis[1].norm(): {img_rope_cis[1].shape} - {img_rope_cis[1].mean()} - {img_rope_cis[1].std()} - {img_rope_cis[1].norm()}")
-        #     print(f"[DEBUG] (reve_pytorch/model.py) x_mask.shape - x_mask.mean() - x_mask.std() - x_mask.norm(): {x_mask.shape} - {x_mask.float().mean()} - {x_mask.float().std()} - {x_mask.float().norm()}")
-        #     print(f"[DEBUG] (reve_pytorch/model.py) txt_mask.shape - txt_mask.mean() - txt_mask.std() - txt_mask.norm(): {txt_mask.shape} - {txt_mask.float().mean()} - {txt_mask.float().std()} - {txt_mask.float().norm()}")
-        #     print(f"[DEBUG] (reve_pytorch/model.py) --------------------------------")
+        # DEBUGGING (benchmarking)
+        image_decoder_start_time = time.time()
 
         for block in self.blocks:
             patched_img = block(
@@ -290,19 +289,20 @@ class ReveV2(nn.Module):
                 txt_mask,
             )
 
-        # # DEBUGGING (match forward pass in reve_pytorch/model.py)
-        # if torch.distributed.get_rank() == 0:
-        #     print(f"[DEBUG] (reve_pytorch/model.py) *** Finished image transformer blocks processing.")
+
+        # DEBUGGING (benchmarking)
+        image_decoder_end_time = time.time()
+        latency_tracker.update(f"[DEBUG] (reve_pytorch/model.py) - image decoder time: {image_decoder_end_time - image_decoder_start_time} seconds", now=image_decoder_end_time)
+
+        # DEBUGGING (benchmarking)
+        image_processing_end_time = time.time()
+        latency_tracker.update(f"[DEBUG] (reve_pytorch/model.py) - image processing time: {image_processing_end_time - image_processing_start_time} seconds", now=image_processing_end_time)
 
         patched_img = self.final_layer(patched_img)
 
-
-        # # DEBUGGING (match forward pass in reve_model.py)
-        # if torch.distributed.get_rank() == 0:
-        #     print(f"[DEBUG] (reve_pytorch/model.py) patched_img.shape - patched_img.mean() - patched_img.std() - patched_img.norm(): {patched_img.shape} - {patched_img.mean()} - {patched_img.std()} - {patched_img.norm()}")
-        #     print(f"[DEBUG] (reve_pytorch/model.py) patched_img: {patched_img}")
-        #     print(f"[DEBUG] (reve_pytorch/model.py) --------------------------------")
-        #     # print(stop_here)
+        # DEBUGGING (benchmarking)
+        full_forward_end_time = time.time()
+        latency_tracker.update(f"[DEBUG] (reve_pytorch/model.py) - full forward pass time: {full_forward_end_time - full_forward_start_time} seconds", now=full_forward_end_time)
 
         return patched_img
 

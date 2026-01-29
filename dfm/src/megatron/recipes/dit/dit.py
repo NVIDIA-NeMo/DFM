@@ -204,8 +204,11 @@ def pretrain_config(
         ddp=DistributedDataParallelConfig(
             check_for_nan_in_grad=True,
             grad_reduce_in_fp32=True,
-            overlap_grad_reduce=False,
-            overlap_param_gather=False,
+            # DEBUGGING (use FSDP)
+            # overlap_grad_reduce=False,
+            # overlap_param_gather=False,
+            overlap_grad_reduce=True if use_megatron_fsdp else False,
+            overlap_param_gather=True if use_megatron_fsdp else False,
             average_in_collective=True,
             use_distributed_optimizer=True,
             use_megatron_fsdp=use_megatron_fsdp,  # need use_distributed_optimizer=True

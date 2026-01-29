@@ -48,6 +48,8 @@ from dfm.src.megatron.model.common.dit_attention import (
     DiTSelfAttention,
 )
 
+from dfm.src.megatron.model.reve.reve_pytorch.layers import latency_tracker
+import time
 
 @dataclass
 class ReveWithAdaLNSubmodules(TransformerLayerSubmodules):
@@ -83,10 +85,15 @@ class RMSNorm(nn.Module):
 class Modulation(nn.Module):
     def __init__(self, config: TransformerConfig, dims: int):
         super().__init__()
+
+        # DEBUGGING
+        modulation_config = copy.deepcopy(config)
+        modulation_config.sequence_parallel = False
+
         self.lin = tensor_parallel.ColumnParallelLinear(
             dims,
             dims,
-            config=config,
+            config=modulation_config,
             init_method=torch.nn.init.xavier_normal_,
             bias=True,
             skip_bias_add=False,
@@ -123,51 +130,17 @@ class GateResiduals(nn.Module):
         vec: torch.Tensor | None,
     ) -> torch.Tensor:
 
-        # # DEBUGGING (match forward pass in reve_pytorch/layers.py)
-        # if torch.distributed.get_rank() == 0:
-        #     print(f"[DEBUG]     (reve_layer_spec.py - before modulation) backbone.shape - backbone.mean() - backbone.std() - backbone.norm(): {backbone.shape} - {backbone.mean()} - {backbone.std()} - {backbone.norm()}")
-        #     print(f"[DEBUG]     (reve_layer_spec.py - before modulation) residual.shape - residual.mean() - residual.std() - residual.norm(): {residual.shape} - {residual.mean()} - {residual.std()} - {residual.norm()}")
-        #     if vec is not None:
-        #         print(f"[DEBUG]     (reve_layer_spec.py - before modulation) vec.shape - vec.mean() - vec.std() - vec.norm(): {vec.shape} - {vec.mean()} - {vec.std()} - {vec.norm()}")
-
         if self.do_modulation:
             gate = self.modulation(vec) + 2.9
         else:
             gate = self.gate + 3.9
             gate = gate.unsqueeze(0)
-
-        # # DEBUGGING (match forward pass in reve_pytorch/layers.py)
-        # if torch.distributed.get_rank() == 0:
-        #     print(f"[DEBUG]     (reve_layer_spec.py - after modulation) gate.shape - gate.mean() - gate.std() - gate.norm(): {gate.shape} - {gate.mean()} - {gate.std()} - {gate.norm()}")
-
         gate = torch.sigmoid(gate)
         gate = gate * (1 - 2 * self.epsilon) + self.epsilon
-
-
-        # # DEBUGGING (match forward pass in reve_pytorch/layers.py)
-        # if torch.distributed.get_rank() == 0:
-        #     print(f"[DEBUG]     (reve_layer_spec.py - before norm) residual.shape - residual.mean() - residual.std() - residual.norm(): {residual.shape} - {residual.mean()} - {residual.std()} - {residual.norm()}")
-
         normalized_residual = self.norm(residual)
-
-
-        # # DEBUGGING (match forward pass in reve_pytorch/layers.py)
-        # if torch.distributed.get_rank() == 0:
-        #     print(f"[DEBUG]     (reve_layer_spec.py - after norm) normalized_residual.shape - normalized_residual.mean() - normalized_residual.std() - normalized_residual.norm(): {normalized_residual.shape} - {normalized_residual.mean()} - {normalized_residual.std()} - {normalized_residual.norm()}")
-
         if gate.ndim == 2:
             # NOTE: Need to unsqueeze(0) instead of unsqueeze(1) as in original Reve code to broadcast with the sequence
             gate = gate.unsqueeze(0)  # to broadcast with the sequence
-
-        # # DEBUGGING (match forward pass in reve_pytorch/layers.py)
-        # if torch.distributed.get_rank() == 0:
-        #     print(f"[DEBUG]     (reve_layer_spec.py - before return) backbone.shape - backbone.mean() - backbone.std() - backbone.norm(): {backbone.shape} - {backbone.mean()} - {backbone.std()} - {backbone.norm()}")
-        #     print(f"[DEBUG]     (reve_layer_spec.py - before return) gate.shape - gate.mean() - gate.std() - gate.norm(): {gate.shape} - {gate.mean()} - {gate.std()} - {gate.norm()}")
-        #     print(f"[DEBUG]     (reve_layer_spec.py - before return) normalized_residual.shape - normalized_residual.mean() - normalized_residual.std() - normalized_residual.norm(): {normalized_residual.shape} - {normalized_residual.mean()} - {normalized_residual.std()} - {normalized_residual.norm()}")
-        #     print(f"[DEBUG]     (reve_layer_spec.py - before return) (backbone * gate).shape - (backbone * gate).mean() - (backbone * gate).std() - (backbone * gate).norm(): {(backbone * gate).shape} - {(backbone * gate).mean()} - {(backbone * gate).std()} - {(backbone * gate).norm()}")
-        #     print(f"[DEBUG]     (reve_layer_spec.py - before return) ((1 - gate) * normalized_residual).shape - ((1 - gate) * normalized_residual).mean() - ((1 - gate) * normalized_residual).std() - ((1 - gate) * normalized_residual).norm(): {((1 - gate) * normalized_residual).shape} - {((1 - gate) * normalized_residual).mean()} - {((1 - gate) * normalized_residual).std()} - {((1 - gate) * normalized_residual).norm()}")
-        #     print(f"[DEBUG]     (reve_layer_spec.py - before return) (backbone * gate + (1 - gate) * normalized_residual).shape - (backbone * gate + (1 - gate) * normalized_residual).mean() - (backbone * gate + (1 - gate) * normalized_residual).std() - (backbone * gate + (1 - gate) * normalized_residual).norm(): {(backbone * gate + (1 - gate) * normalized_residual).shape} - {(backbone * gate + (1 - gate) * normalized_residual).mean()} - {(backbone * gate + (1 - gate) * normalized_residual).std()} - {(backbone * gate + (1 - gate) * normalized_residual).norm()}")
-
         return backbone * gate + (1 - gate) * normalized_residual
 
 
@@ -263,19 +236,20 @@ class ReveLayerWithAdaLN(TransformerLayer):
         rotary_pos_cos_sin=None,
         **kwargs,
     ):
+
+
+        # DEBUGGING (benchmarking)
+        full_layer_forward_start_time = time.time()
+
         vector_emb = attention_mask
-
-        # # DEBUGGING (match forward pass in reve_pytorch/model.py)
-        # if torch.distributed.get_rank() == 0:
-        #     print(f"[DEBUG]     (reve_layer_spec.py) *** Transformer layer forward pass started.")
-
 
         ########################## Self attention #################################
 
-        # # DEBUGGING (match forward pass in reve_pytorch/model.py)
-        # if torch.distributed.get_rank() == 0:
-        #     print(f"[DEBUG]     (reve_layer_spec.py) *** Self attention started.")
+        # DEBUGGING (benchmarking)
+        self_attention_start_time = time.time()
 
+        # DEBUGGING (benchmarking)
+        self_attention_modulation_start_time = time.time()
 
         # Modulation
         if self.do_modulation:
@@ -283,11 +257,12 @@ class ReveLayerWithAdaLN(TransformerLayer):
         else:
             scaled_hidden_states = hidden_states
 
-        # # DEBUGGING (match forward pass in reve_pytorch/model.py)
-        # if torch.distributed.get_rank() == 0:
-        #     print(f"[DEBUG]     (reve_layer_spec.py - before self attention) scaled_hidden_states.shape - scaled_hidden_states.mean() - scaled_hidden_states.std(): {scaled_hidden_states.shape} - {scaled_hidden_states.mean()} - {scaled_hidden_states.std()}")
-        #     # print(f"[DEBUG]     (reve_layer_spec.py - before self attention) rotary_pos_emb.shape - rotary_pos_emb.mean() - rotary_pos_emb.std(): {rotary_pos_emb.shape} - {rotary_pos_emb.mean()} - {rotary_pos_emb.std()}")
-        #     # print(f"[DEBUG]     (reve_layer_spec.py - before self attention) packed_seq_params['self_attention']: {packed_seq_params['self_attention']}")
+        # DEBUGGING (benchmarking)
+        self_attention_modulation_end_time = time.time()
+        latency_tracker.update(f"[DEBUG]             (reve_layer_spec.py) - self attention modulation time: {self_attention_modulation_end_time - self_attention_modulation_start_time} seconds", now=self_attention_modulation_end_time)
+
+        # DEBUGGING (benchmarking)
+        self_attention_core_attention_start_time = time.time()
 
         # Attention
         attention_output, _ = self.full_self_attention(
@@ -297,9 +272,12 @@ class ReveLayerWithAdaLN(TransformerLayer):
             packed_seq_params=None if packed_seq_params is None else packed_seq_params["self_attention"],
         )
 
-        # # DEBUGGING (match forward pass in reve_pytorch/model.py)
-        # if torch.distributed.get_rank() == 0:
-        #     print(f"[DEBUG]     (reve_layer_spec.py - after self attention) attention_output.shape - attention_output.mean() - attention_output.std(): {attention_output.shape} - {attention_output.mean()} - {attention_output.std()}")
+        # DEBUGGING (benchmarking)
+        self_attention_core_attention_end_time = time.time()
+        latency_tracker.update(f"[DEBUG]             (reve_layer_spec.py) - self attention core attention time: {self_attention_core_attention_end_time - self_attention_core_attention_start_time} seconds", now=self_attention_core_attention_end_time)
+
+        # DEBUGGING (benchmarking)
+        self_attention_gate_residuals_start_time = time.time()
 
         # Gate residuals
         if self.use_residual:
@@ -307,24 +285,35 @@ class ReveLayerWithAdaLN(TransformerLayer):
         else:
             hidden_states = attention_output
 
-        # # DEBUGGING (match forward pass in reve_pytorch/model.py)
-        # if torch.distributed.get_rank() == 0:
-        #     print(f"[DEBUG]     (reve_layer_spec.py - after gate residuals) hidden_states.shape - hidden_states.mean() - hidden_states.std(): {hidden_states.shape} - {hidden_states.mean()} - {hidden_states.std()}")
+        # DEBUGGING (benchmarking)
+        self_attention_gate_residuals_end_time = time.time()
+        latency_tracker.update(f"[DEBUG]             (reve_layer_spec.py) - self attention gate residuals time: {self_attention_gate_residuals_end_time - self_attention_gate_residuals_start_time} seconds", now=self_attention_gate_residuals_end_time)
+
+        # DEBUGGING (benchmarking)
+        self_attention_end_time = time.time()
+        latency_tracker.update(f"[DEBUG]         (reve_layer_spec.py) - self attention time: {self_attention_end_time - self_attention_start_time} seconds", now=self_attention_end_time)
 
         ########################## Cross attention #################################
 
-        # # DEBUGGING (match forward pass in reve_pytorch/model.py)
-        # if torch.distributed.get_rank() == 0:
-        #     print(f"[DEBUG]     (reve_layer_spec.py) *** Cross attention started.")
-
-
+        # DEBUGGING (benchmarking)
+        cross_attention_start_time = time.time()
 
         if self.do_cross_attn:
+            # DEBUGGING (benchmarking)
+            cross_attention_modulation_start_time = time.time()
+
             # Modulation
             if self.do_modulation:
                 scaled_hidden_states = self.mod_cross_attention(vector_emb) * hidden_states
             else:
                 scaled_hidden_states = hidden_states
+
+            # DEBUGGING (benchmarking)
+            cross_attention_modulation_end_time = time.time()
+            latency_tracker.update(f"[DEBUG]             (reve_layer_spec.py) - cross attention modulation time: {cross_attention_modulation_end_time - cross_attention_modulation_start_time} seconds", now=cross_attention_modulation_end_time)
+
+            # DEBUGGING (benchmarking)
+            cross_attention_core_attention_start_time = time.time()
 
             # Attention
             attention_output, _ = self.cross_attention(
@@ -334,18 +323,34 @@ class ReveLayerWithAdaLN(TransformerLayer):
                 packed_seq_params=None if packed_seq_params is None else packed_seq_params["cross_attention"],
             )
 
+            # DEBUGGING (benchmarking)
+            cross_attention_core_attention_end_time = time.time()
+            latency_tracker.update(f"[DEBUG]             (reve_layer_spec.py) - cross attention core attention time: {cross_attention_core_attention_end_time - cross_attention_core_attention_start_time} seconds", now=cross_attention_core_attention_end_time)
+
+            # DEBUGGING (benchmarking)
+            cross_attention_gate_residuals_start_time = time.time()
+
             # Gate residuals
             if self.use_residual:
                 hidden_states = self.gate_residual_cross_attention(hidden_states, attention_output, vector_emb)
             else:
                 hidden_states = attention_output
 
+            # DEBUGGING (benchmarking)
+            cross_attention_gate_residuals_end_time = time.time()
+            latency_tracker.update(f"[DEBUG]             (reve_layer_spec.py) - cross attention gate residuals time: {cross_attention_gate_residuals_end_time - cross_attention_gate_residuals_start_time} seconds", now=cross_attention_gate_residuals_end_time)
+
+        # DEBUGGING (benchmarking)
+        cross_attention_end_time = time.time()
+        latency_tracker.update(f"[DEBUG]         (reve_layer_spec.py) - cross attention time: {cross_attention_end_time - cross_attention_start_time} seconds", now=cross_attention_end_time)
+
         ########################## MLP #################################
 
-        # # DEBUGGING (match forward pass in reve_pytorch/model.py)
-        # if torch.distributed.get_rank() == 0:
-        #     print(f"[DEBUG]     (reve_layer_spec.py) *** MLP started.")
+        # DEBUGGING (benchmarking)
+        mlp_start_time = time.time()
 
+        # DEBUGGING (benchmarking)
+        mlp_modulation_start_time = time.time()
 
         # Modulation
         if self.do_modulation:
@@ -353,14 +358,32 @@ class ReveLayerWithAdaLN(TransformerLayer):
         else:
             scaled_hidden_states = hidden_states
 
+        # DEBUGGING (benchmarking)
+        mlp_modulation_end_time = time.time()
+        latency_tracker.update(f"[DEBUG]             (reve_layer_spec.py) - mlp modulation time: {mlp_modulation_end_time - mlp_modulation_start_time} seconds", now=mlp_modulation_end_time)
+
+        # DEBUGGING (benchmarking)
+        mlp_core_computation_start_time = time.time()
+
         # MLP
         mlp_output, _ = self.mlp(scaled_hidden_states)
+
+        # DEBUGGING (benchmarking)
+        mlp_core_computation_end_time = time.time()
+        latency_tracker.update(f"[DEBUG]             (reve_layer_spec.py) - mlp core computation time: {mlp_core_computation_end_time - mlp_core_computation_start_time} seconds", now=mlp_core_computation_end_time)
+
+        # DEBUGGING (benchmarking)
+        mlp_gate_residuals_start_time = time.time()
 
         # Gate residuals
         if self.use_residual:
             hidden_states = self.gate_residual_mlp(hidden_states, mlp_output, vector_emb)
         else:
             hidden_states = mlp_output
+
+        # DEBUGGING (benchmarking)
+        mlp_gate_residuals_end_time = time.time()
+        latency_tracker.update(f"[DEBUG]             (reve_layer_spec.py) - mlp gate residuals time: {mlp_gate_residuals_end_time - mlp_gate_residuals_start_time} seconds", now=mlp_gate_residuals_end_time)
 
         # Jit compiled function creates 'view' tensor. This tensor
         # potentially gets saved in the MPU checkpoint function context,
@@ -369,6 +392,15 @@ class ReveLayerWithAdaLN(TransformerLayer):
         # p2p_communication), it serves to document the origin of this
         # 'view' tensor.
         output = make_viewless_tensor(inp=hidden_states, requires_grad=hidden_states.requires_grad, keep_graph=True)
+
+        # DEBUGGING (benchmarking)
+        mlp_end_time = time.time()
+        latency_tracker.update(f"[DEBUG]         (reve_layer_spec.py) - mlp time: {mlp_end_time - mlp_start_time} seconds", now=mlp_end_time)
+
+        # DEBUGGING (benchmarking)
+        full_layer_forward_end_time = time.time()
+        latency_tracker.update(f"[DEBUG]     (reve_layer_spec.py) - full layer forward time: {full_layer_forward_end_time - full_layer_forward_start_time} seconds", now=full_layer_forward_end_time)
+
         return output, context
 
 
