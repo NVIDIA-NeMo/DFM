@@ -19,6 +19,7 @@ from torch.distributed.fsdp.wrap import (
 
 from model import ReveV2
 from layers import TransformerBlock
+import time
 
 def get_small_config():
     """Small config for fast testing."""
@@ -136,23 +137,30 @@ def mock_train(config):
     # txt_token_dim = text_dims
     # ## config 2 (highest runnable)
     # bs = 1
-    # num_img_tokens = 2048
+    # num_img_tokens = 2304
     # img_token_dim = latent_dims * (patch_size ** 2)
     # num_txt_tokens = 256
     # txt_token_dim = text_dims
-    ## config 3 (highest runnable)
-    # bs = 8
-    # num_img_tokens = 256
+    ## config 3 (highest runnable for TP=8)
+    bs = 72
+    num_img_tokens = 16*16
+    img_token_dim = latent_dims * (patch_size ** 2)
+    num_txt_tokens = 128
+    txt_token_dim = text_dims
+
+    # ## testing config
+    # bs = 1
+    # num_img_tokens = 160*160
     # img_token_dim = latent_dims * (patch_size ** 2)
     # num_txt_tokens = 128
     # txt_token_dim = text_dims
 
-    ## testing config
-    bs = 16
-    num_img_tokens = 256
-    img_token_dim = latent_dims * (patch_size ** 2)
-    num_txt_tokens = 128
-    txt_token_dim = text_dims    
+    # ## testing config 2
+    # bs = 4
+    # num_img_tokens = 32*32
+    # img_token_dim = latent_dims * (patch_size ** 2)
+    # num_txt_tokens = 256
+    # txt_token_dim = text_dims
 
     # Initialize model
     if rank == 0:
@@ -185,8 +193,10 @@ def mock_train(config):
     if world_size <= 8: 
             # If running on fewer devices than expected for a node (e.g. debugging with 1 GPU),
             # FULL_SHARD is equivalent (or NO_SHARD if world_size=1) but safer.
+            print("Sharding strategy: FULL_SHARD")
             sharding_strategy = ShardingStrategy.FULL_SHARD
     else:
+            print("Sharding strategy: HYBRID_SHARD")
             sharding_strategy = ShardingStrategy.HYBRID_SHARD
 
     model = FSDP(
@@ -213,6 +223,9 @@ def mock_train(config):
         print("Starting training loop for a number of steps...", flush=True)
     
     step_times = []
+    forward_times = []
+    backward_times = []
+    optimizer_times = []
     
     # Wait for all ranks
     if rank == 0:
@@ -223,6 +236,7 @@ def mock_train(config):
     
     num_steps = 20000
     for step in range(1, num_steps + 1):
+        torch.cuda.synchronize()
         step_start = time.time()
         
         optimizer.zero_grad()
@@ -242,6 +256,8 @@ def mock_train(config):
         target = torch.randn_like(x)
 
         # Forward pass
+        torch.cuda.synchronize()
+        forward_start = time.time()
         with torch.autocast(device_type="cuda", dtype=torch.bfloat16):
             output = model(
                 x=x,
@@ -254,10 +270,18 @@ def mock_train(config):
 
         # Compute loss
         loss = criterion(output, target)
+        torch.cuda.synchronize()
+        forward_end = time.time()
+        forward_times.append(forward_end - forward_start)
         
         # Backward pass
+        torch.cuda.synchronize()
+        backward_start = time.time()
         loss.backward()
-        
+        torch.cuda.synchronize()
+        backward_end = time.time()
+        backward_times.append(backward_end - backward_start)
+
         # # Check optimizer
         # def check_optimizer_full(optimizer):
         #     # 1. Get the first parameter
@@ -280,15 +304,22 @@ def mock_train(config):
         # check_optimizer_full(optimizer)
 
         # Optimization step
-        optimizer.step()
-        
         torch.cuda.synchronize()
+        optim_start = time.time()
+        optimizer.step()
+        torch.cuda.synchronize()
+        optim_end = time.time()
+        optimizer_times.append(optim_end - optim_start)
+        
         step_end = time.time()
         step_times.append(step_end - step_start)
 
         if step % 10 == 0 and rank == 0:
             avg_step_time = sum(step_times[-10:]) / 10
-            print(f"Step {step}/{num_steps} | Loss: {loss.item():.6f} | Avg Step Time (last 10): {avg_step_time:.4f}s")
+            avg_fwd_time = sum(forward_times[-10:]) / 10
+            avg_bwd_time = sum(backward_times[-10:]) / 10
+            avg_opt_time = sum(optimizer_times[-10:]) / 10
+            print(f"Step {step}/{num_steps} | Loss: {loss.item():.6f} | Avg Step Time (last 10): {avg_step_time:.4f}s | Fwd: {avg_fwd_time:.4f}s | Bwd: {avg_bwd_time:.4f}s | Opt: {avg_opt_time:.4f}s")
 
     if rank == 0:
         print(f"Training finished. Overall Average Step Time: {sum(step_times) / len(step_times):.4f}s")
