@@ -468,7 +468,7 @@ class TrainDiffusionRecipe(BaseRecipe):
                 micro_losses = []
                 for micro_batch in batch_group:
                     try:
-                        loss, metrics = self.flow_matching_pipeline.step(
+                        weighted_loss, average_weighted_loss, loss_mask, metrics = self.flow_matching_pipeline.step(
                             model=self.model,
                             batch=micro_batch,
                             device=self.device,
@@ -482,8 +482,9 @@ class TrainDiffusionRecipe(BaseRecipe):
                         logging.info(f"[DEBUG] Batch shapes - video: {video_shape}, text: {text_shape}")
                         raise
 
-                    (loss / len(batch_group)).backward()
-                    micro_losses.append(float(loss.item()))
+                    # Use average_weighted_loss for backprop (scalar for gradient accumulation)
+                    (average_weighted_loss / len(batch_group)).backward()
+                    micro_losses.append(float(average_weighted_loss.item()))
 
                 grad_norm = torch.nn.utils.clip_grad_norm_(self.model.parameters(), max_norm=1.0)
                 grad_norm = float(grad_norm) if torch.is_tensor(grad_norm) else grad_norm

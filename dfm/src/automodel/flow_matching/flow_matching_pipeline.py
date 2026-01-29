@@ -105,7 +105,7 @@ class FlowMatchingPipeline:
         )
 
         # Training step
-        loss, metrics = pipeline.step(model, batch, device, dtype, global_step)
+        weighted_loss, average_weighted_loss, loss_mask, metrics = pipeline.step(model, batch, device, dtype, global_step)
     """
 
     def __init__(
@@ -266,7 +266,8 @@ class FlowMatchingPipeline:
         model_pred: torch.Tensor,
         target: torch.Tensor,
         sigma: torch.Tensor,
-    ) -> Tuple[torch.Tensor, torch.Tensor, torch.Tensor]:
+        batch: Optional[Dict[str, Any]] = None,
+    ) -> Tuple[torch.Tensor, torch.Tensor, torch.Tensor, torch.Tensor, torch.Tensor, Optional[torch.Tensor]]:
         """
         Compute flow matching loss with optional weighting.
 
@@ -276,13 +277,18 @@ class FlowMatchingPipeline:
             model_pred: Model prediction
             target: Target (velocity = noise - clean)
             sigma: Sigma values for each sample
+            batch: Optional batch dictionary containing loss_mask
 
         Returns:
-            weighted_loss: Final loss to backprop
-            unweighted_loss: Raw MSE loss
+            weighted_loss: Per-element weighted loss
+            average_weighted_loss: Scalar average weighted loss
+            unweighted_loss: Per-element raw MSE loss
+            average_unweighted_loss: Scalar average unweighted loss
             loss_weight: Applied weights
+            loss_mask: Loss mask from batch (or None if not present)
         """
         loss = nn.functional.mse_loss(model_pred.float(), target.float(), reduction="none")
+        loss_mask = batch.get("loss_mask") if batch is not None else None
 
         if self.use_loss_weighting:
             loss_weight = 1.0 + self.flow_shift * sigma
@@ -292,19 +298,21 @@ class FlowMatchingPipeline:
 
         loss_weight = loss_weight.to(model_pred.device)
 
-        unweighted_loss = loss.mean()
-        weighted_loss = (loss * loss_weight).mean()
+        unweighted_loss = loss
+        weighted_loss = loss * loss_weight
+        average_unweighted_loss = unweighted_loss.mean()
+        average_weighted_loss = weighted_loss.mean()
 
-        return weighted_loss, unweighted_loss, loss_weight
+        return weighted_loss, average_weighted_loss, unweighted_loss, average_unweighted_loss, loss_weight, loss_mask
 
     def step(
         self,
         model: nn.Module,
         batch: Dict[str, Any],
-        device: torch.device,
-        dtype: torch.dtype,
+        device: torch.device = torch.device("cuda"),
+        dtype: torch.dtype = torch.bfloat16,
         global_step: int = 0,
-    ) -> Tuple[torch.Tensor, Dict[str, Any]]:
+    ) -> Tuple[torch.Tensor, torch.Tensor, Optional[torch.Tensor], Dict[str, Any]]:
         """
         Execute a single training step with flow matching.
 
@@ -326,7 +334,9 @@ class FlowMatchingPipeline:
             global_step: Current training step (for logging)
 
         Returns:
-            loss: The computed loss
+            weighted_loss: Per-element weighted loss
+            average_weighted_loss: Scalar average weighted loss
+            loss_mask: Mask indicating valid loss elements (or None)
             metrics: Dictionary of training metrics
         """
         debug_mode = os.environ.get("DEBUG_TRAINING", "0") == "1"
@@ -407,26 +417,30 @@ class FlowMatchingPipeline:
         # ====================================================================
         # Loss Computation
         # ====================================================================
-        weighted_loss, unweighted_loss, loss_weight = self.compute_loss(model_pred, target, sigma)
+        weighted_loss, average_weighted_loss, unweighted_loss, average_unweighted_loss, loss_weight, loss_mask = (
+            self.compute_loss(model_pred, target, sigma, batch)
+        )
 
         # Safety check
-        if torch.isnan(weighted_loss) or weighted_loss > 100:
-            logger.error(f"[ERROR] Loss explosion! Loss={weighted_loss.item():.3f}")
-            raise ValueError(f"Loss exploded: {weighted_loss.item()}")
+        if torch.isnan(average_weighted_loss) or average_weighted_loss > 100:
+            logger.error(f"[ERROR] Loss explosion! Loss={average_weighted_loss.item():.3f}")
+            raise ValueError(f"Loss exploded: {average_weighted_loss.item()}")
 
         # Logging
         if detailed_log and debug_mode:
-            self._log_loss_detailed(global_step, model_pred, target, loss_weight, unweighted_loss, weighted_loss)
+            self._log_loss_detailed(
+                global_step, model_pred, target, loss_weight, average_unweighted_loss, average_weighted_loss
+            )
         elif summary_log and debug_mode:
             logger.info(
-                f"[STEP {global_step}] Loss: {weighted_loss.item():.6f} | "
+                f"[STEP {global_step}] Loss: {average_weighted_loss.item():.6f} | "
                 f"w=[{loss_weight.min():.2f},{loss_weight.max():.2f}]"
             )
 
         # Collect metrics
         metrics = {
-            "loss": weighted_loss.item(),
-            "unweighted_loss": unweighted_loss.item(),
+            "loss": average_weighted_loss.item(),
+            "unweighted_loss": average_unweighted_loss.item(),
             "sigma_min": sigma.min().item(),
             "sigma_max": sigma.max().item(),
             "sigma_mean": sigma.mean().item(),
@@ -441,7 +455,7 @@ class FlowMatchingPipeline:
             "data_type": data_type,
         }
 
-        return weighted_loss, metrics
+        return weighted_loss, average_weighted_loss, loss_mask, metrics
 
     def _log_detailed(
         self,
@@ -514,9 +528,11 @@ class FlowMatchingPipeline:
         logger.info(f"[WEIGHTS] Range: [{loss_weight.min():.4f}, {loss_weight.max():.4f}]")
         logger.info(f"[WEIGHTS] Mean: {loss_weight.mean():.4f}")
         logger.info("")
-        logger.info(f"[LOSS] Unweighted: {unweighted_loss.item():.6f}")
-        logger.info(f"[LOSS] Weighted:   {weighted_loss.item():.6f}")
-        logger.info(f"[LOSS] Impact:     {(weighted_loss / max(unweighted_loss, 1e-8)):.3f}x")
+        unweighted_val = unweighted_loss.item()
+        weighted_val = weighted_loss.item()
+        logger.info(f"[LOSS] Unweighted: {unweighted_val:.6f}")
+        logger.info(f"[LOSS] Weighted:   {weighted_val:.6f}")
+        logger.info(f"[LOSS] Impact:     {(weighted_val / max(unweighted_val, 1e-8)):.3f}x")
         logger.info("=" * 80 + "\n")
 
 

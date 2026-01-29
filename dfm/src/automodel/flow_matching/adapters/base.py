@@ -38,6 +38,7 @@ class FlowMatchingContext:
     Attributes:
         noisy_latents: [B, C, F, H, W] or [B, C, H, W] - Noisy latents after interpolation
         latents: [B, C, F, H, W] for video or [B, C, H, W] for image - Original clean latents
+            (also accessible via deprecated 'video_latents' property for backward compatibility)
         timesteps: [B] - Sampled timesteps
         sigma: [B] - Sigma values
         task_type: "t2v" or "i2v"
@@ -45,7 +46,7 @@ class FlowMatchingContext:
         device: Device for tensor operations
         dtype: Data type for tensor operations
         cfg_dropout_prob: Probability of dropping text embeddings (setting to 0) during
-            training for classifier-free guidance (CFG)
+            training for classifier-free guidance (CFG). Defaults to 0.0 for backward compatibility.
         batch: Original batch dictionary (for model-specific data)
     """
 
@@ -63,11 +64,16 @@ class FlowMatchingContext:
     device: torch.device
     dtype: torch.dtype
 
-    # CFG dropout probability
-    cfg_dropout_prob: float
-
     # Original batch (for model-specific data)
     batch: Dict[str, Any]
+
+    # CFG dropout probability (optional with default for backward compatibility)
+    cfg_dropout_prob: float = 0.0
+
+    @property
+    def video_latents(self) -> torch.Tensor:
+        """Backward compatibility alias for 'latents' field."""
+        return self.latents
 
 
 class ModelAdapter(ABC):
