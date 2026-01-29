@@ -161,9 +161,6 @@ def create_dmd_optimizer_provider(
         fake_score_condition=fake_score_condition,
         student_condition=student_condition,
         discriminator_condition=discriminator_condition,
-        fake_score_lr_mult=fake_score_lr_mult,
-        student_lr_mult=student_lr_mult,
-        discriminator_lr_mult=discriminator_lr_mult,
     )
 
 

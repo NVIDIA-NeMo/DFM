@@ -13,6 +13,21 @@ model:
   max_img_w: 448
   max_frames: 48
 
+  # FastGen configuration (for DMD distillation)
+  fast_gen_config:
+    gan_loss_weight_gen: 0.03
+    student_update_freq: 5
+    student_sample_steps: 4
+    gan_use_same_t_noise: true
+    fake_score_pred_type: x0
+    sample_t_cfg:
+      t_list: [0.999, 0.967, 0.908, 0.769, 0]
+      time_dist_type: shifted
+      shift: 5.0
+    discriminator:
+      disc_type: multiscale_down_mlp_large
+      feature_indices: [15, 22, 29]
+
 # Dataset configuration
 dataset:
   task_encoder_seq_length: 33000

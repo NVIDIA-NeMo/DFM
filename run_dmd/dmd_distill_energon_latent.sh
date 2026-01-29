@@ -4,7 +4,7 @@ num_gpus=$(nvidia-smi --query-gpu=name --format=csv,noheader | wc -l)
 dataset="vidprom_wan/vidprom_wan_480p_latents"
 num_train_step=100000
 gan_loss_weight=0.03
-custom_name="convergence_test_wan_dmd_latent_distill_gan_${gan_loss_weight}_"
+custom_name="after_fast_clean_cleanup_wan_dmd_latent_distill_gan_${gan_loss_weight}_"
 cp=1
 pp=1
 tp=1

@@ -40,50 +40,6 @@ from dfm.src.megatron.model.wan.wan_step import wan_data_step
 logger = logging.getLogger(__name__)
 
 
-class MegatronFastGenInferenceWrapper:
-    """
-    Wrapper that adapts Megatron WanModel interface to FastGen network interface.
-    This allows using FastGenModel.generator_fn with Megatron models.
-    """
-
-    def __init__(self, model, batch: dict):
-        self.model = model
-        self.grid_sizes = batch["grid_sizes"]
-        self.packed_seq_params = batch.get("packed_seq_params", None)
-        # Forward noise_scheduler from wrapped model
-        self.noise_scheduler = model.noise_scheduler
-
-    # delete all these to downstream model
-    @property
-    def training(self):
-        return self.model.training
-
-    def eval(self):
-        self.model.eval()
-        return self
-
-    def train(self, mode=True):
-        self.model.train(mode)
-        return self
-
-    def parameters(self):
-        return self.model.parameters()
-
-    def __call__(self, x, t, condition=None, fwd_pred_type=None, **kwargs):
-        """Adapt FastGen call signature to Megatron WanModel signature."""
-        return self.model(
-            x,
-            t=t,
-            context=condition,  # FastGen uses 'condition', WanModel uses 'context'
-            grid_sizes=self.grid_sizes,
-            packed_seq_params=self.packed_seq_params,
-            scale_t=True,  # Needed when using noise scheduler timesteps
-            fwd_pred_type=fwd_pred_type,
-            unpatchify_features=True,
-            **kwargs,
-        )
-
-
 class WanDMDStep:
     def __init__(
         self,
@@ -393,17 +349,28 @@ class WanDMDStep:
                 batch["video_latents"], batch["grid_sizes"], z_dim, unwrapped_model.net.patch_size
             )
             batch["condition"] = batch["context_embeddings"]
+
+            # Prepare forward kwargs explicitly
+            fwd_kwargs = {
+                "grid_sizes": batch["grid_sizes"],
+                "packed_seq_params": batch["packed_seq_params"],
+                "scale_t": True,
+                "unpatchify_features": True,
+            }
+
             # Debug: check pipeline parallel state
             if parallel_state.is_pipeline_last_stage():
                 loss_map, outputs_dict = model.forward(
                     data=batch,
                     iteration=state.train_state.step + 1,
+                    **fwd_kwargs,
                 )
                 output_tensor = loss_map["total_loss"]
             else:
                 output_tensor = model.forward(
                     data=batch,
                     iteration=state.train_state.step + 1,
+                    **fwd_kwargs,
                 )
                 outputs_dict = None  # Ensure outputs_dict is defined for non-last stages
         loss = output_tensor

@@ -18,7 +18,7 @@ class WanDMDModel(WanModel):
         self,
         x: Tensor,
         t: Tensor,
-        context: Tensor,
+        condition: Tensor,
         grid_sizes: list[Tuple[int, int, int]],
         fwd_pred_type: Optional[str] = None,
         packed_seq_params: PackedSeqParams = None,
@@ -34,7 +34,7 @@ class WanDMDModel(WanModel):
             x List[Tensor]: list of vae encoded data (in_channel, f, h, w)
             grid_sizes List[Tuple[int, int, int]]: list of grid sizes (f, h, w)
             t Tensor: timesteps (in [0, 1] if scale_t=True, or [0, 1000] if scale_t=False)
-            context List[Tensor]: list of context (text_len, hidden_size)
+            condition List[Tensor]: list of condition (text_len, hidden_size)
             packed_seq_params PackedSeqParams: packed sequence parameters
             scale_t: If True, rescale t from [0, 1] to [0, 1000] for timestep embeddings.
                      Use this when t comes from noise_scheduler (e.g., during distillation).
@@ -53,7 +53,6 @@ class WanDMDModel(WanModel):
         x_input = x
         if unpatchify_features:
             x = patchify_compact(x, self.patch_size)
-
         # run input embedding
         if self.pre_process:
             # x.shape [s, b, c * pF * pH * pW]
@@ -87,7 +86,7 @@ class WanDMDModel(WanModel):
         timestep_sinusoidal = self.timesteps_proj(t).to(x.dtype)
         e = self.time_embedder(timestep_sinusoidal)
         e0 = self.time_proj(self.time_proj_act_fn(e)).unflatten(1, (6, self.config.hidden_size))
-        context = self.text_embedding(context)  # shape [text_len, b, hidden_size]
+        condition = self.text_embedding(condition)  # shape [text_len, b, hidden_size]
 
         # calculate rotary pos emb
         n_head, dim_head = self.num_heads, self.config.hidden_size // self.num_heads
@@ -100,13 +99,13 @@ class WanDMDModel(WanModel):
         decoder_output = self.decoder(
             hidden_states=x,
             attention_mask=e0,
-            context=context,
+            context=condition,
             context_mask=None,
             rotary_pos_emb=rotary_pos_emb,
             rotary_pos_cos=None,
             rotary_pos_sin=None,
             packed_seq_params=packed_seq_params,
-            feature_indices=feature_indices,
+            extract_layer_indices=feature_indices,
         )
 
         # Handle feature extraction (consistent with FastGen's Wan implementation)

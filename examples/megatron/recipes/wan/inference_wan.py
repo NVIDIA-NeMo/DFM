@@ -175,8 +175,9 @@ def initialize_distributed(tensor_model_parallel_size=1, pipeline_model_parallel
 
 def generate(args):
     initialize_distributed(
-        tensor_model_parallel_size=args.tp_size,
-        pipeline_model_parallel_size=args.pp_size,
+        tensor_model_parallel_size=args.tensor_parallel_size,
+        pipeline_model_parallel_size=args.pipeline_parallel_size,
+        context_parallel_size=args.context_parallel_size,
     )
     rank = torch.distributed.get_rank()
     device = torch.cuda.current_device()

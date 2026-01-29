@@ -25,11 +25,12 @@ iteration or other training state.
 """
 
 from dataclasses import dataclass, field
-from typing import Callable, List, Optional
+from typing import Callable, Dict, List, Optional
 
 from megatron.bridge.training.config import OptimizerConfig
-from megatron.core.optimizer import OptimizerConfig, get_megatron_optimizer
+from megatron.core.optimizer import OptimizerConfig, ParamGroupOverride, ParamKey, get_megatron_optimizer
 from megatron.core.optimizer.optimizer import MegatronOptimizer
+from megatron.core.process_groups_config import ProcessGroupCollection
 from megatron.core.transformer.module import MegatronModule
 
 from .conditional_chained_optimizer import ConditionalChainedOptimizer
@@ -52,18 +53,12 @@ class DMDOptimizerProvider(OptimizerConfig):
         fake_score_condition: Callable that takes iteration (int) and returns True when fake_score should be optimized
         student_condition: Callable that takes iteration (int) and returns True when student should be optimized
         discriminator_condition: Callable that takes iteration (int) and returns True when discriminator should be optimized
-        fake_score_lr_mult: Learning rate multiplier for fake_score optimizer (default: 1.0)
-        student_lr_mult: Learning rate multiplier for student optimizer (default: 1.0)
-        discriminator_lr_mult: Learning rate multiplier for discriminator optimizer (default: 1.0)
     """
 
     # DMD-specific fields
     fake_score_condition: Optional[Callable] = field(default=None)
     student_condition: Optional[Callable] = field(default=None)
     discriminator_condition: Optional[Callable] = field(default=None)
-    fake_score_lr_mult: float = field(default=1.0)
-    student_lr_mult: float = field(default=1.0)
-    discriminator_lr_mult: float = field(default=1.0)
 
     def __post_init__(self):
         """Set default conditions if not provided."""
@@ -80,11 +75,10 @@ class DMDOptimizerProvider(OptimizerConfig):
 
     def provide(
         self,
-        model: List[MegatronModule],
-        no_weight_decay_cond: Optional[Callable] = None,
-        scale_lr_cond: Optional[Callable] = None,
-        lr_mult: float = 1.0,
+        model_chunks: List[MegatronModule],
+        config_overrides: Optional[Dict[ParamKey, ParamGroupOverride]] = None,
         use_gloo_process_groups: bool = False,
+        pg_collection: Optional[ProcessGroupCollection] = None,
     ) -> MegatronOptimizer:
         """Create a ConditionalChainedOptimizer with separate optimizers for each DMD component.
 
@@ -94,14 +88,10 @@ class DMDOptimizerProvider(OptimizerConfig):
         3. Discriminator Optimizer - for parameters in discriminator model (if exists)
 
         Args:
-            config: Optimizer configuration containing learning rate, weight decay, etc.
-            model: List of model chunks (should be DMDDistillModel instances)
-            no_wd_decay_cond: Function to determine if a parameter should skip weight decay
-            scale_lr_cond: Function to determine if a parameter should have scaled learning rate
-            lr_mult: Base learning rate multiplier
+            model_chunks: List of model chunks (should be DMDDistillModel instances)
+            config_overrides: Optional parameter group overrides for fine-grained control
             use_gloo_process_groups: Whether to use Gloo process groups for distributed optimization
-            default_skip_embedding_weight_decay: Skip weight decay for embeddings by default
-            dump_param_to_param_group_map: Path to dump parameter-to-group mapping for debugging
+            pg_collection: Optional process group collection for distributed training
 
         Returns:
             ConditionalChainedOptimizer containing three conditional optimizers
@@ -133,13 +123,13 @@ class DMDOptimizerProvider(OptimizerConfig):
                 return getattr(self._original_chunk, name)
 
         # Collect filtered parameters for each component
-        fake_score_chunks = [FilteredModelChunk(chunk, "fake_score") for chunk in model]
-        student_chunks = [FilteredModelChunk(chunk, "net") for chunk in model]
-        discriminator_chunks = [FilteredModelChunk(chunk, "discriminator") for chunk in model]
+        fake_score_chunks = [FilteredModelChunk(chunk, "fake_score") for chunk in model_chunks]
+        student_chunks = [FilteredModelChunk(chunk, "net") for chunk in model_chunks]
+        discriminator_chunks = [FilteredModelChunk(chunk, "discriminator") for chunk in model_chunks]
 
         # Check if discriminator exists in the model
         has_discriminator = False
-        for chunk in model:
+        for chunk in model_chunks:
             for name, param in chunk.named_parameters():
                 if "discriminator" in name and param.requires_grad:
                     has_discriminator = True
@@ -152,30 +142,22 @@ class DMDOptimizerProvider(OptimizerConfig):
             {
                 "name": "fake_score",
                 "chunks": fake_score_chunks,
-                "lr_mult": self.fake_score_lr_mult,
                 "condition": self.fake_score_condition,
                 "enabled": True,
             },
             {
                 "name": "student (net)",
                 "chunks": student_chunks,
-                "lr_mult": self.student_lr_mult,
                 "condition": self.student_condition,
                 "enabled": True,
             },
             {
                 "name": "discriminator",
                 "chunks": discriminator_chunks,
-                "lr_mult": self.discriminator_lr_mult,
                 "condition": self.discriminator_condition,
                 "enabled": has_discriminator,
             },
         ]
-
-        # Print configuration
-        for component in optimizer_components:
-            if component["enabled"]:
-                print(f"[INFO] {component['name']} LR multiplier: {component['lr_mult']}")
 
         # Create optimizers for each enabled component
         conditional_optimizers = []
@@ -188,11 +170,9 @@ class DMDOptimizerProvider(OptimizerConfig):
             optimizer = get_megatron_optimizer(
                 config=self,
                 model_chunks=component["chunks"],
-                no_weight_decay_cond=no_weight_decay_cond,
-                scale_lr_cond=scale_lr_cond,
-                lr_mult=component["lr_mult"] * lr_mult,
+                config_overrides=config_overrides,
                 use_gloo_process_groups=use_gloo_process_groups,
+                pg_collection=pg_collection,
             )
             conditional_optimizers.append((optimizer, component["condition"]))
-
         return ConditionalChainedOptimizer(conditional_optimizers)

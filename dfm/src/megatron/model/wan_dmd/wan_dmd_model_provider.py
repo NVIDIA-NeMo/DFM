@@ -1,8 +1,9 @@
 from dataclasses import dataclass, field
-from typing import Any, Dict, Optional
+from typing import Any, Dict, Optional, Union
 
-from fastgen.configs.config_dmd2 import ModelConfig
-from fastgen.configs.experiments.Wan.config_dmd2 import create_config as create_wan_dmd2_config
+from fastgen.configs.config_utils import config_from_dict
+from fastgen.configs.experiments.WanT2V.config_dmd2 import create_config as create_wan_dmd2_config
+from fastgen.configs.methods.config_dmd2 import ModelConfig
 from fastgen.methods.distribution_matching.dmd2 import DMD2Model
 from fastgen.networks.noise_schedule import get_noise_schedule
 from fastgen.networks.Wan.network import WanTextEncoder
@@ -42,14 +43,30 @@ def _default_wan_fast_gen_config() -> ModelConfig:
     return create_wan_dmd2_config().model
 
 
+def _default_wan_fast_gen_config_dict() -> Dict[str, Any]:
+    """Create a dict representation of the default fast_gen_config for OmegaConf compatibility.
+
+    Returns an OmegaConf DictConfig which supports both dict and attribute access syntax.
+    """
+    import attrs
+    from omegaconf import OmegaConf
+
+    config_dict = attrs.asdict(create_wan_dmd2_config().model)
+    # Wrap in DictConfig so it supports both dict[key] and obj.key access patterns
+    return OmegaConf.create(config_dict)
+
+
 @dataclass
 class WanDMDCombinedModelProvider(WanDMDModelProvider):
     teacher_model_provider: Optional[WanDMDModelProvider] = None
     fake_score_model_provider: Optional[WanDMDModelProvider] = None
-    fast_gen_config: ModelConfig = field(default_factory=_default_wan_fast_gen_config)
+    # Use Dict instead of ModelConfig so OmegaConf can handle YAML overrides
+    # Will be converted to ModelConfig in provide() method
+    fast_gen_config: Union[Dict[str, Any], ModelConfig] = field(default_factory=_default_wan_fast_gen_config_dict)
     # z_dim: int = 16  # Latent dimension for Wan VAE
 
     def __getattr__(self, name: str):
+        """Allow attribute access to fast_gen_config fields for convenience."""
         try:
             fast_gen_config = object.__getattribute__(self, "fast_gen_config")
         except AttributeError:
@@ -152,32 +169,9 @@ class WanDMDCombinedModelProvider(WanDMDModelProvider):
                 assert len(input_tensor) == 1, "input_tensor should only be length 1 for gpt/bert"
                 second_self.net.decoder.set_input_tensor(input_tensor[0])
 
-            def _extract_fwd_kwargs(second_self, data: Dict[str, Any]) -> Dict[str, Any]:
-                """Extract model-specific forward kwargs from data dict.
+        # Convert fast_gen_config to proper ModelConfig attrs instance if it was serialized to dict by omegaconf/megatron
+        # This ensures DMD2Model receives a proper attrs config object with attribute access
+        default_config = _default_wan_fast_gen_config()
+        self.fast_gen_config = config_from_dict(default_config, self.fast_gen_config)
 
-                Override this method in subclasses to extract custom forward arguments
-                like grid_sizes, packed_seq_params, etc. These kwargs will be passed
-                to all network forward calls.
-
-                Args:
-                    data: Data dict from the dataloader
-
-                Returns:
-                    Dict of additional kwargs to pass to network forward calls
-                """
-                fwd_kwargs = {}
-                # Extract common model-specific kwargs if present in data
-                if "grid_sizes" in data:
-                    fwd_kwargs["grid_sizes"] = data["grid_sizes"]
-                if "packed_seq_params" in data:
-                    fwd_kwargs["packed_seq_params"] = data["packed_seq_params"]
-                if "context_embeddings" in data:
-                    fwd_kwargs["context"] = data["context_embeddings"].to(self.params_dtype)
-                # Enable timestep scaling from [0, 1] to [0, 1000] for distillation
-                # DMD2Model generates timesteps in [0, 1] range, but WanModel expects [0, 1000]
-                fwd_kwargs["scale_t"] = True
-                fwd_kwargs["unpatchify_features"] = True
-                return fwd_kwargs
-
-        # Convert to ModelConfig if it was serialized to dict by omegaconf/megatron
         return WanDMDCombinedModel(config=self)

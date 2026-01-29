@@ -41,7 +41,41 @@ from tqdm import tqdm
 from transformers import AutoTokenizer, UMT5EncoderModel
 
 from dfm.src.megatron.model.wan.utils import grid_sizes_calculation, patchify, unpatchify
-from dfm.src.megatron.model.wan.wan_provider import WanModelProvider
+
+
+def _select_checkpoint_dir(base_dir: str, checkpoint_step) -> str:
+    """
+    Resolve checkpoint directory:
+    - If checkpoint_step is provided, use base_dir/iter_{step:07d}
+    - Otherwise, pick the largest iter_######## subdirectory under base_dir
+    """
+    if checkpoint_step is not None:
+        path = os.path.join(base_dir, f"iter_{int(checkpoint_step):07d}")
+        if os.path.isdir(path):
+            logging.info(f"Using specified checkpoint: {path}")
+            return path
+        raise FileNotFoundError(f"Specified checkpoint step {checkpoint_step} not found at {path}")
+
+    if not os.path.isdir(base_dir):
+        raise FileNotFoundError(f"Checkpoint base directory does not exist: {base_dir}")
+
+    pattern = re.compile(r"^iter_(\d+)$")
+    try:
+        _, latest_path = max(
+            (
+                (int(pattern.match(e.name).group(1)), e.path)
+                for e in os.scandir(base_dir)
+                if e.is_dir() and pattern.match(e.name)
+            ),
+            key=lambda x: x[0],
+        )
+    except ValueError:
+        raise FileNotFoundError(
+            f"No checkpoints found under {base_dir}. Expected subdirectories named like 'iter_0001800'."
+        )
+
+    logging.info(f"Auto-selected latest checkpoint: {latest_path}")
+    return latest_path
 
 
 @torch.no_grad()
@@ -153,11 +187,20 @@ class FlowInferencePipeline:
         if model is not None:
             self.model = model
         else:
-            wan_checkpoint_dir = self._select_checkpoint_dir(checkpoint_dir, checkpoint_step)
-            self.model = self.setup_model_from_checkpoint(wan_checkpoint_dir)
+            wan_checkpoint_dir = _select_checkpoint_dir(checkpoint_dir, checkpoint_step)
+            self.model = self.setup_model_from_checkpoint(
+                checkpoint_dir=wan_checkpoint_dir,
+                tensor_parallel_size=self.tensor_parallel_size,
+                pipeline_parallel_size=self.pipeline_parallel_size,
+                context_parallel_size=self.context_parallel_size,
+                sequence_parallel=self.sequence_parallel,
+                pipeline_dtype=self.pipeline_dtype,
+            )
 
         # if we use context parallelism, we need to set qkv_format to "thd" for context parallelism
-        self.model.config.qkv_format = "thd"  # "sbhd"
+        # Only set if model has a config attribute (megatron-bridge models)
+        if hasattr(self.model, "config"):
+            self.model.config.qkv_format = "thd"  # "sbhd"
 
         # set self.sp_size=1 for later use, just to respect the original Wan inference code
         self.sp_size = 1
@@ -176,27 +219,23 @@ class FlowInferencePipeline:
             return self.model.module
         return self.model
 
-    def setup_model_from_checkpoint(self, checkpoint_dir):
-        provider = WanModelProvider()
-        provider.tensor_model_parallel_size = self.tensor_parallel_size
-        provider.pipeline_model_parallel_size = self.pipeline_parallel_size
-        provider.context_parallel_size = self.context_parallel_size
-        provider.sequence_parallel = self.sequence_parallel
-        provider.pipeline_dtype = self.pipeline_dtype
-        # Once all overrides are set, finalize the model provider to ensure the post initialization logic is run
-        provider.finalize()
-        if not dist.is_initialized():
-            provider.initialize_model_parallel(seed=0)
-
-        ## Read from megatron checkpoint
+    def setup_model_from_checkpoint(
+        self,
+        checkpoint_dir,
+        tensor_parallel_size,
+        pipeline_parallel_size,
+        context_parallel_size,
+        sequence_parallel,
+        pipeline_dtype,
+    ):
         model = _load_megatron_model(
             checkpoint_dir,
             mp_overrides={
-                "tensor_model_parallel_size": self.tensor_parallel_size,
-                "pipeline_model_parallel_size": self.pipeline_parallel_size,
-                "context_parallel_size": self.context_parallel_size,
-                "sequence_parallel": self.sequence_parallel,
-                "pipeline_dtype": self.pipeline_dtype,
+                "tensor_model_parallel_size": tensor_parallel_size,
+                "pipeline_model_parallel_size": pipeline_parallel_size,
+                "context_parallel_size": context_parallel_size,
+                "sequence_parallel": sequence_parallel,
+                "pipeline_dtype": pipeline_dtype,
             },
         )
         if isinstance(model, list):
@@ -205,40 +244,6 @@ class FlowInferencePipeline:
             model = model.module
 
         return model
-
-    def _select_checkpoint_dir(self, base_dir: str, checkpoint_step) -> str:
-        """
-        Resolve checkpoint directory:
-        - If checkpoint_step is provided, use base_dir/iter_{step:07d}
-        - Otherwise, pick the largest iter_######## subdirectory under base_dir
-        """
-        if checkpoint_step is not None:
-            path = os.path.join(base_dir, f"iter_{int(checkpoint_step):07d}")
-            if os.path.isdir(path):
-                logging.info(f"Using specified checkpoint: {path}")
-                return path
-            raise FileNotFoundError(f"Specified checkpoint step {checkpoint_step} not found at {path}")
-
-        if not os.path.isdir(base_dir):
-            raise FileNotFoundError(f"Checkpoint base directory does not exist: {base_dir}")
-
-        pattern = re.compile(r"^iter_(\d+)$")
-        try:
-            _, latest_path = max(
-                (
-                    (int(pattern.match(e.name).group(1)), e.path)
-                    for e in os.scandir(base_dir)
-                    if e.is_dir() and pattern.match(e.name)
-                ),
-                key=lambda x: x[0],
-            )
-        except ValueError:
-            raise FileNotFoundError(
-                f"No checkpoints found under {base_dir}. Expected subdirectories named like 'iter_0001800'."
-            )
-
-        logging.info(f"Auto-selected latest checkpoint: {latest_path}")
-        return latest_path
 
     def forward_pp_step(
         self,
@@ -320,6 +325,60 @@ class FlowInferencePipeline:
         latents = latents / latents_std + latents_mean
         videos = self.vae.decode(latents).sample
         return videos
+
+    def calculate_grid_sizes(self, noises):
+        """
+        Calculate grid_sizes for a list of noise tensors.
+
+        Args:
+            noises (list[torch.Tensor]): List of noise tensors with shape (C, T, H, W)
+
+        Returns:
+            torch.Tensor: Grid sizes tensor with shape (batch_size, 3) containing (T, H, W) grid sizes
+        """
+        grid_sizes = [
+            grid_sizes_calculation(
+                input_shape=u.shape[1:],
+                patch_size=self.patch_size,
+            )
+            for u in noises
+        ]
+        return torch.tensor(grid_sizes, dtype=torch.long)
+
+    def create_packed_seq_params(self, seq_lens, context_lens):
+        """
+        Create packed sequence parameters for self-attention and cross-attention.
+
+        Args:
+            seq_lens (list[int]): List of sequence lengths for video latents
+            context_lens (list[int]): List of context (text) sequence lengths
+
+        Returns:
+            dict: Dictionary containing packed_seq_params for "self_attention" and "cross_attention"
+        """
+        cu_q = torch.cat([torch.tensor([0]), torch.cumsum(torch.tensor(seq_lens), dim=0)])
+        cu_q = cu_q.to(torch.int32).to(self.device)
+        cu_kv_self = cu_q
+        cu_kv_cross = torch.cat([torch.tensor([0]), torch.cumsum(torch.tensor(context_lens), dim=0)])
+        cu_kv_cross = cu_kv_cross.to(torch.int32).to(self.device)
+
+        packed_seq_params = {
+            "self_attention": PackedSeqParams(
+                cu_seqlens_q=cu_q,
+                cu_seqlens_q_padded=cu_q,
+                cu_seqlens_kv=cu_kv_self,
+                cu_seqlens_kv_padded=cu_kv_self,
+                qkv_format=self.model.config.qkv_format,
+            ),
+            "cross_attention": PackedSeqParams(
+                cu_seqlens_q=cu_q,
+                cu_seqlens_q_padded=cu_q,
+                cu_seqlens_kv=cu_kv_cross,
+                cu_seqlens_kv_padded=cu_kv_cross,
+                qkv_format=self.model.config.qkv_format,
+            ),
+        }
+        return packed_seq_params
 
     def generate(
         self,
@@ -459,14 +518,7 @@ class FlowInferencePipeline:
                 )
 
         # calculate grid_sizes
-        grid_sizes = [
-            grid_sizes_calculation(
-                input_shape=u.shape[1:],
-                patch_size=self.patch_size,
-            )
-            for u in noises
-        ]
-        grid_sizes = torch.tensor(grid_sizes, dtype=torch.long)
+        grid_sizes = self.calculate_grid_sizes(noises)
 
         @contextmanager
         def noop_no_sync():
@@ -492,27 +544,7 @@ class FlowInferencePipeline:
             # sample videos
             latents = noises
 
-            cu_q = torch.cat([torch.tensor([0]), torch.cumsum(torch.tensor(seq_lens), dim=0)])
-            cu_q = cu_q.to(torch.int32).to(self.device)
-            cu_kv_self = cu_q
-            cu_kv_cross = torch.cat([torch.tensor([0]), torch.cumsum(torch.tensor(context_lens), dim=0)])
-            cu_kv_cross = cu_kv_cross.to(torch.int32).to(self.device)
-            packed_seq_params = {
-                "self_attention": PackedSeqParams(
-                    cu_seqlens_q=cu_q,
-                    cu_seqlens_q_padded=cu_q,
-                    cu_seqlens_kv=cu_kv_self,
-                    cu_seqlens_kv_padded=cu_kv_self,
-                    qkv_format=self.model.config.qkv_format,
-                ),
-                "cross_attention": PackedSeqParams(
-                    cu_seqlens_q=cu_q,
-                    cu_seqlens_q_padded=cu_q,
-                    cu_seqlens_kv=cu_kv_cross,
-                    cu_seqlens_kv_padded=cu_kv_cross,
-                    qkv_format=self.model.config.qkv_format,
-                ),
-            }
+            packed_seq_params = self.create_packed_seq_params(seq_lens, context_lens)
 
             arg_c = {"context": contexts, "max_seq_len": max_video_seq_len, "packed_seq_params": packed_seq_params}
             arg_null = {
