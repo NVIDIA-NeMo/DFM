@@ -5,7 +5,7 @@ This guide provides concise steps to set up the environment and run WAN pretrain
 ## Container Launch
 
 ```bash
-CONT="nvcr.io/nvidia/nemo:25.09.00"
+CONT="nvcr.io/nvidia/nemo:25.11"
 MOUNT="/lustre/fsw/:/lustre/fsw/"
 
 srun -t 02:00:00 \
@@ -28,18 +28,18 @@ cd /opt/
 
 # DFM (pinned)
 git clone --no-checkout https://github.com/NVIDIA-NeMo/DFM.git
-git -C DFM checkout 174bb7b34de002ebbbcae1ba8e2b12363c7dee01
+git -C DFM checkout 9eaace14995a724c982fe53726a909be2edc93cb
 export DFM_PATH=/opt/DFM
 
 # Megatron-Bridge (pinned)
 rm -rf /opt/Megatron-Bridge
-git clone --no-checkout https://github.com/huvunvidia/Megatron-Bridge.git
-git -C Megatron-Bridge checkout 713ab548e4bfee307eb94a7bb3f57c17dbb31b50
+git clone --no-checkout https://github.com/NVIDIA-NeMo/Megatron-Bridge.git
+git -C Megatron-Bridge checkout 953aabf75c0500180dc14a6a76cf9e7e7c4baec7
 
 # Megatron-LM (pinned)
 rm -rf /opt/Megatron-LM
 git clone --no-checkout https://github.com/NVIDIA/Megatron-LM.git
-git -C Megatron-LM checkout ce8185cbbe04f38beb74360e878450f2e8525885
+git -C Megatron-LM checkout 2d398b42fd4237fffb553109563d73ac099751c3
 
 # Python path
 export PYTHONPATH="${DFM_PATH}/.:/opt/Megatron-Bridge/.:/opt/Megatron-LM"
@@ -142,6 +142,12 @@ NVTE_FUSED_ATTN=1 torchrun --nproc_per_node=8 examples/megatron/recipes/wan/pret
 
 - Using `--mock` argument.
 - Adjust `video_size` (F_latents, H_latents, W_latents) and `number_packed_samples` of `WanMockDataModuleConfig` in `wan.py`. Total `seq_len = F * H * W * number_packed_samples`.
+
+### Reproducing performance recipes
+
+- Please use the appropriate system config recipe in `examples/megatron/recipes/wan/conf/<h100/gb200/gb300>_perf_pretrain_mock.yaml`
+- Usage example `examples/megatron/recipes/wan/pretrain_wan.py --mock --training-mode pretrain --config-file examples/megatron/recipes/wan/conf/gb300_perf_pretrain_mock.yaml`
+- Note that the FLOPs calculation for Wan 2.1 is not currently supported in Megatron-Bridge. Please use a manual calculator until a fix is made.
 
 ## Inference
 
