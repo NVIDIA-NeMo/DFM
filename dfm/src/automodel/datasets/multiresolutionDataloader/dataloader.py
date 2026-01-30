@@ -107,7 +107,6 @@ class SequentialBucketSampler(Sampler[List[int]]):
         logger.info(
             f"  Base batch size: {base_batch_size}" + (f" @ {base_resolution}" if dynamic_batch_size else " (fixed)")
         )
-        logger.info(f"  DDP: rank {self.rank} of {self.num_replicas}")
 
     def _get_batch_size(self, resolution: Tuple[int, int]) -> int:
         """Get batch size for resolution (dynamic or fixed based on setting)."""
@@ -258,8 +257,8 @@ def collate_fn_production(batch: List[Dict]) -> Dict:
     # Handle text encodings
     if "clip_hidden" in batch[0]:
         output["clip_hidden"] = torch.stack([item["clip_hidden"] for item in batch])
-        output["clip_pooled"] = torch.stack([item["clip_pooled"] for item in batch])
-        output["t5_hidden"] = torch.stack([item["t5_hidden"] for item in batch])
+        output["pooled_prompt_embeds"] = torch.stack([item["pooled_prompt_embeds"] for item in batch])
+        output["prompt_embeds"] = torch.stack([item["prompt_embeds"] for item in batch])
     else:
         output["clip_tokens"] = torch.stack([item["clip_tokens"] for item in batch])
         output["t5_tokens"] = torch.stack([item["t5_tokens"] for item in batch])

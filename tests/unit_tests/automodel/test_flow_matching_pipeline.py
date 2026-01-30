@@ -335,14 +335,14 @@ class TestLossComputation:
         sigma = torch.tensor([0.3, 0.7])
         batch = {}
 
-        # Returns: weighted_loss, average_weighted_loss, unweighted_loss, average_unweighted_loss, loss_weight, loss_mask
-        _, scalar_weighted_loss, _, scalar_unweighted_loss, loss_weight, _ = pipeline.compute_loss(
-            model_pred, target, sigma, batch
+        # Returns 6 values for megatron compatibility
+        weighted_loss, average_weighted_loss, unweighted_loss, average_unweighted_loss, loss_weight, _ = (
+            pipeline.compute_loss(model_pred, target, sigma, batch)
         )
 
-        # Verify shapes
-        assert scalar_weighted_loss.ndim == 0, "Weighted loss should be scalar"
-        assert scalar_unweighted_loss.ndim == 0, "Unweighted loss should be scalar"
+        # Verify shapes - average losses should be scalar
+        assert average_weighted_loss.ndim == 0, "Average weighted loss should be scalar"
+        assert average_unweighted_loss.ndim == 0, "Average unweighted loss should be scalar"
 
         # Verify weight formula: w = 1 + shift * σ
         expected_weights = 1.0 + 3.0 * sigma
@@ -363,12 +363,10 @@ class TestLossComputation:
         sigma = torch.tensor([0.3, 0.7])
         batch = {}
 
-        _, scalar_weighted_loss, _, scalar_unweighted_loss, loss_weight, _ = pipeline.compute_loss(
-            model_pred, target, sigma, batch
-        )
+        weighted_loss, _, unweighted_loss, _, loss_weight, _ = pipeline.compute_loss(model_pred, target, sigma, batch)
 
         # Without weighting, weighted loss should equal unweighted loss
-        assert torch.allclose(scalar_weighted_loss, scalar_unweighted_loss, atol=1e-6)
+        assert torch.allclose(weighted_loss, unweighted_loss, atol=1e-6)
 
         # All weights should be 1
         assert torch.allclose(loss_weight, torch.ones_like(loss_weight))
@@ -406,12 +404,12 @@ class TestLossComputation:
         sigma = torch.rand(2)
         batch = {}
 
-        _, scalar_weighted_loss, _, scalar_unweighted_loss, _, _ = pipeline.compute_loss(
+        _, average_weighted_loss, _, average_unweighted_loss, _, _ = pipeline.compute_loss(
             model_pred, target, sigma, batch
         )
 
-        assert scalar_weighted_loss >= 0, "Weighted loss should be non-negative"
-        assert scalar_unweighted_loss >= 0, "Unweighted loss should be non-negative"
+        assert average_weighted_loss >= 0, "Weighted loss should be non-negative"
+        assert average_unweighted_loss >= 0, "Unweighted loss should be non-negative"
 
     def test_loss_is_finite(self, simple_adapter):
         """Test that computed loss is finite."""
@@ -422,12 +420,12 @@ class TestLossComputation:
         sigma = torch.rand(2)
         batch = {}
 
-        _, scalar_weighted_loss, _, scalar_unweighted_loss, _, _ = pipeline.compute_loss(
+        _, average_weighted_loss, _, average_unweighted_loss, _, _ = pipeline.compute_loss(
             model_pred, target, sigma, batch
         )
 
-        assert torch.isfinite(scalar_weighted_loss), "Weighted loss should be finite"
-        assert torch.isfinite(scalar_unweighted_loss), "Unweighted loss should be finite"
+        assert torch.isfinite(average_weighted_loss), "Weighted loss should be finite"
+        assert torch.isfinite(average_unweighted_loss), "Unweighted loss should be finite"
 
     def test_loss_mse_correctness(self, simple_adapter):
         """Test that base loss is MSE."""
@@ -441,12 +439,12 @@ class TestLossComputation:
         sigma = torch.rand(2)
         batch = {}
 
-        _, _, _, scalar_unweighted_loss, _, _ = pipeline.compute_loss(model_pred, target, sigma, batch)
+        _, _, _, average_unweighted_loss, _, _ = pipeline.compute_loss(model_pred, target, sigma, batch)
 
         # Manual MSE calculation
         expected_mse = nn.functional.mse_loss(model_pred.float(), target.float())
 
-        assert torch.allclose(scalar_unweighted_loss, expected_mse, atol=1e-6)
+        assert torch.allclose(average_unweighted_loss, expected_mse, atol=1e-6)
 
 
 class TestFullTrainingStep:
@@ -458,13 +456,16 @@ class TestFullTrainingStep:
         dtype = torch.bfloat16
 
         # Returns: weighted_loss, average_weighted_loss, loss_mask, metrics
-        _, loss, _, metrics = pipeline.step(mock_model, sample_batch, device, dtype, global_step=0)
+        weighted_loss, average_weighted_loss, loss_mask, metrics = pipeline.step(
+            mock_model, sample_batch, device, dtype, global_step=0
+        )
 
         # Verify loss
-        assert isinstance(loss, torch.Tensor), "Loss should be a tensor"
-        assert loss.ndim == 0, "Loss should be scalar"
-        assert not torch.isnan(loss), "Loss should not be NaN"
-        assert torch.isfinite(loss), "Loss should be finite"
+        assert isinstance(weighted_loss, torch.Tensor), "Weighted loss should be a tensor"
+        assert isinstance(average_weighted_loss, torch.Tensor), "Average weighted loss should be a tensor"
+        assert average_weighted_loss.ndim == 0, "Average weighted loss should be scalar"
+        assert not torch.isnan(average_weighted_loss), "Loss should not be NaN"
+        assert torch.isfinite(average_weighted_loss), "Loss should be finite"
 
         # Verify metrics
         assert isinstance(metrics, dict), "Metrics should be a dictionary"
@@ -476,7 +477,7 @@ class TestFullTrainingStep:
         assert "timestep_min" in metrics
         assert "timestep_max" in metrics
         assert "sampling_method" in metrics
-        print(f"✓ Basic training step test passed - Loss: {loss.item():.4f}")
+        print(f"✓ Basic training step test passed - Loss: {average_weighted_loss.item():.4f}")
 
     def test_step_with_different_batch_sizes(self, simple_adapter, mock_model):
         """Test training step with different batch sizes."""
@@ -494,10 +495,12 @@ class TestFullTrainingStep:
                 "text_embeddings": torch.randn(batch_size, 77, 4096),
             }
 
-            _, loss, _, metrics = pipeline.step(mock_model, batch, device, dtype, global_step=0)
+            weighted_loss, average_weighted_loss, loss_mask, metrics = pipeline.step(
+                mock_model, batch, device, dtype, global_step=0
+            )
 
-            assert isinstance(loss, torch.Tensor), f"Loss should be tensor for batch_size={batch_size}"
-            assert not torch.isnan(loss), f"Loss should not be NaN for batch_size={batch_size}"
+            assert isinstance(weighted_loss, torch.Tensor), f"Loss should be tensor for batch_size={batch_size}"
+            assert not torch.isnan(average_weighted_loss), f"Loss should not be NaN for batch_size={batch_size}"
 
     def test_step_with_4d_video_latents(self, pipeline, mock_model):
         """Test that 4D video latents are handled (unsqueezed to 5D)."""
@@ -509,17 +512,21 @@ class TestFullTrainingStep:
             "text_embeddings": torch.randn(77, 4096),  # 2D instead of 3D
         }
 
-        _, loss, _, metrics = pipeline.step(mock_model, batch, device, dtype, global_step=0)
+        weighted_loss, average_weighted_loss, loss_mask, metrics = pipeline.step(
+            mock_model, batch, device, dtype, global_step=0
+        )
 
-        assert isinstance(loss, torch.Tensor)
-        assert not torch.isnan(loss)
+        assert isinstance(weighted_loss, torch.Tensor)
+        assert not torch.isnan(average_weighted_loss)
 
     def test_step_metrics_collection(self, pipeline, mock_model, sample_batch):
         """Test that all expected metrics are collected."""
         device = torch.device("cpu")
         dtype = torch.bfloat16
 
-        _, loss, _, metrics = pipeline.step(mock_model, sample_batch, device, dtype, global_step=100)
+        weighted_loss, average_weighted_loss, loss_mask, metrics = pipeline.step(
+            mock_model, sample_batch, device, dtype, global_step=100
+        )
 
         expected_keys = [
             "loss",
@@ -546,7 +553,9 @@ class TestFullTrainingStep:
         device = torch.device("cpu")
         dtype = torch.bfloat16
 
-        _, loss, _, metrics = pipeline.step(mock_model, sample_batch, device, dtype, global_step=0)
+        weighted_loss, average_weighted_loss, loss_mask, metrics = pipeline.step(
+            mock_model, sample_batch, device, dtype, global_step=0
+        )
 
         assert 0.0 <= metrics["sigma_min"] <= 1.0, "Sigma min should be in [0, 1]"
         assert 0.0 <= metrics["sigma_max"] <= 1.0, "Sigma max should be in [0, 1]"
@@ -564,7 +573,9 @@ class TestFullTrainingStep:
         device = torch.device("cpu")
         dtype = torch.bfloat16
 
-        _, loss, _, metrics = pipeline.step(mock_model, sample_batch, device, dtype, global_step=0)
+        weighted_loss, average_weighted_loss, loss_mask, metrics = pipeline.step(
+            mock_model, sample_batch, device, dtype, global_step=0
+        )
 
         assert 0.0 <= metrics["timestep_min"] <= num_timesteps
         assert 0.0 <= metrics["timestep_max"] <= num_timesteps
@@ -574,7 +585,9 @@ class TestFullTrainingStep:
         device = torch.device("cpu")
         dtype = torch.bfloat16
 
-        _, loss, _, metrics = pipeline.step(mock_model, sample_batch, device, dtype, global_step=0)
+        weighted_loss, average_weighted_loss, loss_mask, metrics = pipeline.step(
+            mock_model, sample_batch, device, dtype, global_step=0
+        )
 
         assert torch.isfinite(torch.tensor(metrics["noisy_min"])), "Noisy min should be finite"
         assert torch.isfinite(torch.tensor(metrics["noisy_max"])), "Noisy max should be finite"
@@ -584,10 +597,12 @@ class TestFullTrainingStep:
         device = torch.device("cpu")
         dtype = torch.bfloat16
 
-        _, loss, _, metrics = pipeline.step(mock_model, image_batch, device, dtype, global_step=0)
+        weighted_loss, average_weighted_loss, loss_mask, metrics = pipeline.step(
+            mock_model, image_batch, device, dtype, global_step=0
+        )
 
-        assert isinstance(loss, torch.Tensor)
-        assert not torch.isnan(loss)
+        assert isinstance(weighted_loss, torch.Tensor)
+        assert not torch.isnan(average_weighted_loss)
         assert metrics["data_type"] == "image"
         assert metrics["task_type"] == "t2v"  # Image always uses t2v
 
@@ -691,9 +706,11 @@ class TestEdgeCasesAndErrors:
         }
 
         mock_model = MockModel()
-        _, loss, _, metrics = pipeline.step(mock_model, batch, torch.device("cpu"), torch.float32, global_step=0)
+        weighted_loss, average_weighted_loss, loss_mask, metrics = pipeline.step(
+            mock_model, batch, torch.device("cpu"), torch.float32, global_step=0
+        )
 
-        assert not torch.isnan(loss)
+        assert not torch.isnan(average_weighted_loss)
 
     def test_large_batch_handling(self, simple_adapter):
         """Test handling of larger batch sizes."""
@@ -709,9 +726,11 @@ class TestEdgeCasesAndErrors:
         }
 
         mock_model = MockModel()
-        _, loss, _, metrics = pipeline.step(mock_model, batch, torch.device("cpu"), torch.float32, global_step=0)
+        weighted_loss, average_weighted_loss, loss_mask, metrics = pipeline.step(
+            mock_model, batch, torch.device("cpu"), torch.float32, global_step=0
+        )
 
-        assert not torch.isnan(loss)
+        assert not torch.isnan(average_weighted_loss)
 
     def test_extreme_flow_shift_values(self, simple_adapter):
         """Test with extreme flow shift values."""
@@ -732,9 +751,11 @@ class TestEdgeCasesAndErrors:
             }
 
             mock_model = MockModel()
-            _, loss, _, metrics = pipeline.step(mock_model, batch, torch.device("cpu"), torch.float32, global_step=0)
+            weighted_loss, average_weighted_loss, loss_mask, metrics = pipeline.step(
+                mock_model, batch, torch.device("cpu"), torch.float32, global_step=0
+            )
 
-            assert torch.isfinite(loss), f"Loss should be finite for shift={shift}"
+            assert torch.isfinite(average_weighted_loss), f"Loss should be finite for shift={shift}"
 
     def test_sigma_clamping_edge_cases(self, simple_adapter):
         """Test sigma clamping at boundary values."""
@@ -771,13 +792,13 @@ class TestIntegration:
                 "text_embeddings": torch.randn(2, 77, 4096),
             }
 
-            _, loss, _, metrics = pipeline.step(
+            weighted_loss, average_weighted_loss, loss_mask, metrics = pipeline.step(
                 mock_model, batch, torch.device("cpu"), torch.float32, global_step=step
             )
-            losses.append(loss.item())
+            losses.append(average_weighted_loss.item())
 
-            assert not torch.isnan(loss), f"Loss became NaN at step {step}"
-            assert torch.isfinite(loss), f"Loss became infinite at step {step}"
+            assert not torch.isnan(average_weighted_loss), f"Loss became NaN at step {step}"
+            assert torch.isfinite(average_weighted_loss), f"Loss became infinite at step {step}"
 
     def test_pipeline_with_all_sampling_methods(self, simple_adapter):
         """Test pipeline works with all sampling methods."""
@@ -797,9 +818,11 @@ class TestIntegration:
                 "text_embeddings": torch.randn(2, 77, 4096),
             }
 
-            _, loss, _, metrics = pipeline.step(mock_model, batch, torch.device("cpu"), torch.float32, global_step=0)
+            weighted_loss, average_weighted_loss, loss_mask, metrics = pipeline.step(
+                mock_model, batch, torch.device("cpu"), torch.float32, global_step=0
+            )
 
-            assert not torch.isnan(loss), f"Loss should not be NaN for method={method}"
+            assert not torch.isnan(average_weighted_loss), f"Loss should not be NaN for method={method}"
 
     def test_pipeline_state_consistency(self, simple_adapter):
         """Test that pipeline maintains consistent state."""
