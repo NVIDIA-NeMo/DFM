@@ -13,7 +13,8 @@ LR=5e-5
 WARMUP_ITERS=1000
 CHECKPOINT_DIR=${CHECKPOINT_BASE_DIR}/${EXP_NAME}
 # set this PRETRAIN_CHECKPOINT_DIR to CHECKPOINT_DIR to train from scratch
-PRETRAIN_CHECKPOINT_DIR=${CHECKPOINT_DIR}
+PRETRAIN_CHECKPOINT_DIR=${PRETRAIN_CHECKPOINT_DIR:-${CHECKPOINT_DIR}}
+TRAIN_ITERS=${TRAIN_ITERS:-100}
 
 NVTE_FUSED_ATTN=1 torchrun \
   --nnodes=${NUM_NODES} \
@@ -42,7 +43,7 @@ NVTE_FUSED_ATTN=1 torchrun \
   optimizer.adam_beta2=0.95 \
   optimizer.clip_grad=2.0 \
   train.eval_iters=0 \
-  train.train_iters=100 \
+  train.train_iters=${TRAIN_ITERS} \
   scheduler.lr_decay_style=constant \
   scheduler.lr_warmup_iters=${WARMUP_ITERS} \
   model.seq_length=12480 \
