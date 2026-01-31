@@ -1,16 +1,9 @@
-# HunyuanVideo-1.5 720p T2V Training Configuration
-#
-# This configuration file is fully compatible with TrainDiffusionRecipe class
-# (dfm/src/automodel/recipes/train.py) using FlowMatchingPipelineV2
-
-# Model configuration
 model:
   pretrained_model_name_or_path: "hunyuanvideo-community/HunyuanVideo-1.5-Diffusers-720p_t2v"
-  mode: "finetune"  # "finetune" or "pretrain"
-  cache_dir: null  # Optional: specify cache directory for model weights
+  mode: "finetune"
+  cache_dir: null
   attention_backend: "_flash_3_hub"
 
-# Optimizer configuration
 optim:
   learning_rate: 5e-6
 
@@ -18,46 +11,41 @@ optim:
     weight_decay: 0.01
     betas: [0.9, 0.999]
 
-# FSDP (Fully Sharded Data Parallel) configuration
 fsdp:
-  enable_fsdp: true
-  dp_size: 8  # Auto-calculate based on world_size and other parallel dimensions
+  dp_size: 8
   dp_replicate_size: 1
-  tp_size: 1  # Tensor parallelism size
-  cp_size: 1  # Context parallelism size
-  pp_size: 1  # Pipeline parallelism size
+  tp_size: 1
+  cp_size: 1
+  pp_size: 1
   cpu_offload: false
   activation_checkpointing: true
   use_hf_tp_plan: false
 
-# Flow matching V2 configuration
 flow_matching:
-  adapter_type: "hunyuan"  # Options: "hunyuan", "simple"
+  adapter_type: "hunyuan"
   adapter_kwargs:
     use_condition_latents: true
     default_image_embed_shape: [729, 1152]
-  timestep_sampling: "logit_normal"  # Options: "uniform", "logit_normal", "lognorm", "mix", "mode"
+  timestep_sampling: "logit_normal"
   logit_mean: 0.0
   logit_std: 1.0
-  flow_shift: 3.0  # Flow shift for training
-  mix_uniform_ratio: 0.1  # For "mix" timestep sampling
+  flow_shift: 3.0
+  mix_uniform_ratio: 0.1
   sigma_min: 0.0
   sigma_max: 1.0
   num_train_timesteps: 1000
   i2v_prob: 0.3
   use_loss_weighting: false
-  log_interval: 1000  # Steps between detailed logs
-  summary_log_interval: 100  # Steps between summary logs
+  log_interval: 1000
+  summary_log_interval: 100
 
-# Training step scheduler configuration
 step_scheduler:
   num_epochs: 30
-  local_batch_size: 1  # Batch size per GPU
-  global_batch_size: 8  # Effective batch size across all GPUs (with gradient accumulation)
-  ckpt_every_steps: 1000  # Save checkpoint every N steps
-  log_every: 10  # Log metrics every N steps
+  local_batch_size: 1
+  global_batch_size: 8
+  ckpt_every_steps: 1000
+  log_every: 10
 
-# Data configuration
 data:
   dataloader:
     _target_: dfm.src.automodel.datasets.build_dataloader
@@ -65,7 +53,6 @@ data:
     num_workers: 2
     device: cpu
 
-# Checkpoint configuration
 checkpoint:
   enabled: true
   checkpoint_dir: /opt/DFM/hunyuan_t2v_flow_outputs_base_recipe_flowPipelineV2/
@@ -78,10 +65,8 @@ wandb:
   mode: online
   name: 720p_t2v_run
 
-# Distributed environment configuration
 dist_env:
   backend: "nccl"
   init_method: "env://"
 
-# Random seed
 seed: 42

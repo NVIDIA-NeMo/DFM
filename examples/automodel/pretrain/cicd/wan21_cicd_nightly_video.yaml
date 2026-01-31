@@ -1,9 +1,9 @@
 seed: 42
 
 wandb:
-  project: wan-t2v-flow-matching-pretrain
+  project: wan-t2v-cicd-nightly-pretrain
   mode: online
-  name: wan2_1_t2v_fm_pretrain
+  name: WAN21_OpenVID_Video
 
 dist_env:
   backend: nccl
@@ -11,47 +11,34 @@ dist_env:
 
 model:
   pretrained_model_name_or_path: Wan-AI/Wan2.1-T2V-1.3B-Diffusers
-  mode: pretrain
+  mode: pretrain  # "pretrain" initializes with random weights using pipeline_spec
+  # Pipeline specification for pretraining (required when mode: pretrain)
   pipeline_spec:
     transformer_cls: "WanTransformer3DModel"
     subfolder: "transformer"
-    enable_gradient_checkpointing: false
+    enable_gradient_checkpointing: true
     load_full_pipeline: false
 
 step_scheduler:
   global_batch_size: 8
   local_batch_size: 1
-  ckpt_every_steps: 1000
-  num_epochs: 100
-  log_every: 2
+  ckpt_every_steps: 50
+  num_epochs: 8
+  log_every: 1
 
 data:
   dataloader:
     _target_: dfm.src.automodel.datasets.build_dataloader
-    meta_folder: /lustre/fsw/portfolios/coreai/users/linnanw/hdvilla_sample/pika/wan21_codes/1.3B_meta/
-    num_workers: 2
+    meta_folder: /lustre/fsw/portfolios/coreai/users/linnanw/CICD/Wan21/nightly/video
+    num_workers: 10
     device: cpu
 
 optim:
   learning_rate: 5e-5
+  clip_grad: 2.0
   optimizer:
     weight_decay: 0.1
     betas: [0.9, 0.95]
-  # "warmup_steps": 1000,
-  # "lr_min": 1e-5,
-
-
-flow_matching:
-  adapter_type: "simple"  # Options: "hunyuan", "simple"
-  adapter_kwargs: {}
-  use_sigma_noise: true
-  timestep_sampling: uniform
-  logit_mean: 0.0
-  logit_std: 1.5
-  flow_shift: 2.5
-  mix_uniform_ratio: 0.2
-  # "sigma_min": 0.0,  # PRETRAIN: No clamping, full range
-  # "sigma_max": 1.0,  # PRETRAIN: No clamping, full range
 
 fsdp:
   tp_size: 1
@@ -60,9 +47,21 @@ fsdp:
   dp_replicate_size: 1
   dp_size: none
 
+flow_matching:
+  adapter_type: "simple"
+  adapter_kwargs: {}
+  use_sigma_noise: true
+  timestep_sampling: logit_normal
+  logit_mean: 0.0
+  logit_std: 1.5
+  flow_shift: 2.5
+  mix_uniform_ratio: 0.2
+  sigma_min: 0.0
+  sigma_max: 1.0
+
 checkpoint:
   enabled: true
-  checkpoint_dir: /opt/DFM/wan_t2v_flow_outputs_base_recipe_fsdp_run_1/
+  checkpoint_dir: /opt/DFM/wan21_fsdp_nightly_video/
   model_save_format: torch_save
   save_consolidated: false
-  restore_from: null
+  restore_from: /opt/DFM/wan21_fsdp_nightly_image/LATEST

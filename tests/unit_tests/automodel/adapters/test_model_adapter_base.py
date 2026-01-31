@@ -40,13 +40,14 @@ class TestFlowMatchingContext:
 
         context = FlowMatchingContext(
             noisy_latents=torch.randn(2, 16, 4, 8, 8),
-            video_latents=torch.randn(2, 16, 4, 8, 8),
+            latents=torch.randn(2, 16, 4, 8, 8),
             timesteps=torch.rand(2) * 1000,
             sigma=torch.rand(2),
             task_type="t2v",
             data_type="video",
             device=torch.device("cpu"),
             dtype=torch.float32,
+            cfg_dropout_prob=0.0,
             batch=batch,
         )
 
@@ -62,13 +63,14 @@ class TestFlowMatchingContext:
 
         context = FlowMatchingContext(
             noisy_latents=torch.randn(2, 16, 4, 8, 8),
-            video_latents=torch.randn(2, 16, 4, 8, 8),
+            latents=torch.randn(2, 16, 4, 8, 8),
             timesteps=torch.rand(2) * 1000,
             sigma=torch.rand(2),
             task_type="i2v",
             data_type="video",
             device=torch.device("cpu"),
             dtype=torch.float32,
+            cfg_dropout_prob=0.0,
             batch=batch,
         )
 
@@ -80,13 +82,14 @@ class TestFlowMatchingContext:
 
         context = FlowMatchingContext(
             noisy_latents=torch.randn(2, 16, 1, 8, 8),
-            video_latents=torch.randn(2, 16, 1, 8, 8),
+            latents=torch.randn(2, 16, 1, 8, 8),
             timesteps=torch.rand(2) * 1000,
             sigma=torch.rand(2),
             task_type="t2v",
             data_type="image",
             device=torch.device("cpu"),
             dtype=torch.float32,
+            cfg_dropout_prob=0.0,
             batch=batch,
         )
 
@@ -102,13 +105,14 @@ class TestFlowMatchingContext:
 
         context = FlowMatchingContext(
             noisy_latents=torch.randn(2, 16, 4, 8, 8),
-            video_latents=batch["video_latents"],
+            latents=batch["video_latents"],
             timesteps=torch.rand(2) * 1000,
             sigma=torch.rand(2),
             task_type="t2v",
             data_type="video",
             device=torch.device("cpu"),
             dtype=torch.float32,
+            cfg_dropout_prob=0.0,
             batch=batch,
         )
 
@@ -127,18 +131,19 @@ class TestFlowMatchingContext:
             batch = {"video_latents": torch.randn(shape)}
             context = FlowMatchingContext(
                 noisy_latents=torch.randn(shape),
-                video_latents=torch.randn(shape),
+                latents=torch.randn(shape),
                 timesteps=torch.rand(shape[0]) * 1000,
                 sigma=torch.rand(shape[0]),
                 task_type="t2v",
                 data_type="video",
                 device=torch.device("cpu"),
                 dtype=torch.float32,
+                cfg_dropout_prob=0.0,
                 batch=batch,
             )
 
             assert context.noisy_latents.shape == shape
-            assert context.video_latents.shape == shape
+            assert context.latents.shape == shape
             assert context.timesteps.shape == (shape[0],)
             assert context.sigma.shape == (shape[0],)
 
@@ -150,13 +155,14 @@ class TestFlowMatchingContext:
             batch = {"video_latents": torch.randn(2, 16, 4, 8, 8)}
             context = FlowMatchingContext(
                 noisy_latents=torch.randn(2, 16, 4, 8, 8),
-                video_latents=torch.randn(2, 16, 4, 8, 8),
+                latents=torch.randn(2, 16, 4, 8, 8),
                 timesteps=torch.rand(2) * 1000,
                 sigma=torch.rand(2),
                 task_type="t2v",
                 data_type="video",
                 device=torch.device("cpu"),
                 dtype=dtype,
+                cfg_dropout_prob=0.0,
                 batch=batch,
             )
 

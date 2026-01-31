@@ -142,7 +142,7 @@ class HunyuanAdapter(ModelAdapter):
 
         # Prepare latents (with or without condition)
         if self.use_condition_latents:
-            cond_latents = self.get_condition_latents(context.video_latents, context.task_type)
+            cond_latents = self.get_condition_latents(context.latents, context.task_type)
             latents = torch.cat([context.noisy_latents, cond_latents], dim=1)
         else:
             latents = context.noisy_latents
