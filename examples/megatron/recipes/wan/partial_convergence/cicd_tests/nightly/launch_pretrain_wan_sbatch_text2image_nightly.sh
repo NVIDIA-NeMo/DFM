@@ -5,7 +5,7 @@ NUM_NODES=1
 TIME=00:30:00
 
 # Training parameters
-EXP_NAME=sbatch_wan_1.3B_pretrain_text2image_cicd_3000vids_nightly_example
+EXP_NAME=wan_1.3B_pretrain_text2image_cicd_3000vids_nightly_example
 PROJECT=wan
 MBS=1
 GBS=8

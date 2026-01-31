@@ -5,7 +5,7 @@ NUM_NODES=1
 TIME=00:30:00
 
 # Training parameters
-EXP_NAME=sbatch_wan_1.3B_pretrain_text2video_cicd_3000vids_nightly_example
+EXP_NAME=wan_1.3B_pretrain_text2video_cicd_3000vids_nightly_example
 PROJECT=wan
 MBS=1
 GBS=2
@@ -34,7 +34,7 @@ NVTE_FUSED_ATTN=1 MASTER_ADDR=${MASTER_ADDR} MASTER_PORT=${MASTER_PORT} torchrun
   dataset.packing_buffer_size=50 \
   dataset.num_workers=10 \
   checkpoint.save=${CHECKPOINT_DIR} \
-  checkpoint.load=${PRETRAIN_CHECKPOINT_DIR} \
+  checkpoint.load=${CHECKPOINT_BASE_DIR}/wan_1.3B_pretrain_text2image_cicd_3000vids_nightly_example \
   checkpoint.load_optim=true \
   checkpoint.save_interval=100 \
   optimizer.lr=${LR} \
