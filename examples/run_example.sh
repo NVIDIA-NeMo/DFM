@@ -4,6 +4,11 @@
 # Usage: sbatch --account=<account> --nodes=<nodes> --time=<time> examples/run_example.sh --example-script <path> --container <container> --checkpoint-base-dir <dir> --dataset-base-dir <dir> [--partition <partition>] [--mount <mount>]
 #
 # NUM_NODES and TIME should be parsed from the example script and passed to sbatch via --nodes and --time
+#
+# Optional environment variables (export before running sbatch):
+#   WANDB_API_KEY - Weights & Biases API key for experiment tracking
+#   HF_TOKEN      - Hugging Face token for accessing gated models/datasets
+#   HF_HOME       - Hugging Face cache directory
 
 #SBATCH --partition=batch
 #SBATCH --job-name=dfm-example
@@ -50,6 +55,11 @@ while [[ $# -gt 0 ]]; do
             echo ""
             echo "Optional arguments:"
             echo "  --mount               Slurm mount to use (default: /lustre:/lustre)"
+            echo ""
+            echo "Optional environment variables (set before running sbatch):"
+            echo "  WANDB_API_KEY         Weights & Biases API key for experiment tracking"
+            echo "  HF_TOKEN              Hugging Face token for accessing gated models/datasets"
+            echo "  HF_HOME               Hugging Face cache directory"
             exit 0
             ;;
         *)
@@ -121,6 +131,11 @@ export RDZV_PORT=${RDZV_PORT}
 export CHECKPOINT_DIR=${CHECKPOINT_DIR}
 export CHECKPOINT_BASE_DIR=${CHECKPOINT_BASE_DIR}
 export DATASET_BASE_DIR=${DATASET_BASE_DIR}
+
+# Optional environment variables (pass through if set)
+${WANDB_API_KEY:+export WANDB_API_KEY=${WANDB_API_KEY}}
+${HF_TOKEN:+export HF_TOKEN=${HF_TOKEN}}
+${HF_HOME:+export HF_HOME=${HF_HOME}}
 
 ${TORCHRUN_CMD}
 "
