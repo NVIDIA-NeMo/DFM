@@ -16,7 +16,7 @@ model:
   pipeline_spec:
     transformer_cls: "WanTransformer3DModel"
     subfolder: "transformer"
-    enable_gradient_checkpointing: true
+    enable_gradient_checkpointing: false
     load_full_pipeline: false
 
 step_scheduler:

@@ -13,12 +13,35 @@
 # limitations under the License.
 
 from .base import BaseModelProcessor
+from .base_video import BaseVideoProcessor
+from .caption_loaders import (
+    CaptionLoader,
+    JSONLCaptionLoader,
+    JSONSidecarCaptionLoader,
+    MetaJSONCaptionLoader,
+    get_caption_loader,
+)
 from .flux import FluxProcessor
+from .hunyuan import HunyuanVideoProcessor
 from .registry import ProcessorRegistry
+from .wan import WanProcessor
 
 
 __all__ = [
+    # Base classes
     "BaseModelProcessor",
+    "BaseVideoProcessor",
+    # Registry
     "ProcessorRegistry",
+    # Image processors
     "FluxProcessor",
+    # Video processors
+    "WanProcessor",
+    "HunyuanVideoProcessor",
+    # Caption loaders
+    "CaptionLoader",
+    "JSONSidecarCaptionLoader",
+    "MetaJSONCaptionLoader",
+    "JSONLCaptionLoader",
+    "get_caption_loader",
 ]
