@@ -22,4 +22,4 @@ torchrun --nnodes=${SLURM_NNODES} \
     -c examples/automodel/pretrain/cicd/wan21_cicd_nightly_video.yaml \
     --data.dataloader.meta_folder=${DATASET_BASE_DIR}/Wan21/nightly/video \
     --checkpoint.checkpoint_dir=${CHECKPOINT_DIR} \
-    --checkpoint.restore_from=${CHECKPOINT_DIR}/automodel_wan_1.3B_pretrain_text2image_nightly/LATEST
+    --checkpoint.restore_from=${CHECKPOINT_BASE_DIR}/automodel_wan_1.3B_pretrain_text2image_nightly/LATEST
