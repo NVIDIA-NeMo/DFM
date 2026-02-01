@@ -20,5 +20,5 @@ torchrun --nnodes=${SLURM_NNODES} \
     --rdzv_endpoint=${MASTER_ADDR}:${MASTER_PORT} \
     examples/automodel/pretrain/pretrain.py \
     -c examples/automodel/pretrain/cicd/wan21_cicd_nightly_image.yaml \
-    data.dataloader.meta_folder=${DATASET_BASE_DIR}/Wan21/nightly/image \
-    checkpoint.checkpoint_dir=${CHECKPOINT_DIR}
+    --data.dataloader.meta_folder=${DATASET_BASE_DIR}/Wan21/nightly/image \
+    --checkpoint.checkpoint_dir=${CHECKPOINT_DIR}

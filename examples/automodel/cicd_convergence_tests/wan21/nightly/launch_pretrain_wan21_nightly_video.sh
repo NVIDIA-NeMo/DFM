@@ -20,6 +20,6 @@ torchrun --nnodes=${SLURM_NNODES} \
     --rdzv_endpoint=${MASTER_ADDR}:${MASTER_PORT} \
     examples/automodel/pretrain/pretrain.py \
     -c examples/automodel/pretrain/cicd/wan21_cicd_nightly_video.yaml \
-    data.dataloader.meta_folder=${DATASET_BASE_DIR}/Wan21/nightly/video \
-    checkpoint.checkpoint_dir=${CHECKPOINT_DIR} \
-    checkpoint.restore_from=${CHECKPOINT_DIR}/automodel_wan_1.3B_pretrain_text2image_nightly/LATEST
+    --data.dataloader.meta_folder=${DATASET_BASE_DIR}/Wan21/nightly/video \
+    --checkpoint.checkpoint_dir=${CHECKPOINT_DIR} \
+    --checkpoint.restore_from=${CHECKPOINT_DIR}/automodel_wan_1.3B_pretrain_text2image_nightly/LATEST
