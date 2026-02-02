@@ -56,7 +56,7 @@ class MockCacheBuilder:
     def create_sample(
         self,
         idx: int,
-        crop_resolution: tuple = (512, 512),
+        bucket_resolution: tuple = (512, 512),
         original_resolution: tuple = (1024, 768),
         aspect_ratio: float = 1.0,
     ) -> Dict:
@@ -65,7 +65,7 @@ class MockCacheBuilder:
 
         # Create mock latent and text embeddings
         data = {
-            "latent": torch.randn(16, crop_resolution[1] // 8, crop_resolution[0] // 8),
+            "latent": torch.randn(16, bucket_resolution[1] // 8, bucket_resolution[0] // 8),
             "crop_offset": [0, 0],
             "prompt": f"Test prompt {idx}",
             "image_path": f"/fake/path/image_{idx}.jpg",
@@ -80,7 +80,7 @@ class MockCacheBuilder:
 
         metadata_entry = {
             "cache_file": str(cache_file),
-            "crop_resolution": list(crop_resolution),
+            "bucket_resolution": list(bucket_resolution),
             "original_resolution": list(original_resolution),
             "aspect_ratio": aspect_ratio,
             "bucket_id": idx % 5,
@@ -105,7 +105,7 @@ class MockCacheBuilder:
             ar = aspect_ratios[idx % len(aspect_ratios)]
             entry = self.create_sample(
                 idx,
-                crop_resolution=res,
+                bucket_resolution=res,
                 aspect_ratio=ar,
             )
             self.metadata.append(entry)
@@ -515,7 +515,7 @@ class TestCollateFnProductionCPU:
 
         assert isinstance(batch, dict)
         assert "latent" in batch
-        assert "crop_resolution" in batch
+        assert "bucket_resolution" in batch
 
     def test_collate_stacks_tensors(self, simple_dataset):
         """Test collate function stacks tensors correctly."""
@@ -524,7 +524,7 @@ class TestCollateFnProductionCPU:
         batch = collate_fn_production(items)
 
         assert batch["latent"].shape[0] == 4
-        assert batch["crop_resolution"].shape[0] == 4
+        assert batch["bucket_resolution"].shape[0] == 4
         assert batch["original_resolution"].shape[0] == 4
         assert batch["crop_offset"].shape[0] == 4
 
@@ -557,7 +557,7 @@ class TestCollateFnProductionCPU:
         res_set = set()
         for i in range(len(multi_resolution_dataset)):
             item = multi_resolution_dataset[i]
-            res = tuple(item["crop_resolution"].tolist())
+            res = tuple(item["bucket_resolution"].tolist())
             if res not in res_set:
                 items.append(item)
                 res_set.add(res)
@@ -729,7 +729,7 @@ class TestCollateFnProductionGPU:
         batch_gpu = {k: v.cuda() if isinstance(v, torch.Tensor) else v for k, v in batch.items()}
 
         assert batch_gpu["latent"].is_cuda
-        assert batch_gpu["crop_resolution"].is_cuda
+        assert batch_gpu["bucket_resolution"].is_cuda
 
     def test_collate_then_transfer_to_gpu(self, simple_dataset):
         """Test collating on CPU then transferring to GPU."""
@@ -742,7 +742,7 @@ class TestCollateFnProductionGPU:
         latent_gpu = batch["latent"].to(device)
         assert latent_gpu.device.type == "cuda"
 
-        crop_res_gpu = batch["crop_resolution"].to(device)
+        crop_res_gpu = batch["bucket_resolution"].to(device)
         assert crop_res_gpu.device.type == "cuda"
 
 
@@ -788,7 +788,7 @@ class TestBuildMultiresolutionDataloaderGPU:
         for batch in dataloader:
             # Transfer all tensors to GPU
             latent_gpu = batch["latent"].to(device)
-            crop_res_gpu = batch["crop_resolution"].to(device)
+            crop_res_gpu = batch["bucket_resolution"].to(device)
             orig_res_gpu = batch["original_resolution"].to(device)
             crop_offset_gpu = batch["crop_offset"].to(device)
 

@@ -468,11 +468,13 @@ class TrainDiffusionRecipe(BaseRecipe):
         total_steps = self.num_epochs * self.steps_per_epoch
 
         # Build LR scheduler (returns None if lr_scheduler not in config)
-        self.lr_scheduler = build_lr_scheduler(
+        # Wrap in list for compatibility with checkpointing (OptimizerState expects list)
+        lr_scheduler = build_lr_scheduler(
             self.cfg.get("lr_scheduler", None),
             self.optimizer,
             total_steps,
         )
+        self.lr_scheduler = [lr_scheduler] if lr_scheduler is not None else None
 
         self.global_step = 0
         self.start_epoch = 0
@@ -569,7 +571,7 @@ class TrainDiffusionRecipe(BaseRecipe):
 
                 self.optimizer.step()
                 if self.lr_scheduler is not None:
-                    self.lr_scheduler.step(1)
+                    self.lr_scheduler[0].step(1)
 
                 group_loss_mean = float(sum(micro_losses) / len(micro_losses))
                 epoch_loss += group_loss_mean

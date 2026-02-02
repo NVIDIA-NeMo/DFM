@@ -24,6 +24,9 @@ from dfm.src.automodel.datasets.mock_dataloader import (
     build_mock_dataloader,
     mock_collate_fn,
 )
+from dfm.src.automodel.datasets.multiresolutionDataloader import (
+    build_video_multiresolution_dataloader,
+)
 
 
 __all__ = [
@@ -35,4 +38,6 @@ __all__ = [
     "MockWanDataset",
     "build_mock_dataloader",
     "mock_collate_fn",
+    # Multiresolution video dataloader
+    "build_video_multiresolution_dataloader",
 ]

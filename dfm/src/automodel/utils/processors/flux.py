@@ -79,9 +79,9 @@ class FluxProcessor(BaseModelProcessor):
         print("  Configuring VAE...")
         models["vae"] = pipeline.vae.to(device=device, dtype=torch.bfloat16)
         models["vae"].eval()
-        print(f"!!! VAE config: {models['vae'].config}")
-        print(f"!!! VAE shift_factor: {models['vae'].config.shift_factor}")
-        print(f"!!! VAE scaling_factor: {models['vae'].config.scaling_factor}")
+        print(f"VAE config: {models['vae'].config}")
+        print(f"VAE shift_factor: {models['vae'].config.shift_factor}")
+        print(f"VAE scaling_factor: {models['vae'].config.scaling_factor}")
 
         # Extract CLIP components
         print("  Configuring CLIP...")
@@ -263,7 +263,7 @@ class FluxProcessor(BaseModelProcessor):
             "prompt_embeds": text_encodings["prompt_embeds"],
             # Metadata
             "original_resolution": metadata["original_resolution"],
-            "crop_resolution": metadata["crop_resolution"],
+            "bucket_resolution": metadata["bucket_resolution"],
             "crop_offset": metadata["crop_offset"],
             "prompt": metadata["prompt"],
             "image_path": metadata["image_path"],

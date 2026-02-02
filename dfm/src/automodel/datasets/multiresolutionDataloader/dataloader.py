@@ -228,12 +228,12 @@ class SequentialBucketSampler(Sampler[List[int]]):
 def collate_fn_production(batch: List[Dict]) -> Dict:
     """Production collate function with verification."""
     # Verify all samples have same resolution
-    resolutions = [tuple(item["crop_resolution"].tolist()) for item in batch]
+    resolutions = [tuple(item["bucket_resolution"].tolist()) for item in batch]
     assert len(set(resolutions)) == 1, f"Mixed resolutions in batch: {set(resolutions)}"
 
     # Stack tensors
     latents = torch.stack([item["latent"] for item in batch])
-    crop_resolutions = torch.stack([item["crop_resolution"] for item in batch])
+    bucket_resolutions = torch.stack([item["bucket_resolution"] for item in batch])
     original_resolutions = torch.stack([item["original_resolution"] for item in batch])
     crop_offsets = torch.stack([item["crop_offset"] for item in batch])
 
@@ -245,7 +245,7 @@ def collate_fn_production(batch: List[Dict]) -> Dict:
 
     output = {
         "latent": latents,
-        "crop_resolution": crop_resolutions,
+        "bucket_resolution": bucket_resolutions,
         "original_resolution": original_resolutions,
         "crop_offset": crop_offsets,
         "prompt": prompts,

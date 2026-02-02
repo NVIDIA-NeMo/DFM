@@ -316,7 +316,7 @@ def _process_image(args: Tuple) -> Optional[Dict]:
 
         metadata = {
             "original_resolution": (orig_width, orig_height),
-            "crop_resolution": (target_width, target_height),
+            "bucket_resolution": (target_width, target_height),
             "crop_offset": crop_offset,
             "prompt": caption,
             "image_path": str(Path(image_path).absolute()),
@@ -330,7 +330,7 @@ def _process_image(args: Tuple) -> Optional[Dict]:
         return {
             "cache_file": str(cache_file),
             "image_path": str(Path(image_path).absolute()),
-            "crop_resolution": [target_width, target_height],
+            "bucket_resolution": [target_width, target_height],
             "original_resolution": [orig_width, orig_height],
             "prompt": caption,
             "bucket_id": bucket["id"],
@@ -516,7 +516,7 @@ def preprocess_dataset(
 
     bucket_counts: Dict[str, int] = {}
     for item in all_metadata:
-        res = f"{item['crop_resolution'][0]}x{item['crop_resolution'][1]}"
+        res = f"{item['bucket_resolution'][0]}x{item['bucket_resolution'][1]}"
         bucket_counts[res] = bucket_counts.get(res, 0) + 1
 
     print("\nBucket distribution:")

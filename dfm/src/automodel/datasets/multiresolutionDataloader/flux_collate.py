@@ -58,7 +58,7 @@ def collate_fn_flux(batch: List[Dict]) -> Dict:
             "image_paths": production_batch.get("image_path", []),
             "bucket_ids": production_batch.get("bucket_id", []),
             "aspect_ratios": production_batch.get("aspect_ratio", []),
-            "crop_resolution": production_batch.get("crop_resolution"),
+            "bucket_resolution": production_batch.get("bucket_resolution"),
             "original_resolution": production_batch.get("original_resolution"),
             "crop_offset": production_batch.get("crop_offset"),
         },

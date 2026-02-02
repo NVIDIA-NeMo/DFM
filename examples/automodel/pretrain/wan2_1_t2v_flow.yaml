@@ -27,10 +27,13 @@ step_scheduler:
 
 data:
   dataloader:
-    _target_: dfm.src.automodel.datasets.build_dataloader
-    meta_folder: /lustre/fsw/portfolios/coreai/users/linnanw/hdvilla_sample/pika/wan21_codes/1.3B_meta/
-    num_workers: 2
-    device: cpu
+    _target_: dfm.src.automodel.datasets.multiresolutionDataloader.build_video_multiresolution_dataloader
+    cache_dir: /lustre/fsw/portfolios/coreai/users/pthombre/Automodel/OpenVID_512p_frames/
+    model_type: wan
+    num_workers: 4
+    dynamic_batch_size: false
+    shuffle: true
+    drop_last: true
 
 optim:
   learning_rate: 5e-5

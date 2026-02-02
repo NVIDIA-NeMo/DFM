@@ -86,8 +86,9 @@ class WanProcessor(BaseVideoProcessor):
 
     @property
     def quantization(self) -> int:
-        # Wan VAE requires 8-pixel aligned dimensions
-        return 8
+        # Wan VAE downsamples by 8x and transformer has patch_size=2 in latent space
+        # Therefore, pixel dimensions must be divisible by 8 * 2 = 16
+        return 16
 
     def load_models(self, model_name: str, device: str) -> Dict[str, Any]:
         """

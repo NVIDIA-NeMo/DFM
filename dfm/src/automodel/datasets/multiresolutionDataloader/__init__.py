@@ -12,6 +12,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+from .base_dataset import BaseMultiresolutionDataset
 from .dataloader import (
     SequentialBucketSampler,
     build_multiresolution_dataloader,
@@ -23,10 +24,20 @@ from .flux_collate import (
 )
 from .multi_tier_bucketing import MultiTierBucketCalculator
 from .text_to_image_dataset import TextToImageDataset
+from .text_to_video_dataset import TextToVideoDataset
+from .video_collate import (
+    build_video_multiresolution_dataloader,
+    collate_fn_video,
+)
 
 
 __all__ = [
+    # Base class
+    "BaseMultiresolutionDataset",
+    # Dataset classes
     "TextToImageDataset",
+    "TextToVideoDataset",
+    # Utilities
     "MultiTierBucketCalculator",
     "SequentialBucketSampler",
     "build_multiresolution_dataloader",
@@ -34,4 +45,7 @@ __all__ = [
     # Flux-specific
     "build_flux_multiresolution_dataloader",
     "collate_fn_flux",
+    # Video-specific
+    "build_video_multiresolution_dataloader",
+    "collate_fn_video",
 ]
