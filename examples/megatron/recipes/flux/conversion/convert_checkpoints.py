@@ -118,50 +118,35 @@ def import_hf_to_megatron(
         print(f"   Trust remote code: {trust_remote_code}")
 
     # Import using the convenience method
-    print(f"📥 Loading HuggingFace model: {hf_model}")
-    # try:
-    #     AutoBridge.import_ckpt(
-    #         hf_model_id=hf_model,
-    #         megatron_path=megatron_path,
-    #         **kwargs,
-    #     )
-    # except ValueError as e:
-        # Fallback for Diffusers-based flux repos that do not provide a transformers config
-    # msg = str(e)
-    is_flux_repo = ("flux" in hf_model.lower()) or ("diffusers" in hf_model.lower())
-    auto_config_failed = True # ("Unrecognized model" in msg) or ("Failed to load configuration" in msg)
-    if is_flux_repo or auto_config_failed:
-        print("ℹ️ AutoConfig path failed; falling back to flux Diffusers conversion.")
-        # Minimal single-rank env to satisfy provider init if needed
-        os.environ.setdefault("MASTER_ADDR", "127.0.0.1")
-        os.environ.setdefault("MASTER_PORT", str(29500 + random.randint(0, 1000)))
-        os.environ.setdefault("RANK", "0")
-        os.environ.setdefault("WORLD_SIZE", "1")
-        os.environ.setdefault("LOCAL_RANK", "0")
+    print(f"📥 Loading HuggingFace model from diffusers: {hf_model}")
+    # Minimal single-rank env to satisfy provider init if needed
+    os.environ.setdefault("MASTER_ADDR", "127.0.0.1")
+    os.environ.setdefault("MASTER_PORT", str(29500 + random.randint(0, 1000)))
+    os.environ.setdefault("RANK", "0")
+    os.environ.setdefault("WORLD_SIZE", "1")
+    os.environ.setdefault("LOCAL_RANK", "0")
 
-        hf = PreTrainedFlux(hf_model)
-        bridge = FluxBridge()
-        provider = bridge.provider_bridge(hf)
-        provider.perform_initialization = False
-        megatron_models = provider.provide_distributed_model(wrap_with_ddp=False, use_cpu_initialization=True)
-        bridge.load_weights_hf_to_megatron(hf, megatron_models)
+    hf = PreTrainedFlux(hf_model)
+    bridge = FluxBridge()
+    provider = bridge.provider_bridge(hf)
+    provider.perform_initialization = False
+    megatron_models = provider.provide_distributed_model(wrap_with_ddp=False, use_cpu_initialization=True)
+    bridge.load_weights_hf_to_megatron(hf, megatron_models)
 
-        # Save all parameters in transformer with their norms to a file
-        param_norms_file = "megatron_bridge_param_norms.txt"
-        with open(param_norms_file, "w") as f:
-            f.write("=" * 80 + "\n")
-            f.write("Transformer Parameters and Norms\n")
-            f.write("=" * 80 + "\n")
-            for name, param in megatron_models[0].named_parameters():
-                if param.requires_grad:
-                    norm = param.data.norm().item()
-                    f.write(f"{name:80s} | shape: {str(list(param.shape)):20s} | norm: {norm:.6f}\n")
-            f.write("=" * 80 + "\n")
-        print(f"Parameter norms saved to: {param_norms_file}")
+    # Save all parameters in transformer with their norms to a file
+    param_norms_file = "megatron_bridge_param_norms.txt"
+    with open(param_norms_file, "w") as f:
+        f.write("=" * 80 + "\n")
+        f.write("Transformer Parameters and Norms\n")
+        f.write("=" * 80 + "\n")
+        for name, param in megatron_models[0].named_parameters():
+            if param.requires_grad:
+                norm = param.data.norm().item()
+                f.write(f"{name:80s} | shape: {str(list(param.shape)):20s} | norm: {norm:.6f}\n")
+        f.write("=" * 80 + "\n")
+    print(f"Parameter norms saved to: {param_norms_file}")
 
-        save_megatron_model(megatron_models, megatron_path, hf_tokenizer_path=None)
-        # else:
-        #     raise
+    save_megatron_model(megatron_models, megatron_path, hf_tokenizer_path=None)
 
     print(f"✅ Successfully imported model to: {megatron_path}")
 
@@ -214,55 +199,34 @@ def export_megatron_to_hf(
 
     print(f"📋 Found configuration: {config_files[0]}")
 
-    # Try generic export first
-    try:
-        # For demonstration, we'll create a bridge from a known config
-        # This would typically be extracted from the checkpoint metadata
-        bridge = AutoBridge.from_hf_pretrained(hf_model, trust_remote_code=True)
-
-        # Export using the convenience method
-        print("📤 Exporting to HuggingFace format...")
-        bridge.export_ckpt(
-            megatron_path=megatron_path,
-            hf_path=hf_path,
-            show_progress=show_progress,
+    print("ℹ️ Starting Flux Diffusers export...")
+    # Minimal single-process distributed context on CPU for loading Megatron ckpt
+    with temporary_distributed_context(backend="gloo"):
+        # Resolve latest iter_* directory (use the config file we found)
+        checkpoint_iter_dir = config_files[0].parent
+        # 1) Load Megatron model from checkpoint
+        megatron_models = load_megatron_model(
+            str(checkpoint_iter_dir), use_cpu_init=True, skip_temp_dist_context=True
         )
-    except ValueError as e:
-        # Fallback for Diffusers-based Flux repos that do not provide a transformers config
-        msg = str(e)
-        is_flux_repo = ("flux" in hf_model.lower()) or ("diffusers" in hf_model.lower())
-        auto_config_failed = ("Unrecognized model" in msg) or ("Failed to load configuration" in msg)
-        if is_flux_repo or auto_config_failed:
-            print("ℹ️ AutoConfig path failed; falling back to Flux Diffusers export.")
-            # Minimal single-process distributed context on CPU for loading Megatron ckpt
-            with temporary_distributed_context(backend="gloo"):
-                # Resolve latest iter_* directory (use the config file we found)
-                checkpoint_iter_dir = config_files[0].parent
-                # 1) Load Megatron model from checkpoint
-                megatron_models = load_megatron_model(
-                    str(checkpoint_iter_dir), use_cpu_init=True, skip_temp_dist_context=True
-                )
-                if not isinstance(megatron_models, list):
-                    megatron_models = [megatron_models]
+        if not isinstance(megatron_models, list):
+            megatron_models = [megatron_models]
 
-                # 2) Prepare HF Flux wrapper for state/metadata and save artifacts
-                hf = PreTrainedFlux(hf_model)
-                Path(hf_path).mkdir(parents=True, exist_ok=True)
-                # Some diffusers configs are FrozenDict and don't support save_pretrained; skip quietly
-                try:
-                    hf.save_artifacts(hf_path)
-                except Exception:
-                    pass
+        # 2) Prepare HF Flux wrapper for state/metadata and save artifacts
+        hf = PreTrainedFlux(hf_model)
+        Path(hf_path).mkdir(parents=True, exist_ok=True)
+        # Some diffusers configs are FrozenDict and don't support save_pretrained; skip quietly
+        try:
+            hf.save_artifacts(hf_path)
+        except Exception:
+            pass
 
-                # 3) Stream-export weights Megatron -> HF safetensors via Flux bridge
-                bridge = FluxBridge()
-                generator = bridge.stream_weights_megatron_to_hf(
-                    megatron_models, hf, cpu=True, show_progress=show_progress
-                )
-                # 4) Save streamed weights into hf_path
-                hf.state.source.save_generator(generator, hf_path)
-        else:
-            raise
+        # 3) Stream-export weights Megatron -> HF safetensors via Flux bridge
+        bridge = FluxBridge()
+        generator = bridge.stream_weights_megatron_to_hf(
+            megatron_models, hf, cpu=True, show_progress=show_progress
+        )
+        # 4) Save streamed weights into hf_path
+        hf.state.source.save_generator(generator, hf_path)
 
     print(f"✅ Successfully exported model to: {hf_path}")
 
