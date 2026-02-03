@@ -24,6 +24,7 @@ from megatron.core.transformer.enums import AttnMaskType
 from megatron.core.transformer.spec_utils import ModuleSpec, build_module
 from megatron.core.transformer.transformer_config import TransformerConfig
 
+
 try:
     from megatron.core.extensions.transformer_engine import SplitAlongDim
 except ImportError:

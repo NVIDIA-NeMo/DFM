@@ -15,7 +15,6 @@
 """FLUX layer specifications and transformer blocks."""
 
 import copy
-from typing import Literal
 
 import torch
 import torch.nn as nn
@@ -28,7 +27,6 @@ from megatron.core.transformer.module import MegatronModule
 from megatron.core.transformer.spec_utils import ModuleSpec, build_module
 from megatron.core.transformer.transformer_config import TransformerConfig
 from megatron.core.transformer.transformer_layer import TransformerLayer, TransformerLayerSubmodules
-from megatron.core.utils import make_viewless_tensor
 
 from dfm.src.megatron.model.common.normalization import RMSNorm
 from dfm.src.megatron.model.flux.flux_attention import (
@@ -36,6 +34,7 @@ from dfm.src.megatron.model.flux.flux_attention import (
     JointSelfAttention,
     JointSelfAttentionSubmodules,
 )
+
 
 try:
     from megatron.core.transformer.custom_layers.transformer_engine import (

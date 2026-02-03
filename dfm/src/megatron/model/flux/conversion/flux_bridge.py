@@ -12,21 +12,22 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+from typing import Mapping
+
 import torch
 from diffusers import FluxTransformer2DModel
 from megatron.bridge.models.conversion.mapping_registry import MegatronMappingRegistry
 from megatron.bridge.models.conversion.model_bridge import MegatronModelBridge
 from megatron.bridge.models.conversion.param_mapping import (
     AutoMapping,
-    RowParallelMapping,
     QKVMapping,
+    RowParallelMapping,
 )
-from megatron.bridge.models.conversion.utils import get_module_and_param_from_name
 
 from dfm.src.megatron.model.flux.conversion.flux_hf_pretrained import PreTrainedFlux
 from dfm.src.megatron.model.flux.flux_model import Flux
 from dfm.src.megatron.model.flux.flux_provider import FluxProvider
-from typing import Mapping
+
 
 @MegatronModelBridge.register_bridge(source=FluxTransformer2DModel, target=Flux)
 class FluxBridge(MegatronModelBridge):

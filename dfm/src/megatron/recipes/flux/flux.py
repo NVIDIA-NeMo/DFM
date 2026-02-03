@@ -228,7 +228,7 @@ def pretrain_config(
         )
     else:
         # Real dataset configuration using Energon WebDataset
-        from dfm.src.megatron.data.flux.flux_energon_datamodule import FluxDataModuleConfig        
+        from dfm.src.megatron.data.flux.flux_energon_datamodule import FluxDataModuleConfig
         dataset = FluxDataModuleConfig(
             path=data_paths,  # Path to WebDataset shards directory
             seq_length=1024,

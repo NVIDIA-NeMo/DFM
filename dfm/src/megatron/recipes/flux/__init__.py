@@ -14,5 +14,6 @@
 
 from dfm.src.megatron.recipes.flux.flux import model_config, pretrain_config
 
+
 __all__ = ["model_config", "pretrain_config"]
 

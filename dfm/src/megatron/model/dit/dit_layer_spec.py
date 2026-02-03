@@ -18,7 +18,6 @@ import copy
 from dataclasses import dataclass
 from typing import Literal, Optional, Union
 
-import torch
 import torch.nn as nn
 from megatron.core.jit import jit_fuser
 from megatron.core.transformer.attention import (

@@ -14,7 +14,6 @@
 
 """FLUX diffusion model implementation with Megatron Core."""
 
-import os
 from contextlib import nullcontext
 from typing import TYPE_CHECKING
 
@@ -24,10 +23,10 @@ from megatron.core import parallel_state
 from megatron.core.dist_checkpointing.mapping import ShardedStateDict
 from megatron.core.dist_checkpointing.utils import replace_prefix_for_sharding
 from megatron.core.models.common.vision_module.vision_module import VisionModule
+from megatron.core.transformer.enums import ModelType
 from megatron.core.transformer.transformer_config import TransformerConfig
 from megatron.core.transformer.utils import sharded_state_dict_default
 from torch import nn
-from megatron.core.transformer.enums import ModelType
 
 from dfm.src.megatron.model.flux.flux_layer_spec import (
     AdaLNContinuous,
@@ -38,8 +37,9 @@ from dfm.src.megatron.model.flux.flux_layer_spec import (
 )
 from dfm.src.megatron.model.flux.layers import EmbedND, MLPEmbedder, TimeStepEmbedder
 
+
 if TYPE_CHECKING:
-    from dfm.src.megatron.model.flux.flux_provider import FluxProvider
+    pass
 
 
 class Flux(VisionModule):

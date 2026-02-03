@@ -32,12 +32,12 @@ Components:
     - AdaLNContinuous: Continuous Adaptive Layer Normalization
 """
 
+from dfm.src.megatron.model.common.normalization import RMSNorm
 from dfm.src.megatron.model.flux.flux_attention import (
     FluxSingleAttention,
     JointSelfAttention,
     JointSelfAttentionSubmodules,
 )
-from dfm.src.megatron.model.common.normalization import RMSNorm
 from dfm.src.megatron.model.flux.flux_layer_spec import (
     AdaLN,
     AdaLNContinuous,
@@ -47,13 +47,13 @@ from dfm.src.megatron.model.flux.flux_layer_spec import (
     get_flux_single_transformer_engine_spec,
 )
 from dfm.src.megatron.model.flux.flux_model import Flux
-from dfm.src.megatron.model.flux.flux_provider import FluxProvider
 from dfm.src.megatron.model.flux.flux_pipeline import (
     ClipConfig,
     FlowMatchEulerDiscreteScheduler,
     FluxInferencePipeline,
     T5Config,
 )
+from dfm.src.megatron.model.flux.flux_provider import FluxProvider
 from dfm.src.megatron.model.flux.layers import (
     EmbedND,
     MLPEmbedder,
@@ -62,6 +62,7 @@ from dfm.src.megatron.model.flux.layers import (
     get_timestep_embedding,
     rope,
 )
+
 
 __all__ = [
     # Main model

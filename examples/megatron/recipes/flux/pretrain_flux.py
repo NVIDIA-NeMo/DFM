@@ -214,7 +214,7 @@ def main() -> None:
         logger.info("--- Final Merged Configuration ---")
         cfg.print_yaml()
         logger.info("----------------------------------")
-        logger.info(f"FluxForwardStep config:")
+        logger.info("FluxForwardStep config:")
         logger.info(f"  timestep_sampling: {args.timestep_sampling}")
         logger.info(f"  logit_mean: {args.logit_mean}")
         logger.info(f"  logit_std: {args.logit_std}")

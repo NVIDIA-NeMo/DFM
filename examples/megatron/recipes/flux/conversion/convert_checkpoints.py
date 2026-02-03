@@ -53,7 +53,6 @@ from pathlib import Path
 from typing import Optional
 
 import torch
-from megatron.bridge import AutoBridge
 from megatron.bridge.training.model_load_save import (
     load_megatron_model,
     save_megatron_model,

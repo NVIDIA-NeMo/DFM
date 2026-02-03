@@ -3,8 +3,10 @@
 
 import argparse
 import os
+
 import torch
 import torch.distributed as dist
+
 
 def parse_args():
     parser = argparse.ArgumentParser(description="FLUX inference")

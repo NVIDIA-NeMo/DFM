@@ -14,21 +14,20 @@
 
 """FLUX inference pipeline for text-to-image generation."""
 
+import math
 import os
 from dataclasses import dataclass, field
-from typing import Callable, List, Optional, Union, Tuple
+from typing import List, Optional, Tuple, Union
 
 import numpy as np
 import torch
+from megatron.bridge.training.model_load_save import load_megatron_model as _load_megatron_model
 from PIL import Image
-from safetensors.torch import load_file as load_safetensors
-from safetensors.torch import save_file as save_safetensors
 from torch import nn
 from tqdm import tqdm
-from megatron.bridge.training.model_load_save import load_megatron_model as _load_megatron_model
-from dfm.src.megatron.model.flux.flux_model import Flux
+
 from dfm.src.megatron.model.flux.flux_provider import FluxProvider
-import math
+
 
 @dataclass
 class T5Config:
