@@ -151,7 +151,6 @@ class FluxForwardStep:
             On other stages: hidden_states tensor.
         """
         # Get latents from batch - expected in [B, C, H, W] format
-
         if "latents" in batch:
             latents = batch["latents"]
         else:
@@ -176,7 +175,9 @@ class FluxForwardStep:
             raise ValueError("Expected precached text embeddings in batch.")
 
         # Forward pass
-        with torch.amp.autocast("cuda", enabled=self.autocast_dtype in (torch.half, torch.bfloat16), dtype=self.autocast_dtype):
+        with torch.amp.autocast(
+            "cuda", enabled=self.autocast_dtype in (torch.half, torch.bfloat16), dtype=self.autocast_dtype
+        ):
             noise_pred = model(
                 img=packed_noisy_model_input,
                 txt=prompt_embeds,

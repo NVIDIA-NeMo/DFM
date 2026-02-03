@@ -22,7 +22,7 @@ model:
   pipeline_model_parallel_size: 1
   context_parallel_size: 1
   sequence_parallel: false
-  
+
   # FLUX architecture (FLUX-schnell defaults)
   num_joint_layers: 19
   num_single_layers: 38
@@ -30,7 +30,7 @@ model:
   num_attention_heads: 24
   in_channels: 64
   context_dim: 4096
-  
+
   # For FLUX-dev, set guidance_embed: true
   guidance_embed: false
   guidance_scale: 3.5

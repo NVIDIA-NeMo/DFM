@@ -96,4 +96,3 @@ __all__ = [
     "ClipConfig",
     "AutoEncoderConfig",
 ]
-

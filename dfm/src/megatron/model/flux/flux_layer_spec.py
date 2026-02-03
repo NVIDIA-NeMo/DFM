@@ -312,7 +312,7 @@ class MMDiTLayer(TransformerLayer):
         return hidden_states, encoder_hidden_states
 
     def __call__(self, *args, **kwargs):
-        if hasattr(self, 'cudagraph_manager'):
+        if hasattr(self, "cudagraph_manager"):
             return self.cudagraph_manager(self, args, kwargs)
         return super(MegatronModule, self).__call__(*args, **kwargs)
 
@@ -397,7 +397,7 @@ class FluxSingleTransformerBlock(TransformerLayer):
         return hidden_states, None
 
     def __call__(self, *args, **kwargs):
-        if hasattr(self, 'cudagraph_manager'):
+        if hasattr(self, "cudagraph_manager"):
             return self.cudagraph_manager(self, args, kwargs)
         return super(MegatronModule, self).__call__(*args, **kwargs)
 
@@ -472,4 +472,3 @@ def get_flux_single_transformer_engine_spec() -> ModuleSpec:
             ),
         ),
     )
-

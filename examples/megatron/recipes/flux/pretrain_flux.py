@@ -198,7 +198,6 @@ def main() -> None:
     # Apply overrides while preserving excluded fields
     apply_overrides(cfg, final_overrides_as_dict, excluded_fields)
 
-
     # Configure FluxForwardStep with flow matching parameters
     flux_forward_step = FluxForwardStep(
         timestep_sampling=args.timestep_sampling,
@@ -229,4 +228,3 @@ def main() -> None:
 
 if __name__ == "__main__":
     main()
-

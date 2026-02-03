@@ -97,9 +97,9 @@ class FluxTaskEncoder(DiffusionTaskEncoderWithSequencePacking):
         # - 'prompt_embeds': T5 embeddings [text_seq_len, context_dim]
         # - 'pooled_prompt_embeds': CLIP pooled embeddings [pooled_dim]
         if isinstance(text_embeddings, dict):
-            prompt_embeds = text_embeddings.get('prompt_embeds', text_embeddings.get('t5_embeds'))
-            pooled_prompt_embeds = text_embeddings.get('pooled_prompt_embeds', text_embeddings.get('clip_embeds'))
-            
+            prompt_embeds = text_embeddings.get("prompt_embeds", text_embeddings.get("t5_embeds"))
+            pooled_prompt_embeds = text_embeddings.get("pooled_prompt_embeds", text_embeddings.get("clip_embeds"))
+
             # Ensure pooled_prompt_embeds is not None
             if pooled_prompt_embeds is None:
                 pooled_prompt_embeds = torch.zeros(768, dtype=torch.bfloat16)
@@ -185,23 +185,23 @@ class FluxTaskEncoder(DiffusionTaskEncoderWithSequencePacking):
     @stateless
     def batch(self, samples: List[DiffusionSample]) -> dict:
         """Return dictionary with data for batch."""
-        
+
         # Helper function to extract metadata
         def extract_metadata(sample):
             # Handle case where video_metadata is a list (from packed samples)
             metadata = sample.video_metadata
             if isinstance(metadata, list):
                 metadata = metadata[0] if len(metadata) > 0 else {}
-            
+
             if isinstance(metadata, dict) and "pooled_prompt_embeds" in metadata:
                 pooled = metadata["pooled_prompt_embeds"]
                 text_ids = metadata.get("text_ids", torch.zeros(512, 3, dtype=torch.bfloat16))
                 orig_metadata = metadata.get("original_metadata", metadata)
-                
+
                 return (pooled, text_ids, orig_metadata)
             else:
                 raise ValueError("Expected 'pooled_prompt_embeds' in metadata.")
-        
+
         if self.packing_buffer_size is None:
             # No packing - batch multiple samples
             latents_list = []
@@ -215,10 +215,10 @@ class FluxTaskEncoder(DiffusionTaskEncoderWithSequencePacking):
             seq_len_kv_padded_list = []
             latent_shape_list = []
             metadata_list = []
-            
+
             for sample in samples:
                 pooled, text_ids, metadata = extract_metadata(sample)
-                
+
                 latents_list.append(sample.video)
                 prompt_embeds_list.append(sample.context_embeddings)
                 pooled_embeds_list.append(pooled)
@@ -230,7 +230,7 @@ class FluxTaskEncoder(DiffusionTaskEncoderWithSequencePacking):
                 seq_len_kv_padded_list.append(sample.seq_len_kv_padded)
                 latent_shape_list.append(sample.latent_shape)
                 metadata_list.append(metadata)
-            
+
             return dict(
                 latents=torch.stack(latents_list),
                 prompt_embeds=torch.stack(prompt_embeds_list),
@@ -252,16 +252,16 @@ class FluxTaskEncoder(DiffusionTaskEncoderWithSequencePacking):
         # Stack to create batch dimension
         # sample.video has shape [C, H, W] -> unsqueeze to [1, C, H, W] for batch
         latents = sample.video.unsqueeze(0)  # [1, C, H, W]
-        
+
         # Prompt embeds: [text_seq_len, D] -> [1, text_seq_len, D] for batch
         prompt_embeds = sample.context_embeddings.unsqueeze(0)  # [1, text_seq_len, D]
-        
+
         # Pooled embeds: [pooled_dim] -> [1, pooled_dim] for batch
         pooled_prompt_embeds = pooled_prompt_embeds.unsqueeze(0)  # [1, pooled_dim]
-        
+
         # Text IDs: [text_seq_len, 3] -> [1, text_seq_len, 3] for batch
         text_ids = text_ids.unsqueeze(0)  # [1, text_seq_len, 3]
-        
+
         # Loss mask: [seq_len_q] -> [1, seq_len_q] for batch
         loss_mask = sample.loss_mask.unsqueeze(0) if sample.loss_mask is not None else None
 
@@ -293,4 +293,3 @@ class FluxTaskEncoder(DiffusionTaskEncoderWithSequencePacking):
         # image_metadata: [num_samples]
 
         return batch
-

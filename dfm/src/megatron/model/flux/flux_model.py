@@ -143,7 +143,6 @@ class Flux(VisionModule):
         self.norm_out = AdaLNContinuous(config=config, conditioning_embedding_dim=self.hidden_size)
         self.proj_out = nn.Linear(self.hidden_size, self.patch_size * self.patch_size * self.out_channels, bias=True)
 
-
     def get_fp8_context(self):
         """Get FP8 autocast context if FP8 is enabled."""
         if not self.config.fp8:
@@ -291,7 +290,7 @@ class Flux(VisionModule):
 
         return output
 
-    def sharded_state_dict(self, prefix='', sharded_offsets: tuple = (), metadata: dict = None) -> ShardedStateDict:
+    def sharded_state_dict(self, prefix="", sharded_offsets: tuple = (), metadata: dict = None) -> ShardedStateDict:
         """
         Get sharded state dict for distributed checkpointing.
 
@@ -306,13 +305,13 @@ class Flux(VisionModule):
         sharded_state_dict = {}
 
         # Handle double blocks
-        layer_prefix = f'{prefix}double_blocks.'
+        layer_prefix = f"{prefix}double_blocks."
         for layer in self.double_blocks:
             offset = layer._get_layer_offset(self.config)
 
             global_layer_offset = layer.layer_number
-            state_dict_prefix = f'{layer_prefix}{global_layer_offset - offset}.'
-            sharded_prefix = f'{layer_prefix}{global_layer_offset}.'
+            state_dict_prefix = f"{layer_prefix}{global_layer_offset - offset}."
+            sharded_prefix = f"{layer_prefix}{global_layer_offset}."
             sharded_pp_offset = []
 
             layer_sharded_state_dict = layer.sharded_state_dict(state_dict_prefix, sharded_pp_offset, metadata)
@@ -321,13 +320,13 @@ class Flux(VisionModule):
             sharded_state_dict.update(layer_sharded_state_dict)
 
         # Handle single blocks
-        layer_prefix = f'{prefix}single_blocks.'
+        layer_prefix = f"{prefix}single_blocks."
         for layer in self.single_blocks:
             offset = layer._get_layer_offset(self.config)
 
             global_layer_offset = layer.layer_number
-            state_dict_prefix = f'{layer_prefix}{global_layer_offset - offset}.'
-            sharded_prefix = f'{layer_prefix}{global_layer_offset}.'
+            state_dict_prefix = f"{layer_prefix}{global_layer_offset - offset}."
+            sharded_prefix = f"{layer_prefix}{global_layer_offset}."
             sharded_pp_offset = []
 
             layer_sharded_state_dict = layer.sharded_state_dict(state_dict_prefix, sharded_pp_offset, metadata)
@@ -339,11 +338,10 @@ class Flux(VisionModule):
         for name, module in self.named_children():
             if not (module is self.single_blocks or module is self.double_blocks):
                 sharded_state_dict.update(
-                    sharded_state_dict_default(module, f'{prefix}{name}.', sharded_offsets, metadata)
+                    sharded_state_dict_default(module, f"{prefix}{name}.", sharded_offsets, metadata)
                 )
         return sharded_state_dict
 
     def set_input_tensor(self, input_tensor):
         """Set input tensor for pipeline parallelism."""
         pass
-

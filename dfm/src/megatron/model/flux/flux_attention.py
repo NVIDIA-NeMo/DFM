@@ -98,7 +98,7 @@ class JointSelfAttention(Attention):
             bias=self.config.add_bias_linear or self.config.add_qkv_bias,
             skip_bias_add=False,
             is_expert=False,
-            tp_comm_buffer_name='qkv',
+            tp_comm_buffer_name="qkv",
         )
 
         if submodules.added_linear_qkv is not None:
@@ -112,7 +112,7 @@ class JointSelfAttention(Attention):
                 bias=self.config.add_qkv_bias,
                 skip_bias_add=False,
                 is_expert=False,
-                tp_comm_buffer_name='qkv',
+                tp_comm_buffer_name="qkv",
             )
 
         if not context_pre_only:
@@ -126,7 +126,7 @@ class JointSelfAttention(Attention):
                 input_is_parallel=True,
                 skip_bias_add=True,
                 is_expert=False,
-                tp_comm_buffer_name='proj',
+                tp_comm_buffer_name="proj",
             )
 
         if submodules.q_layernorm is not None:
@@ -412,7 +412,7 @@ class FluxSingleAttention(SelfAttention):
             input_is_parallel=True,
             skip_bias_add=True,
             is_expert=False,
-            tp_comm_buffer_name='proj',
+            tp_comm_buffer_name="proj",
         )
 
     def forward(
@@ -514,4 +514,3 @@ class FluxSingleAttention(SelfAttention):
 
         output, _ = self.linear_proj(core_attn_out)
         return output
-

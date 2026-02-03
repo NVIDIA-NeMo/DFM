@@ -118,7 +118,7 @@ def _load_image(image_path: str) -> np.ndarray:
 def _load_metadata(data_folder: Path, image_extensions: List[str] = None) -> List[Dict]:
     """
     Load metadata from meta.json or scan directory for images.
-    
+
     Expected meta.json format:
     [
         {
@@ -143,7 +143,7 @@ def _load_metadata(data_folder: Path, image_extensions: List[str] = None) -> Lis
             continue
         if entry.suffix.lower() not in image_extensions:
             continue
-        
+
         image_name = entry.name
         # Look for caption in .txt file
         caption_file = entry.with_suffix(".txt")
@@ -151,14 +151,14 @@ def _load_metadata(data_folder: Path, image_extensions: List[str] = None) -> Lis
         if caption_file.exists():
             with open(caption_file, "r") as f:
                 caption = f.read().strip()
-        
+
         items.append(
             {
                 "file_name": image_name,
                 "caption": caption,
             }
         )
-    
+
     if not items:
         raise FileNotFoundError(f"No meta.json and no image files found in {data_folder}")
     return items
@@ -179,7 +179,7 @@ def _init_flux_vae(
     # Use float32 for all devices to avoid dtype mismatch issues
     # The FLUX VAE appears to have internal operations that require float32
     dtype = torch.float32
-    
+
     vae = AutoencoderKL.from_pretrained(
         model_id,
         subfolder="vae",
@@ -188,18 +188,18 @@ def _init_flux_vae(
     # Ensure all parameters and buffers are on the correct device and dtype
     vae = vae.to(device=device, dtype=dtype)
     vae.eval()
-    
+
     # Verify dtype consistency for all parameters
     for name, param in vae.named_parameters():
         if param.dtype != dtype:
             param.data = param.data.to(dtype)
-    
+
     # Also convert buffers (like running means in batch norm)
     for name, buffer in vae.named_buffers():
         if buffer.dtype not in [torch.int32, torch.int64, torch.long]:  # Skip integer buffers
             if buffer.dtype != dtype:
                 buffer.data = buffer.data.to(dtype)
-    
+
     if enable_memory_optimization and hasattr(vae, "enable_slicing"):
         vae.enable_slicing()
     if enable_memory_optimization and hasattr(vae, "enable_tiling"):
@@ -245,12 +245,12 @@ def _encode_text_flux(
 ) -> Tuple[torch.Tensor, torch.Tensor]:
     """
     Encode text with both T5 and CLIP encoders.
-    
+
     Returns:
         Tuple of (t5_embeds [seq_len, hidden_dim], clip_pooled_embeds [hidden_dim])
     """
     caption = caption.strip()
-    
+
     # T5 encoding
     t5_inputs = t5_tokenizer(
         caption,
@@ -261,10 +261,7 @@ def _encode_text_flux(
         return_attention_mask=True,
     )
     t5_inputs = {k: v.to(device) for k, v in t5_inputs.items()}
-    t5_outputs = t5_encoder(
-        input_ids=t5_inputs["input_ids"],
-        attention_mask=t5_inputs["attention_mask"]
-    )
+    t5_outputs = t5_encoder(input_ids=t5_inputs["input_ids"], attention_mask=t5_inputs["attention_mask"])
     t5_embeds = t5_outputs.last_hidden_state[0]  # [seq_len, hidden_dim]
 
     # CLIP encoding
@@ -291,36 +288,36 @@ def _encode_image_latents(
 ) -> torch.Tensor:
     """
     Encode image to latents using FLUX VAE.
-    
+
     Args:
         vae: FLUX VAE model
         device: Device to use
         image: RGB numpy array [H, W, C] in range [0, 255]
         deterministic_latents: If True, use mean; if False, sample
-        
+
     Returns:
         Latents tensor [C, H_latent, W_latent]
     """
     # Normalize to [0, 1] then to [-1, 1] (standard for diffusion VAEs)
     image = image.astype(np.float32) / 255.0
     image = image * 2.0 - 1.0
-    
+
     # Convert to tensor [1, C, H, W]
     image_tensor = torch.from_numpy(image).permute(2, 0, 1).unsqueeze(0)
     # Match VAE's dtype to avoid dtype mismatch with internal weights
     image_tensor = image_tensor.to(device=device, dtype=vae.dtype)
-    
+
     # FLUX VAE expects inputs in [-1, 1] range
     latent_dist = vae.encode(image_tensor)
-    
+
     if deterministic_latents:
         latents = latent_dist.latent_dist.mode()
     else:
         latents = latent_dist.latent_dist.sample()
-    
+
     # Remove batch dimension: [1, C, H, W] -> [C, H, W]
     latents = latents[0]
-    
+
     return latents
 
 
@@ -343,7 +340,7 @@ def _save_individual_sample(
 ) -> None:
     """
     Save individual files for a sample.
-    
+
     Args:
         output_dir: Base output directory
         sample_key: Unique key for this sample (e.g., "000001")
@@ -354,18 +351,18 @@ def _save_individual_sample(
     """
     sample_dir = output_dir / "individual_samples" / sample_key
     sample_dir.mkdir(parents=True, exist_ok=True)
-    
+
     # Save latents
     torch.save(latents, sample_dir / "latents.pt")
-    
+
     # Save text embeddings
     with open(sample_dir / "text_embeddings.pkl", "wb") as f:
         pickle.dump(text_embeddings, f)
-    
+
     # Save metadata
     with open(sample_dir / "metadata.json", "w") as f:
         json.dump(json_data, f, indent=2)
-    
+
     # Optionally save processed image
     if processed_image is not None:
         # Convert RGB back to BGR for OpenCV
@@ -420,17 +417,17 @@ def main():
 
     # Distributed processing
     parser.add_argument("--distributed", action="store_true", help="Use distributed processing")
-    
+
     # Individual file saving
     parser.add_argument(
         "--save_individual_files",
         action="store_true",
-        help="Save individual files (latents, embeddings, metadata) in addition to webdataset tars"
+        help="Save individual files (latents, embeddings, metadata) in addition to webdataset tars",
     )
     parser.add_argument(
         "--save_processed_images",
         action="store_true",
-        help="Also save processed images when --save_individual_files is enabled"
+        help="Also save processed images when --save_individual_files is enabled",
     )
 
     args = parser.parse_args()
@@ -468,7 +465,7 @@ def main():
         device=device,
         enable_memory_optimization=not args.no_memory_optimization,
     )
-    
+
     t5_tokenizer, t5_encoder, clip_tokenizer, clip_encoder, text_dtype = _init_text_encoders(
         t5_model_id=args.t5_model,
         clip_model_id=args.clip_model,
@@ -482,7 +479,7 @@ def main():
     # Distribute work across ranks
     start_idx, end_idx = get_start_end_idx_for_this_rank(len(metadata_list), rank, world_size)
     print(f"Rank {rank} of {world_size} processing {end_idx - start_idx} samples, from {start_idx} to {end_idx}")
-    
+
     if args.save_individual_files:
         print(f"Individual files will be saved to: {output_dir / 'individual_samples'}")
         if args.save_processed_images:
@@ -496,7 +493,7 @@ def main():
             caption = meta.get("caption", "")
 
             image_path = str(data_folder / image_name)
-            
+
             try:
                 # Load and resize image
                 image = _load_image(image_path)
@@ -511,14 +508,17 @@ def main():
                 H, W = image.shape[:2]
 
                 # Encode image to latents
-                latents = _encode_image_latents(
-                    vae, device, image, deterministic_latents=not args.stochastic
-                )
+                latents = _encode_image_latents(vae, device, image, deterministic_latents=not args.stochastic)
 
                 # Encode text with T5 and CLIP
                 t5_embeds, clip_pooled_embeds = _encode_text_flux(
-                    t5_tokenizer, t5_encoder, clip_tokenizer, clip_encoder,
-                    device, caption, max_sequence_length=args.max_sequence_length
+                    t5_tokenizer,
+                    t5_encoder,
+                    clip_tokenizer,
+                    clip_encoder,
+                    device,
+                    caption,
+                    max_sequence_length=args.max_sequence_length,
                 )
 
                 # Move to CPU
@@ -559,7 +559,7 @@ def main():
                 }
                 sink.write(sample)
                 written += 1
-                
+
                 # Optionally save individual files
                 if args.save_individual_files:
                     _save_individual_sample(
@@ -570,17 +570,16 @@ def main():
                         json_data=json_data,
                         processed_image=image if args.save_processed_images else None,
                     )
-                
+
             except Exception as e:
                 print(f"Rank {rank}: Error processing {image_path}: {e}")
                 continue
 
     print(f"Rank {rank}: Done! Wrote {written} samples.")
-    
+
     if args.distributed:
         dist.destroy_process_group()
 
 
 if __name__ == "__main__":
     main()
-

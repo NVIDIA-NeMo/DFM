@@ -48,6 +48,7 @@ class ClipConfig:
     always_return_pooled: Optional[bool] = field(default_factory=lambda: True)
     device: str = "cuda"
 
+
 class FlowMatchEulerDiscreteScheduler:
     """
     Euler scheduler.
@@ -429,6 +430,7 @@ class FluxInferencePipeline(nn.Module):
         """
         try:
             from diffusers import AutoencoderKL
+
             self.vae = AutoencoderKL.from_pretrained(vae_path).to(self.device).eval()
         except ImportError:
             raise ImportError("Please install diffusers: pip install diffusers")
@@ -659,12 +661,12 @@ class FluxInferencePipeline(nn.Module):
         if output_path:
             os.makedirs(output_path, exist_ok=True)
             assert len(images) == int(len(prompt) * num_images_per_prompt)
-            prompt = [p[:40] + f'_{idx}' for p in prompt for idx in range(num_images_per_prompt)]
+            prompt = [p[:40] + f"_{idx}" for p in prompt for idx in range(num_images_per_prompt)]
             for file_name, image in zip(prompt, images):
-                image.save(os.path.join(output_path, f'{file_name}.png'))
+                image.save(os.path.join(output_path, f"{file_name}.png"))
 
         return images
-    
+
     @staticmethod
     def numpy_to_pil(images):
         """
@@ -679,9 +681,9 @@ class FluxInferencePipeline(nn.Module):
 
     @staticmethod
     def torch_to_numpy(images):
-        '''
+        """
         Convert a torch image or a batch of images to a numpy image.
-        '''
+        """
         numpy_images = images.float().cpu().permute(0, 2, 3, 1).numpy()
         return numpy_images
 

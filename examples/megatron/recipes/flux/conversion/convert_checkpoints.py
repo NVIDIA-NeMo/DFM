@@ -204,9 +204,7 @@ def export_megatron_to_hf(
         # Resolve latest iter_* directory (use the config file we found)
         checkpoint_iter_dir = config_files[0].parent
         # 1) Load Megatron model from checkpoint
-        megatron_models = load_megatron_model(
-            str(checkpoint_iter_dir), use_cpu_init=True, skip_temp_dist_context=True
-        )
+        megatron_models = load_megatron_model(str(checkpoint_iter_dir), use_cpu_init=True, skip_temp_dist_context=True)
         if not isinstance(megatron_models, list):
             megatron_models = [megatron_models]
 
@@ -221,9 +219,7 @@ def export_megatron_to_hf(
 
         # 3) Stream-export weights Megatron -> HF safetensors via Flux bridge
         bridge = FluxBridge()
-        generator = bridge.stream_weights_megatron_to_hf(
-            megatron_models, hf, cpu=True, show_progress=show_progress
-        )
+        generator = bridge.stream_weights_megatron_to_hf(megatron_models, hf, cpu=True, show_progress=show_progress)
         # 4) Save streamed weights into hf_path
         hf.state.source.save_generator(generator, hf_path)
 

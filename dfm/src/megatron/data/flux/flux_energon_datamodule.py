@@ -52,7 +52,6 @@ class FluxDataModuleConfig(DiffusionDataModuleConfig):
             use_train_split_for_val=True,
         )
         self.sequence_length = self.dataset.seq_length
+
     def build_datasets(self, context: DatasetBuildContext):
         return self.dataset.train_dataloader(), self.dataset.train_dataloader(), self.dataset.train_dataloader()
-
-

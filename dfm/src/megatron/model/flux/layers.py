@@ -248,5 +248,3 @@ class TimeStepEmbedder(nn.Module):
         timesteps_emb = self.time_embedder(timesteps_proj)
 
         return timesteps_emb
-
-
