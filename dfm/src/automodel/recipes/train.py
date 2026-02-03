@@ -32,10 +32,8 @@ from nemo_automodel.recipes.llm.train_ft import build_distributed, build_wandb
 from torch.distributed.fsdp import MixedPrecisionPolicy
 from transformers.utils.hub import TRANSFORMERS_CACHE
 
-from dfm.src.automodel._diffusers.auto_diffusion_pipeline import NeMoWanPipeline
-from dfm.src.automodel.flow_matching.training_step_t2v import (
-    step_fsdp_transformer_t2v,
-)
+from dfm.src.automodel._diffusers.auto_diffusion_pipeline import NeMoAutoDiffusionPipeline
+from dfm.src.automodel.flow_matching.flow_matching_pipeline import FlowMatchingPipeline, create_adapter
 
 
 def build_model_and_optimizer(
@@ -46,57 +44,129 @@ def build_model_and_optimizer(
     device: torch.device,
     dtype: torch.dtype,
     cpu_offload: bool = False,
-    fsdp_cfg: Dict[str, Any] = {},
+    fsdp_cfg: Optional[Dict[str, Any]] = None,
+    ddp_cfg: Optional[Dict[str, Any]] = None,
+    attention_backend: Optional[str] = None,
     optimizer_cfg: Optional[Dict[str, Any]] = None,
-) -> tuple[NeMoWanPipeline, dict[str, Dict[str, Any]], torch.optim.Optimizer, Any]:
-    """Build the WAN 2.1 diffusion model, parallel scheme, and optimizer."""
+    pipeline_spec: Optional[Dict[str, Any]] = None,
+) -> tuple[NeMoAutoDiffusionPipeline, torch.optim.Optimizer, Any]:
+    """Build the diffusion model, parallel scheme, and optimizer.
 
-    logging.info("[INFO] Building NeMoWanPipeline with transformer parallel scheme...")
+    Args:
+        model_id: Pretrained model name or path.
+        finetune_mode: Whether to load for finetuning (True) or pretraining (False).
+        learning_rate: Learning rate for optimizer.
+        device: Target device.
+        dtype: Model dtype.
+        cpu_offload: Whether to enable CPU offload (FSDP only).
+        fsdp_cfg: FSDP configuration dict. Mutually exclusive with ddp_cfg.
+        ddp_cfg: DDP configuration dict. Mutually exclusive with fsdp_cfg.
+        attention_backend: Optional attention backend override.
+        optimizer_cfg: Optional optimizer configuration.
+        pipeline_spec: Pipeline specification for pretraining (from_config).
+            Required when finetune_mode is False. Should contain:
+            - transformer_cls: str (e.g., "WanTransformer3DModel", "FluxTransformer2DModel")
+            - subfolder: str (e.g., "transformer")
+            - Optional: pipeline_cls, load_full_pipeline, enable_gradient_checkpointing
+
+    Returns:
+        Tuple of (pipeline, optimizer, device_mesh or None).
+
+    Raises:
+        ValueError: If both fsdp_cfg and ddp_cfg are provided.
+        ValueError: If finetune_mode is False and pipeline_spec is not provided.
+    """
+    # Validate mutually exclusive configs
+    if fsdp_cfg is not None and ddp_cfg is not None:
+        raise ValueError(
+            "Cannot specify both 'fsdp' and 'ddp' configurations. "
+            "Please provide only one distributed training strategy."
+        )
+
+    logging.info("[INFO] Building NeMoAutoDiffusionPipeline with transformer parallel scheme...")
 
     if not dist.is_initialized():
         logging.info("[WARN] torch.distributed not initialized; proceeding in single-process mode")
 
     world_size = dist.get_world_size() if dist.is_initialized() else 1
 
-    if fsdp_cfg.get("dp_size", None) is None:
-        denom = max(1, fsdp_cfg.get("tp_size", 1) * fsdp_cfg.get("cp_size", 1) * fsdp_cfg.get("pp_size", 1))
-        fsdp_cfg.dp_size = max(1, world_size // denom)
+    # Build manager args based on which config is provided
+    if ddp_cfg is not None:
+        # DDP configuration
+        logging.info("[INFO] Using DDP (DistributedDataParallel) for training")
+        manager_args: Dict[str, Any] = {
+            "_manager_type": "ddp",
+            "backend": ddp_cfg.get("backend", "nccl"),
+            "world_size": world_size,
+            "activation_checkpointing": ddp_cfg.get("activation_checkpointing", False),
+        }
+    else:
+        # FSDP configuration (default)
+        fsdp_cfg = fsdp_cfg or {}
+        logging.info("[INFO] Using FSDP2 (Fully Sharded Data Parallel) for training")
 
-    manager_args: Dict[str, Any] = {
-        "dp_size": fsdp_cfg.get("dp_size", None),
-        "dp_replicate_size": fsdp_cfg.get("dp_replicate_size", None),
-        "tp_size": fsdp_cfg.get("tp_size", 1),
-        "cp_size": fsdp_cfg.get("cp_size", 1),
-        "pp_size": fsdp_cfg.get("pp_size", 1),
-        "backend": "nccl",
-        "world_size": world_size,
-        "use_hf_tp_plan": fsdp_cfg.get("use_hf_tp_plan", False),
-        "activation_checkpointing": True,
-        "mp_policy": MixedPrecisionPolicy(
-            param_dtype=dtype,
-            reduce_dtype=dtype,
-            output_dtype=dtype,
-        ),
-    }
+        dp_size = fsdp_cfg.get("dp_size", None)
+
+        if dp_size is None:
+            denom = max(1, fsdp_cfg.get("tp_size", 1) * fsdp_cfg.get("cp_size", 1) * fsdp_cfg.get("pp_size", 1))
+            dp_size = max(1, world_size // denom)
+
+        manager_args: Dict[str, Any] = {
+            "_manager_type": "fsdp2",
+            "dp_size": fsdp_cfg.get("dp_size", None),
+            "dp_replicate_size": fsdp_cfg.get("dp_replicate_size", None),
+            "tp_size": fsdp_cfg.get("tp_size", 1),
+            "cp_size": fsdp_cfg.get("cp_size", 1),
+            "pp_size": fsdp_cfg.get("pp_size", 1),
+            "backend": "nccl",
+            "world_size": world_size,
+            "use_hf_tp_plan": fsdp_cfg.get("use_hf_tp_plan", False),
+            "activation_checkpointing": fsdp_cfg.get("activation_checkpointing", True),
+            "mp_policy": MixedPrecisionPolicy(
+                param_dtype=dtype,
+                reduce_dtype=torch.float32,
+                output_dtype=dtype,
+            ),
+        }
 
     parallel_scheme = {"transformer": manager_args}
 
-    kwargs = {}
     if finetune_mode:
-        kwargs["load_for_training"] = True
-        kwargs["low_cpu_mem_usage"] = True
-    init_fn = NeMoWanPipeline.from_pretrained if finetune_mode else NeMoWanPipeline.from_config
-
-    pipe, created_managers = init_fn(
-        model_id,
-        torch_dtype=dtype,
-        device=device,
-        parallel_scheme=parallel_scheme,
-        components_to_load=["transformer"],
-        **kwargs,
-    )
+        # Finetuning: load from pretrained weights
+        logging.info("[INFO] Loading pretrained model for finetuning")
+        pipe, created_managers = NeMoAutoDiffusionPipeline.from_pretrained(
+            model_id,
+            torch_dtype=dtype,
+            device=device,
+            parallel_scheme=parallel_scheme,
+            components_to_load=["transformer"],
+            load_for_training=True,
+            low_cpu_mem_usage=True,
+        )
+    else:
+        # Pretraining: initialize with random weights using pipeline_spec
+        if pipeline_spec is None:
+            raise ValueError(
+                "pipeline_spec is required for pretraining (finetune_mode=False). "
+                "Please provide pipeline_spec in your YAML config with at least:\n"
+                "  pipeline_spec:\n"
+                "    transformer_cls: 'WanTransformer3DModel'  # or 'FluxTransformer2DModel', etc.\n"
+                "    subfolder: 'transformer'"
+            )
+        logging.info("[INFO] Initializing model with random weights for pretraining")
+        pipe, created_managers = NeMoAutoDiffusionPipeline.from_config(
+            model_id,
+            pipeline_spec=pipeline_spec,
+            torch_dtype=dtype,
+            device=device,
+            parallel_scheme=parallel_scheme,
+            components_to_load=["transformer"],
+        )
     fsdp2_manager = created_managers["transformer"]
     transformer_module = pipe.transformer
+    if attention_backend is not None:
+        logging.info(f"[INFO] Setting attention backend to {attention_backend}")
+        transformer_module.set_attention_backend(attention_backend)
 
     trainable_params = [p for p in transformer_module.parameters() if p.requires_grad]
     if not trainable_params:
@@ -105,6 +175,7 @@ def build_model_and_optimizer(
     optimizer_cfg = optimizer_cfg or {}
     weight_decay = optimizer_cfg.get("weight_decay", 0.01)
     betas = optimizer_cfg.get("betas", (0.9, 0.999))
+    # TODO: Support other optimizers
     optimizer = torch.optim.AdamW(trainable_params, lr=learning_rate, weight_decay=weight_decay, betas=betas)
 
     logging.info("[INFO] Optimizer config: lr=%s, weight_decay=%s, betas=%s", learning_rate, weight_decay, betas)
@@ -145,8 +216,8 @@ def is_main_process():
     return (not dist.is_initialized()) or dist.get_rank() == 0
 
 
-class TrainWan21DiffusionRecipe(BaseRecipe):
-    """Config-driven wrapper around WAN 2.1 T2V training."""
+class TrainDiffusionRecipe(BaseRecipe):
+    """Training recipe for diffusion models."""
 
     def __init__(self, cfg):
         self.cfg = cfg
@@ -164,7 +235,8 @@ class TrainWan21DiffusionRecipe(BaseRecipe):
         self.seed = self.cfg.get("seed", 42)
         self.rng = StatefulRNG(seed=self.seed, ranked=True)
 
-        self.model_id = self.cfg.get("model.pretrained_model_name_or_path", "Wan-AI/Wan2.1-T2V-1.3B-Diffusers")
+        self.model_id = self.cfg.get("model.pretrained_model_name_or_path")
+        self.attention_backend = self.cfg.get("model.attention_backend")
         self.learning_rate = self.cfg.get("optim.learning_rate", 5e-6)
         self.bf16 = torch.bfloat16
 
@@ -180,31 +252,56 @@ class TrainWan21DiffusionRecipe(BaseRecipe):
         self.num_nodes = max(1, self.world_size // self.local_world_size)
         self.node_rank = dist.get_rank() // self.local_world_size if dist.is_initialized() else 0
 
-        logging.info("[INFO] WAN 2.1 T2V Trainer with Flow Matching")
+        logging.info("[INFO] Diffusion Trainer with Flow Matching")
         logging.info(
             f"[INFO] Total GPUs: {self.world_size}, GPUs per node: {self.local_world_size}, Num nodes: {self.num_nodes}"
         )
         logging.info(f"[INFO] Node rank: {self.node_rank}, Local rank: {self.local_rank}")
         logging.info(f"[INFO] Learning rate: {self.learning_rate}")
 
-        fsdp_cfg = self.cfg.get("fsdp", {})
+        # Get distributed training configs (mutually exclusive)
+        fsdp_cfg = self.cfg.get("fsdp", None)
+        ddp_cfg = self.cfg.get("ddp", None)
         fm_cfg = self.cfg.get("flow_matching", {})
 
-        self.cpu_offload = fsdp_cfg.get("cpu_offload", False)
-        self.use_sigma_noise = fm_cfg.get("use_sigma_noise", True)
-        self.timestep_sampling = fm_cfg.get("timestep_sampling", "uniform")
+        # Validate mutually exclusive distributed configs
+        if fsdp_cfg is not None and ddp_cfg is not None:
+            raise ValueError(
+                "Cannot specify both 'fsdp' and 'ddp' configurations in YAML. "
+                "Please provide only one distributed training strategy."
+            )
+
+        self.cpu_offload = fsdp_cfg.get("cpu_offload", False) if fsdp_cfg else False
+
+        # Flow matching configuration
+        self.adapter_type = fm_cfg.get("adapter_type", "simple")
+        self.timestep_sampling = fm_cfg.get("timestep_sampling", "logit_normal")
         self.logit_mean = fm_cfg.get("logit_mean", 0.0)
         self.logit_std = fm_cfg.get("logit_std", 1.0)
         self.flow_shift = fm_cfg.get("flow_shift", 3.0)
         self.mix_uniform_ratio = fm_cfg.get("mix_uniform_ratio", 0.1)
         self.sigma_min = fm_cfg.get("sigma_min", 0.0)
         self.sigma_max = fm_cfg.get("sigma_max", 1.0)
+        self.num_train_timesteps = fm_cfg.get("num_train_timesteps", 1000)
+        self.i2v_prob = fm_cfg.get("i2v_prob", 0.3)
+        self.use_loss_weighting = fm_cfg.get("use_loss_weighting", True)
+        self.log_interval = fm_cfg.get("log_interval", 100)
+        self.summary_log_interval = fm_cfg.get("summary_log_interval", 10)
 
-        logging.info(f"[INFO] Flow matching: {'ENABLED' if self.use_sigma_noise else 'DISABLED'}")
-        if self.use_sigma_noise:
-            logging.info(f"[INFO]   - Timestep sampling: {self.timestep_sampling}")
-            logging.info(f"[INFO]   - Flow shift: {self.flow_shift}")
-            logging.info(f"[INFO]   - Mix uniform ratio: {self.mix_uniform_ratio}")
+        # Adapter-specific configuration
+        adapter_kwargs = fm_cfg.get("adapter_kwargs", {})
+        self.adapter_kwargs = adapter_kwargs.to_dict()
+
+        logging.info("[INFO] Flow Matching V2 Pipeline")
+        logging.info(f"[INFO]   - Adapter type: {self.adapter_type}")
+        logging.info(f"[INFO]   - Timestep sampling: {self.timestep_sampling}")
+        logging.info(f"[INFO]   - Flow shift: {self.flow_shift}")
+        logging.info(f"[INFO]   - Mix uniform ratio: {self.mix_uniform_ratio}")
+        logging.info(f"[INFO]   - Use loss weighting: {self.use_loss_weighting}")
+
+        # Get pipeline_spec for pretraining mode (required when mode != "finetune")
+        pipeline_spec_cfg = self.cfg.get("model.pipeline_spec", None)
+        pipeline_spec = pipeline_spec_cfg.to_dict() if pipeline_spec_cfg is not None else None
 
         (self.pipe, self.optimizer, self.device_mesh) = build_model_and_optimizer(
             model_id=self.model_id,
@@ -214,7 +311,10 @@ class TrainWan21DiffusionRecipe(BaseRecipe):
             dtype=self.bf16,
             cpu_offload=self.cpu_offload,
             fsdp_cfg=fsdp_cfg,
+            ddp_cfg=ddp_cfg,
             optimizer_cfg=self.cfg.get("optim.optimizer", {}),
+            attention_backend=self.attention_backend,
+            pipeline_spec=pipeline_spec,
         )
 
         self.model = self.pipe.transformer
@@ -230,8 +330,6 @@ class TrainWan21DiffusionRecipe(BaseRecipe):
             raise ValueError(
                 "checkpoint config is required in YAML (enabled, checkpoint_dir, model_save_format, save_consolidated)"
             )
-        if not checkpoint_cfg.get("enabled", False):
-            raise ValueError("checkpoint.enabled must be true in YAML for diffusion training")
 
         # Build BaseRecipe-style checkpointing configuration (DCP/TORCH_SAVE) from YAML
         model_state_dict_keys = list(self.model.state_dict().keys())
@@ -270,13 +368,19 @@ class TrainWan21DiffusionRecipe(BaseRecipe):
             raise RuntimeError("Training dataloader is empty; cannot proceed with training")
 
         # Derive DP size consistent with model parallel config
-        tp_size = fsdp_cfg.get("tp_size", 1)
-        cp_size = fsdp_cfg.get("cp_size", 1)
-        pp_size = fsdp_cfg.get("pp_size", 1)
-        denom = max(1, tp_size * cp_size * pp_size)
-        self.dp_size = fsdp_cfg.get("dp_size", None)
-        if self.dp_size is None:
-            self.dp_size = max(1, self.world_size // denom)
+        if ddp_cfg is not None:
+            # DDP uses pure data parallelism across all ranks
+            self.dp_size = self.world_size
+        else:
+            # FSDP may have TP/CP/PP dimensions
+            _fsdp_cfg = fsdp_cfg or {}
+            tp_size = _fsdp_cfg.get("tp_size", 1)
+            cp_size = _fsdp_cfg.get("cp_size", 1)
+            pp_size = _fsdp_cfg.get("pp_size", 1)
+            denom = max(1, tp_size * cp_size * pp_size)
+            self.dp_size = _fsdp_cfg.get("dp_size", None)
+            if self.dp_size is None:
+                self.dp_size = max(1, self.world_size // denom)
 
         # Infer local micro-batch size from dataloader if available
         self.local_batch_size = self.cfg.step_scheduler.local_batch_size
@@ -308,6 +412,26 @@ class TrainWan21DiffusionRecipe(BaseRecipe):
         )
 
         self.load_checkpoint(self.restore_from)
+
+        # Init Flow Matching Pipeline V2 with model adapter
+        model_adapter = create_adapter(self.adapter_type, **self.adapter_kwargs)
+        self.flow_matching_pipeline = FlowMatchingPipeline(
+            model_adapter=model_adapter,
+            num_train_timesteps=self.num_train_timesteps,
+            timestep_sampling=self.timestep_sampling,
+            flow_shift=self.flow_shift,
+            i2v_prob=self.i2v_prob,
+            logit_mean=self.logit_mean,
+            logit_std=self.logit_std,
+            mix_uniform_ratio=self.mix_uniform_ratio,
+            sigma_min=self.sigma_min,
+            sigma_max=self.sigma_max,
+            use_loss_weighting=self.use_loss_weighting,
+            log_interval=self.log_interval,
+            summary_log_interval=self.summary_log_interval,
+            device=self.device,
+        )
+        logging.info(f"[INFO] Flow Matching Pipeline V2 initialized with {self.adapter_type} adapter")
 
         if is_main_process():
             os.makedirs(self.checkpoint_config.checkpoint_dir, exist_ok=True)
@@ -344,20 +468,11 @@ class TrainWan21DiffusionRecipe(BaseRecipe):
                 micro_losses = []
                 for micro_batch in batch_group:
                     try:
-                        loss, _ = step_fsdp_transformer_t2v(
-                            scheduler=self.pipe.scheduler,
+                        weighted_loss, average_weighted_loss, loss_mask, metrics = self.flow_matching_pipeline.step(
                             model=self.model,
                             batch=micro_batch,
                             device=self.device,
-                            bf16=self.bf16,
-                            use_sigma_noise=self.use_sigma_noise,
-                            timestep_sampling=self.timestep_sampling,
-                            logit_mean=self.logit_mean,
-                            logit_std=self.logit_std,
-                            flow_shift=self.flow_shift,
-                            mix_uniform_ratio=self.mix_uniform_ratio,
-                            sigma_min=self.sigma_min,
-                            sigma_max=self.sigma_max,
+                            dtype=self.bf16,
                             global_step=global_step,
                         )
                     except Exception as exc:
@@ -367,8 +482,9 @@ class TrainWan21DiffusionRecipe(BaseRecipe):
                         logging.info(f"[DEBUG] Batch shapes - video: {video_shape}, text: {text_shape}")
                         raise
 
-                    (loss / len(batch_group)).backward()
-                    micro_losses.append(float(loss.item()))
+                    # Use average_weighted_loss for backprop (scalar for gradient accumulation)
+                    (average_weighted_loss / len(batch_group)).backward()
+                    micro_losses.append(float(average_weighted_loss.item()))
 
                 grad_norm = torch.nn.utils.clip_grad_norm_(self.model.parameters(), max_norm=1.0)
                 grad_norm = float(grad_norm) if torch.is_tensor(grad_norm) else grad_norm
@@ -420,3 +536,21 @@ class TrainWan21DiffusionRecipe(BaseRecipe):
                 wandb.finish()
 
         logging.info("[INFO] Training complete!")
+
+    def _get_dp_rank(self, include_cp: bool = False) -> int:
+        """Get data parallel rank, handling DDP mode where device_mesh is None."""
+        # In DDP mode, device_mesh is None, so use torch.distributed directly
+        device_mesh = getattr(self, "device_mesh", None)
+        if device_mesh is None:
+            return dist.get_rank() if dist.is_initialized() else 0
+        # Otherwise, use the parent implementation
+        return super()._get_dp_rank(include_cp=include_cp)
+
+    def _get_dp_group_size(self, include_cp: bool = False) -> int:
+        """Get data parallel world size, handling DDP mode where device_mesh is None."""
+        # In DDP mode, device_mesh is None, so use torch.distributed directly
+        device_mesh = getattr(self, "device_mesh", None)
+        if device_mesh is None:
+            return dist.get_world_size() if dist.is_initialized() else 1
+        # Otherwise, use the parent implementation
+        return super()._get_dp_group_size(include_cp=include_cp)
