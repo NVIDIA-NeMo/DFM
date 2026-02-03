@@ -333,6 +333,46 @@ def get_start_end_idx_for_this_rank(dataset_size: int, rank: int, world_size: in
     return start_idx, end_idx
 
 
+def _save_individual_sample(
+    output_dir: Path,
+    sample_key: str,
+    latents: torch.Tensor,
+    text_embeddings: Dict,
+    json_data: Dict,
+    processed_image: Optional[np.ndarray] = None,
+) -> None:
+    """
+    Save individual files for a sample.
+    
+    Args:
+        output_dir: Base output directory
+        sample_key: Unique key for this sample (e.g., "000001")
+        latents: Latent tensor [C, H, W]
+        text_embeddings: Dict with prompt_embeds and pooled_prompt_embeds
+        json_data: Metadata dict
+        processed_image: Optional processed image [H, W, C] in RGB format
+    """
+    sample_dir = output_dir / "individual_samples" / sample_key
+    sample_dir.mkdir(parents=True, exist_ok=True)
+    
+    # Save latents
+    torch.save(latents, sample_dir / "latents.pt")
+    
+    # Save text embeddings
+    with open(sample_dir / "text_embeddings.pkl", "wb") as f:
+        pickle.dump(text_embeddings, f)
+    
+    # Save metadata
+    with open(sample_dir / "metadata.json", "w") as f:
+        json.dump(json_data, f, indent=2)
+    
+    # Optionally save processed image
+    if processed_image is not None:
+        # Convert RGB back to BGR for OpenCV
+        image_bgr = cv2.cvtColor(processed_image, cv2.COLOR_RGB2BGR)
+        cv2.imwrite(str(sample_dir / "processed_image.jpg"), image_bgr, [cv2.IMWRITE_JPEG_QUALITY, 95])
+
+
 def main():
     import argparse
 
@@ -380,6 +420,18 @@ def main():
 
     # Distributed processing
     parser.add_argument("--distributed", action="store_true", help="Use distributed processing")
+    
+    # Individual file saving
+    parser.add_argument(
+        "--save_individual_files",
+        action="store_true",
+        help="Save individual files (latents, embeddings, metadata) in addition to webdataset tars"
+    )
+    parser.add_argument(
+        "--save_processed_images",
+        action="store_true",
+        help="Also save processed images when --save_individual_files is enabled"
+    )
 
     args = parser.parse_args()
 
@@ -430,6 +482,11 @@ def main():
     # Distribute work across ranks
     start_idx, end_idx = get_start_end_idx_for_this_rank(len(metadata_list), rank, world_size)
     print(f"Rank {rank} of {world_size} processing {end_idx - start_idx} samples, from {start_idx} to {end_idx}")
+    
+    if args.save_individual_files:
+        print(f"Individual files will be saved to: {output_dir / 'individual_samples'}")
+        if args.save_processed_images:
+            print("Processed images will also be saved")
 
     with wds.ShardWriter(shard_pattern, maxcount=args.shard_maxcount) as sink:
         written = 0
@@ -493,6 +550,7 @@ def main():
                     },
                 }
 
+                # Write to webdataset
                 sample = {
                     "__key__": f"{index:06}",
                     "pth": latents_cpu,
@@ -502,9 +560,19 @@ def main():
                 sink.write(sample)
                 written += 1
                 
+                # Optionally save individual files
+                if args.save_individual_files:
+                    _save_individual_sample(
+                        output_dir=output_dir,
+                        sample_key=f"{index:06}",
+                        latents=latents_cpu,
+                        text_embeddings=text_embeddings,
+                        json_data=json_data,
+                        processed_image=image if args.save_processed_images else None,
+                    )
+                
             except Exception as e:
                 print(f"Rank {rank}: Error processing {image_path}: {e}")
-                raise e
                 continue
 
     print(f"Rank {rank}: Done! Wrote {written} samples.")

@@ -618,7 +618,6 @@ class FluxInferencePipeline(nn.Module):
         self.scheduler.set_timesteps(sigmas=sigmas, device=device, mu=mu)
         timesteps = self.scheduler.timesteps
 
-        # breakpoint()
         # Denoising loop
         for t in tqdm(timesteps, desc="Denoising"):
             timestep = t.expand(latents.shape[1]).to(device=device, dtype=dtype)

@@ -158,7 +158,6 @@ def import_hf_to_megatron(
                     f.write(f"{name:80s} | shape: {str(list(param.shape)):20s} | norm: {norm:.6f}\n")
             f.write("=" * 80 + "\n")
         print(f"Parameter norms saved to: {param_norms_file}")
-        breakpoint()
 
         save_megatron_model(megatron_models, megatron_path, hf_tokenizer_path=None)
         # else:
