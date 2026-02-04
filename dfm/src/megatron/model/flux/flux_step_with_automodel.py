@@ -20,11 +20,11 @@ into Megatron's training flow, reusing the well-tested flow matching logic.
 """
 
 import logging
+import random
 from functools import partial
 from typing import Any, Dict, Iterable
 
 import torch
-import random
 from megatron.bridge.training.losses import masked_next_token_loss
 from megatron.bridge.training.state import GlobalState
 from megatron.core import parallel_state
@@ -34,6 +34,7 @@ from megatron.core.utils import get_model_config
 # Import automodel pipeline components
 from dfm.src.automodel.flow_matching.adapters.base import FlowMatchingContext, ModelAdapter
 from dfm.src.automodel.flow_matching.flow_matching_pipeline import FlowMatchingPipeline
+
 
 logger = logging.getLogger(__name__)
 

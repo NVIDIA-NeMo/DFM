@@ -31,11 +31,12 @@ from dfm.src.megatron.model.flux.flux_pipeline import FlowMatchEulerDiscreteSche
 logger = logging.getLogger(__name__)
 
 
-def flux_data_step(dataloader_iter):
+def flux_data_step(dataloader_iter, store_in_state=False):
     """Process batch data for FLUX model.
 
     Args:
         dataloader_iter: Iterator over the dataloader.
+        store_in_state: If True, store the batch in GlobalState for callbacks.
 
     Returns:
         Processed batch dictionary with tensors moved to CUDA.
@@ -50,6 +51,16 @@ def flux_data_step(dataloader_iter):
 
     if "loss_mask" not in _batch or _batch["loss_mask"] is None:
         _batch["loss_mask"] = torch.ones(1, device="cuda")
+
+    # Store batch in state for callbacks (e.g., validation image generation)
+    if store_in_state:
+        try:
+            from megatron.bridge.training.pretrain import get_current_state
+
+            state = get_current_state()
+            state._last_validation_batch = _batch
+        except:
+            pass  # If state access fails, silently continue
 
     return _batch
 
@@ -113,6 +124,9 @@ class FluxForwardStep:
 
         with straggler_timer(bdata=True):
             batch = flux_data_step(data_iterator)
+            # Store batch for validation callbacks (only during evaluation)
+            if not torch.is_grad_enabled():
+                state._last_batch = batch
         timers("batch-generator").stop()
 
         check_for_nan_in_loss = state.cfg.rerun_state_machine.check_for_nan_in_loss
