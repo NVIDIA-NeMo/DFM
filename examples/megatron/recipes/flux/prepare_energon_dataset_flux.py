@@ -141,7 +141,7 @@ def _load_metadata(data_folder: Path, image_extensions: List[str] = None) -> Lis
         },
         ...
     ]
-    
+
     Or JSON Lines format (one JSON object per line):
     {"file_name": "image1.jpg", "caption": "A description"}
     {"file_name": "image2.jpg", "caption": "Another description"}
@@ -153,14 +153,14 @@ def _load_metadata(data_folder: Path, image_extensions: List[str] = None) -> Lis
     if meta_path.exists():
         with open(meta_path, "r") as f:
             content = f.read().strip()
-            
+
             # Try to parse as JSON array first
             try:
                 return json.loads(content)
             except json.JSONDecodeError:
                 # If that fails, try parsing as JSON Lines (one JSON object per line)
                 items = []
-                for line in content.split('\n'):
+                for line in content.split("\n"):
                     line = line.strip()
                     if line:
                         try:
