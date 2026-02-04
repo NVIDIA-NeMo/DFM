@@ -21,6 +21,7 @@ Handles FLUX.1-dev and similar FLUX architecture models with:
 - T5 text encoder
 """
 
+import logging
 from typing import Any, Dict
 
 import torch
@@ -28,6 +29,8 @@ from torch import autocast
 
 from .base import BaseModelProcessor
 from .registry import ProcessorRegistry
+
+logger = logging.getLogger(__name__)
 
 
 @ProcessorRegistry.register("flux")
@@ -65,7 +68,7 @@ class FluxProcessor(BaseModelProcessor):
         """
         from diffusers import FluxPipeline
 
-        print(f"[FLUX] Loading models from {model_name} via FluxPipeline...")
+        logger.info("[FLUX] Loading models from %s via FluxPipeline...", model_name)
 
         # Load pipeline without transformer (not needed for preprocessing)
         pipeline = FluxPipeline.from_pretrained(
@@ -76,21 +79,21 @@ class FluxProcessor(BaseModelProcessor):
 
         models = {}
 
-        print("  Configuring VAE...")
+        logger.info("  Configuring VAE...")
         models["vae"] = pipeline.vae.to(device=device, dtype=torch.bfloat16)
         models["vae"].eval()
-        print(f"!!! VAE config: {models['vae'].config}")
-        print(f"!!! VAE shift_factor: {models['vae'].config.shift_factor}")
-        print(f"!!! VAE scaling_factor: {models['vae'].config.scaling_factor}")
+        logger.debug("VAE config: %s", models["vae"].config)
+        logger.debug("VAE shift_factor: %s", models["vae"].config.shift_factor)
+        logger.debug("VAE scaling_factor: %s", models["vae"].config.scaling_factor)
 
         # Extract CLIP components
-        print("  Configuring CLIP...")
+        logger.info("  Configuring CLIP...")
         models["clip_tokenizer"] = pipeline.tokenizer
         models["clip_encoder"] = pipeline.text_encoder.to(device)
         models["clip_encoder"].eval()
 
         # Extract T5 components
-        print("  Configuring T5...")
+        logger.info("  Configuring T5...")
         models["t5_tokenizer"] = pipeline.tokenizer_2
         models["t5_encoder"] = pipeline.text_encoder_2.to(device)
         models["t5_encoder"].eval()
@@ -99,7 +102,7 @@ class FluxProcessor(BaseModelProcessor):
         del pipeline
         torch.cuda.empty_cache()
 
-        print("[FLUX] Models loaded successfully!")
+        logger.info("[FLUX] Models loaded successfully!")
         return models
 
     def encode_image(
@@ -231,7 +234,7 @@ class FluxProcessor(BaseModelProcessor):
             return True
 
         except Exception as e:
-            print(f"[FLUX] Verification failed: {e}")
+            logger.warning("[FLUX] Verification failed: %s", e)
             return False
 
     def get_cache_data(
@@ -263,7 +266,7 @@ class FluxProcessor(BaseModelProcessor):
             "prompt_embeds": text_encodings["prompt_embeds"],
             # Metadata
             "original_resolution": metadata["original_resolution"],
-            "crop_resolution": metadata["crop_resolution"],
+            "bucket_resolution": metadata["bucket_resolution"],
             "crop_offset": metadata["crop_offset"],
             "prompt": metadata["prompt"],
             "image_path": metadata["image_path"],
