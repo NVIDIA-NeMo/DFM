@@ -46,6 +46,7 @@ def _calculate_resize_dimensions(
     original_width: int,
     target_size: Optional[Tuple[int, int]],
     maintain_aspect_ratio: bool,
+    center_crop: bool = False,
 ) -> Tuple[int, int]:
     """Calculate target dimensions for resizing."""
     if target_size is None:
@@ -58,12 +59,25 @@ def _calculate_resize_dimensions(
     original_aspect = original_width / max(1, original_height)
     target_aspect = target_width / max(1, target_height)
 
-    if original_aspect > target_aspect:
-        new_width = target_width
-        new_height = int(round(target_width / max(1e-6, original_aspect)))
+    if center_crop:
+        # For center crop: resize so BOTH dimensions are >= target (resize on shorter edge)
+        # This ensures we can crop to exact size without padding
+        if original_aspect > target_aspect:
+            # Image is wider: match height, width will be larger
+            new_height = target_height
+            new_width = int(round(target_height * original_aspect))
+        else:
+            # Image is taller: match width, height will be larger
+            new_width = target_width
+            new_height = int(round(target_width / max(1e-6, original_aspect)))
     else:
-        new_height = target_height
-        new_width = int(round(target_height * original_aspect))
+        # For no center crop: resize so image fits within target (resize on longer edge)
+        if original_aspect > target_aspect:
+            new_width = target_width
+            new_height = int(round(target_width / max(1e-6, original_aspect)))
+        else:
+            new_height = target_height
+            new_width = int(round(target_height * original_aspect))
 
     return new_height, new_width
 
@@ -81,7 +95,7 @@ def _resize_image(
 
     original_height, original_width = image.shape[:2]
     resize_height, resize_width = _calculate_resize_dimensions(
-        original_height, original_width, target_size, maintain_aspect_ratio
+        original_height, original_width, target_size, maintain_aspect_ratio, center_crop
     )
 
     interpolation = _map_interpolation(resize_mode)
@@ -119,7 +133,7 @@ def _load_metadata(data_folder: Path, image_extensions: List[str] = None) -> Lis
     """
     Load metadata from meta.json or scan directory for images.
 
-    Expected meta.json format:
+    Expected meta.json format (JSON array):
     [
         {
             "file_name": "image1.jpg",
@@ -127,6 +141,10 @@ def _load_metadata(data_folder: Path, image_extensions: List[str] = None) -> Lis
         },
         ...
     ]
+    
+    Or JSON Lines format (one JSON object per line):
+    {"file_name": "image1.jpg", "caption": "A description"}
+    {"file_name": "image2.jpg", "caption": "Another description"}
     """
     if image_extensions is None:
         image_extensions = [".jpg", ".jpeg", ".png", ".webp", ".bmp"]
@@ -134,7 +152,25 @@ def _load_metadata(data_folder: Path, image_extensions: List[str] = None) -> Lis
     meta_path = data_folder / "meta.json"
     if meta_path.exists():
         with open(meta_path, "r") as f:
-            return json.load(f)
+            content = f.read().strip()
+            
+            # Try to parse as JSON array first
+            try:
+                return json.loads(content)
+            except json.JSONDecodeError:
+                # If that fails, try parsing as JSON Lines (one JSON object per line)
+                items = []
+                for line in content.split('\n'):
+                    line = line.strip()
+                    if line:
+                        try:
+                            items.append(json.loads(line))
+                        except json.JSONDecodeError as e:
+                            print(f"Warning: Failed to parse line in meta.json: {line[:100]}... Error: {e}")
+                            continue
+                if items:
+                    return items
+                raise ValueError("Failed to parse meta.json as either JSON array or JSON Lines format")
 
     # Fallback: scan for image files with sidecar captions
     items: List[Dict] = []
@@ -490,7 +526,7 @@ def main():
         for index in tqdm(range(start_idx, end_idx), desc=f"Rank {rank}"):
             meta = metadata_list[index]
             image_name = meta["file_name"]
-            caption = meta.get("caption", "")
+            caption = meta.get("text", "")
 
             image_path = str(data_folder / image_name)
 
