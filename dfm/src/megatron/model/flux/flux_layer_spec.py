@@ -223,7 +223,7 @@ class MMDiTLayer(TransformerLayer):
                 f"currently only support `ada_norm_continous`, `ada_norm_zero`"
             )
 
-        # Override Cross Attention to disable CP.
+        # Override config for context MLP to disable CP.
         # Disable TP Comm overlap as well.
         cp_override_config = copy.deepcopy(config)
         cp_override_config.context_parallel_size = 1
