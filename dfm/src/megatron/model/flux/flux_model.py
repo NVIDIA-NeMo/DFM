@@ -347,7 +347,7 @@ class Flux(VisionModule):
         replica_modules = ["img_embed", "txt_embed", "timestep_embedding", "vector_embedding", "proj_out"]
         if self.guidance_embed:
             replica_modules.append("guidance_embedding")
-        
+
         for module_name in replica_modules:
             if hasattr(self, module_name):
                 module = getattr(self, module_name)
@@ -377,10 +377,10 @@ class Flux(VisionModule):
         vpp_world = parallel_state.get_virtual_pipeline_model_parallel_world_size()
         vpp_world = vpp_world if vpp_world else 1
         pp_rank = parallel_state.get_pipeline_model_parallel_rank()
-        
+
         # Remove the existing entry and replace with properly configured sharded tensor
         del sharded_state_dict[embedder_weight_key]
-        
+
         replica_id = (
             tp_rank,
             (vpp_rank + pp_rank * vpp_world),
