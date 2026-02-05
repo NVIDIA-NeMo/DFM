@@ -191,7 +191,7 @@ def main() -> None:
             model.tensor_model_parallel_size=4 \
             model.pipeline_model_parallel_size=2 \
             train.global_batch_size=512
-        
+
         # Automodel pipeline with custom flow matching parameters
         torchrun --nproc_per_node=8 pretrain_flux.py --mock \
             --flow-shift=1.0 --use-loss-weighting
