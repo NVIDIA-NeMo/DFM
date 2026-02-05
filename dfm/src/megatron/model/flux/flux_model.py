@@ -26,6 +26,7 @@ from megatron.core.models.common.vision_module.vision_module import VisionModule
 from megatron.core.transformer.enums import ModelType
 from megatron.core.transformer.transformer_config import TransformerConfig
 from megatron.core.transformer.utils import sharded_state_dict_default
+from megatron.core.utils import make_sharded_tensor_for_checkpoint
 from torch import nn
 
 from dfm.src.megatron.model.flux.flux_layer_spec import (
@@ -340,7 +341,58 @@ class Flux(VisionModule):
                 sharded_state_dict.update(
                     sharded_state_dict_default(module, f"{prefix}{name}.", sharded_offsets, metadata)
                 )
+
+        # Set replica IDs for embedding and output layers
+        # These layers are replicated across tensor parallel ranks and need proper replica IDs
+        replica_modules = ["img_embed", "txt_embed", "timestep_embedding", "vector_embedding", "proj_out"]
+        if self.guidance_embed:
+            replica_modules.append("guidance_embedding")
+        
+        for module_name in replica_modules:
+            if hasattr(self, module_name):
+                module = getattr(self, module_name)
+                for param_name, param in module.named_parameters():
+                    weight_key = f"{prefix}{module_name}.{param_name}"
+                    if weight_key in sharded_state_dict:
+                        self._set_embedder_weights_replica_id(param, sharded_state_dict, weight_key)
+
         return sharded_state_dict
+
+    def _set_embedder_weights_replica_id(
+        self, tensor: torch.Tensor, sharded_state_dict: ShardedStateDict, embedder_weight_key: str
+    ) -> None:
+        """Set replica IDs of the weights in embedding layers for sharded state dict.
+
+        Args:
+            tensor: The parameter tensor to set replica ID for.
+            sharded_state_dict: State dict with the weight to tie.
+            embedder_weight_key: Key of the weight in the state dict.
+
+        Returns:
+            None, acts in-place.
+        """
+        tp_rank = parallel_state.get_tensor_model_parallel_rank()
+        vpp_rank = parallel_state.get_virtual_pipeline_model_parallel_rank()
+        vpp_rank = vpp_rank if vpp_rank else 0
+        vpp_world = parallel_state.get_virtual_pipeline_model_parallel_world_size()
+        vpp_world = vpp_world if vpp_world else 1
+        pp_rank = parallel_state.get_pipeline_model_parallel_rank()
+        
+        # Remove the existing entry and replace with properly configured sharded tensor
+        del sharded_state_dict[embedder_weight_key]
+        
+        replica_id = (
+            tp_rank,
+            (vpp_rank + pp_rank * vpp_world),
+            parallel_state.get_data_parallel_rank(with_context_parallel=True),
+        )
+
+        sharded_state_dict[embedder_weight_key] = make_sharded_tensor_for_checkpoint(
+            tensor=tensor,
+            key=embedder_weight_key,
+            replica_id=replica_id,
+            allow_shape_mismatch=False,
+        )
 
     def set_input_tensor(self, input_tensor):
         """Set input tensor for pipeline parallelism."""
