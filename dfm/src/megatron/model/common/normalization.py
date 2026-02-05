@@ -40,5 +40,7 @@ class RMSNorm(nn.Module):
         return x * torch.rsqrt(x.pow(2).mean(-1, keepdim=True) + self.eps)
 
     def forward(self, x):
-        output = self._norm(x.float()).type_as(x)
-        return output * self.weight
+        # Compute normalization and weight scaling in float32 for numerical stability,
+        # then convert back to input dtype to preserve dtype throughout the model
+        output = self._norm(x.float()) * self.weight
+        return output.type_as(x)

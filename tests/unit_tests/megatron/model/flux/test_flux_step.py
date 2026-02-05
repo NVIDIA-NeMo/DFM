@@ -24,6 +24,7 @@ from dfm.src.megatron.model.flux.flux_step import FluxForwardStep, flux_data_ste
 pytestmark = [pytest.mark.unit]
 
 
+@pytest.mark.run_only_on("GPU")
 class TestFluxDataStep:
     """Test flux_data_step function."""
 
@@ -259,6 +260,7 @@ class TestFluxForwardStepLatentOperations:
         assert ids1.data_ptr() == ids2.data_ptr()
 
 
+@pytest.mark.run_only_on("GPU")
 class TestFluxForwardStepPrepareImageLatent:
     """Test prepare_image_latent method."""
 
