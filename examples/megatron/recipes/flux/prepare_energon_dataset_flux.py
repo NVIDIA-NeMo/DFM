@@ -526,7 +526,7 @@ def main():
         for index in tqdm(range(start_idx, end_idx), desc=f"Rank {rank}"):
             meta = metadata_list[index]
             image_name = meta["file_name"]
-            caption = meta.get("text", "")
+            caption = meta.get("caption", "")
 
             image_path = str(data_folder / image_name)
 

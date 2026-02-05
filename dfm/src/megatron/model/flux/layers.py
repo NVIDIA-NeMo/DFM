@@ -14,10 +14,10 @@
 
 """FLUX embedding layers for diffusion models."""
 
-import math
 from typing import List
 
 import torch
+from diffusers.models.embeddings import Timesteps
 from torch import Tensor, nn
 
 
@@ -104,99 +104,6 @@ class MLPEmbedder(nn.Module):
         return self.out_layer(self.silu(self.in_layer(x)))
 
 
-def get_timestep_embedding(
-    timesteps: torch.Tensor,
-    embedding_dim: int,
-    flip_sin_to_cos: bool = True,
-    downscale_freq_shift: float = 0,
-    scale: float = 1,
-    max_period: int = 10000,
-) -> torch.Tensor:
-    """
-    Create sinusoidal timestep embeddings.
-
-    This matches the implementation in Denoising Diffusion Probabilistic Models.
-
-    Args:
-        timesteps: A 1-D Tensor of N indices, one per batch element.
-            These may be fractional.
-        embedding_dim: The dimension of the output.
-        flip_sin_to_cos: Whether the embedding order should be `cos, sin` (if True)
-            or `sin, cos` (if False).
-        downscale_freq_shift: Controls the delta between frequencies between dimensions.
-        scale: Scaling factor applied to the embeddings.
-        max_period: Controls the maximum frequency of the embeddings.
-
-    Returns:
-        torch.Tensor: An [N x dim] Tensor of positional embeddings.
-    """
-    assert len(timesteps.shape) == 1, "Timesteps should be a 1d-array"
-
-    half_dim = embedding_dim // 2
-    exponent = -math.log(max_period) * torch.arange(
-        start=0, end=half_dim, dtype=torch.float32, device=timesteps.device
-    )
-    exponent = exponent / (half_dim - downscale_freq_shift)
-
-    emb = torch.exp(exponent)
-    emb = timesteps[:, None].float() * emb[None, :]
-
-    # Scale embeddings
-    emb = scale * emb
-
-    # Concat sine and cosine embeddings
-    emb = torch.cat([torch.sin(emb), torch.cos(emb)], dim=-1)
-
-    # Flip sine and cosine embeddings
-    if flip_sin_to_cos:
-        emb = torch.cat([emb[:, half_dim:], emb[:, :half_dim]], dim=-1)
-
-    # Zero pad
-    if embedding_dim % 2 == 1:
-        emb = torch.nn.functional.pad(emb, (0, 1, 0, 0))
-    return emb
-
-
-class Timesteps(nn.Module):
-    """
-    Module for generating sinusoidal timestep embeddings.
-
-    Args:
-        embedding_dim: Dimension of the output embeddings.
-        flip_sin_to_cos: Whether to flip sin and cos order.
-        downscale_freq_shift: Frequency shift for downscaling.
-        scale: Scaling factor for embeddings.
-        max_period: Maximum period for the sinusoidal functions.
-    """
-
-    def __init__(
-        self,
-        embedding_dim: int,
-        flip_sin_to_cos: bool = True,
-        downscale_freq_shift: float = 0,
-        scale: float = 1,
-        max_period: int = 10000,
-    ):
-        super().__init__()
-        self.embedding_dim = embedding_dim
-        self.flip_sin_to_cos = flip_sin_to_cos
-        self.downscale_freq_shift = downscale_freq_shift
-        self.scale = scale
-        self.max_period = max_period
-
-    def forward(self, timesteps: torch.Tensor) -> torch.Tensor:
-        """Generate timestep embeddings."""
-        t_emb = get_timestep_embedding(
-            timesteps,
-            self.embedding_dim,
-            flip_sin_to_cos=self.flip_sin_to_cos,
-            downscale_freq_shift=self.downscale_freq_shift,
-            scale=self.scale,
-            max_period=self.max_period,
-        )
-        return t_emb
-
-
 class TimeStepEmbedder(nn.Module):
     """
     A neural network module that embeds timesteps for use in diffusion models.
@@ -226,11 +133,10 @@ class TimeStepEmbedder(nn.Module):
         super().__init__()
 
         self.time_proj = Timesteps(
-            embedding_dim=embedding_dim,
+            num_channels=embedding_dim,
             flip_sin_to_cos=flip_sin_to_cos,
             downscale_freq_shift=downscale_freq_shift,
             scale=scale,
-            max_period=max_period,
         )
         self.time_embedder = MLPEmbedder(in_dim=embedding_dim, hidden_dim=hidden_dim)
 

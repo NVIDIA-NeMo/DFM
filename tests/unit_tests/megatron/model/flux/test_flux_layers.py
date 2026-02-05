@@ -20,8 +20,6 @@ from dfm.src.megatron.model.flux.layers import (
     EmbedND,
     MLPEmbedder,
     TimeStepEmbedder,
-    Timesteps,
-    get_timestep_embedding,
     rope,
 )
 
@@ -215,136 +213,6 @@ class TestMLPEmbedder:
         assert embedder.out_layer.bias is not None
 
 
-class TestGetTimestepEmbedding:
-    """Test the get_timestep_embedding function."""
-
-    def test_get_timestep_embedding_basic_shape(self):
-        """Test get_timestep_embedding returns correct shape."""
-        timesteps = torch.tensor([0, 100, 500, 999])
-        embedding_dim = 128
-
-        emb = get_timestep_embedding(timesteps, embedding_dim)
-
-        assert emb.shape == (4, embedding_dim)
-
-    def test_get_timestep_embedding_requires_1d_timesteps(self):
-        """Test that get_timestep_embedding requires 1D timesteps."""
-        timesteps = torch.tensor([[0, 1], [2, 3]])  # 2D
-        embedding_dim = 128
-
-        with pytest.raises(AssertionError, match="Timesteps should be a 1d-array"):
-            get_timestep_embedding(timesteps, embedding_dim)
-
-    def test_get_timestep_embedding_with_flip_sin_cos(self):
-        """Test get_timestep_embedding with flip_sin_to_cos option."""
-        timesteps = torch.tensor([100.0])
-        embedding_dim = 64
-
-        emb_flipped = get_timestep_embedding(timesteps, embedding_dim, flip_sin_to_cos=True)
-        emb_not_flipped = get_timestep_embedding(timesteps, embedding_dim, flip_sin_to_cos=False)
-
-        # Results should be different with different flip settings
-        assert not torch.allclose(emb_flipped, emb_not_flipped)
-
-    def test_get_timestep_embedding_with_scale(self):
-        """Test get_timestep_embedding with different scales."""
-        timesteps = torch.tensor([100.0])
-        embedding_dim = 64
-
-        emb_scale1 = get_timestep_embedding(timesteps, embedding_dim, scale=1.0)
-        emb_scale2 = get_timestep_embedding(timesteps, embedding_dim, scale=2.0)
-
-        # Scale affects the input to sin/cos, so outputs should differ but not be simple multiples
-        # Verify that they are different and have the same shape
-        assert emb_scale1.shape == emb_scale2.shape
-        assert not torch.allclose(emb_scale1, emb_scale2, atol=1e-5)
-
-    def test_get_timestep_embedding_with_odd_dimension(self):
-        """Test get_timestep_embedding with odd embedding dimension."""
-        timesteps = torch.tensor([100.0])
-        embedding_dim = 63  # Odd
-
-        emb = get_timestep_embedding(timesteps, embedding_dim)
-
-        # Should be zero-padded to the correct dimension
-        assert emb.shape == (1, embedding_dim)
-
-    def test_get_timestep_embedding_fractional_timesteps(self):
-        """Test get_timestep_embedding with fractional timesteps."""
-        timesteps = torch.tensor([0.5, 1.5, 2.5])
-        embedding_dim = 64
-
-        emb = get_timestep_embedding(timesteps, embedding_dim)
-
-        assert emb.shape == (3, embedding_dim)
-        assert torch.isfinite(emb).all()
-
-    def test_get_timestep_embedding_zero_timestep(self):
-        """Test get_timestep_embedding with zero timestep."""
-        timesteps = torch.tensor([0.0])
-        embedding_dim = 64
-
-        emb = get_timestep_embedding(timesteps, embedding_dim)
-
-        assert emb.shape == (1, embedding_dim)
-        assert torch.isfinite(emb).all()
-
-    def test_get_timestep_embedding_max_period(self):
-        """Test get_timestep_embedding with different max_period values."""
-        timesteps = torch.tensor([100.0])
-        embedding_dim = 64
-
-        emb_10k = get_timestep_embedding(timesteps, embedding_dim, max_period=10000)
-        emb_5k = get_timestep_embedding(timesteps, embedding_dim, max_period=5000)
-
-        # Different max_period should produce different embeddings
-        assert not torch.allclose(emb_10k, emb_5k)
-
-
-class TestTimesteps:
-    """Test the Timesteps module."""
-
-    def test_timesteps_initialization(self):
-        """Test Timesteps module initialization."""
-        embedding_dim = 128
-
-        timesteps = Timesteps(embedding_dim)
-
-        assert timesteps.embedding_dim == embedding_dim
-        assert timesteps.flip_sin_to_cos is True
-        assert timesteps.downscale_freq_shift == 0
-        assert timesteps.scale == 1
-        assert timesteps.max_period == 10000
-
-    def test_timesteps_initialization_custom(self):
-        """Test Timesteps module with custom parameters."""
-        timesteps = Timesteps(
-            embedding_dim=256, flip_sin_to_cos=False, downscale_freq_shift=1.0, scale=2.0, max_period=5000
-        )
-
-        assert timesteps.embedding_dim == 256
-        assert timesteps.flip_sin_to_cos is False
-        assert timesteps.downscale_freq_shift == 1.0
-        assert timesteps.scale == 2.0
-        assert timesteps.max_period == 5000
-
-    def test_timesteps_forward(self):
-        """Test Timesteps forward pass."""
-        timesteps_module = Timesteps(embedding_dim=128)
-        timesteps_input = torch.tensor([0.0, 100.0, 500.0])
-
-        output = timesteps_module(timesteps_input)
-
-        assert output.shape == (3, 128)
-        assert torch.isfinite(output).all()
-
-    def test_timesteps_is_nn_module(self):
-        """Test that Timesteps is an nn.Module."""
-        timesteps = Timesteps(128)
-
-        assert isinstance(timesteps, torch.nn.Module)
-
-
 class TestTimeStepEmbedder:
     """Test the TimeStepEmbedder class."""
 
@@ -355,7 +223,6 @@ class TestTimeStepEmbedder:
 
         embedder = TimeStepEmbedder(embedding_dim, hidden_dim)
 
-        assert isinstance(embedder.time_proj, Timesteps)
         assert isinstance(embedder.time_embedder, MLPEmbedder)
         assert embedder.time_proj.embedding_dim == embedding_dim
 
@@ -494,16 +361,6 @@ class TestLayersEdgeCases:
 
         assert output.shape == (4, 512)
         assert torch.isfinite(output).all()
-
-    def test_timestep_embedding_with_negative_timesteps(self):
-        """Test get_timestep_embedding with negative timesteps."""
-        timesteps = torch.tensor([-100.0, -50.0, 0.0, 50.0])
-        embedding_dim = 64
-
-        emb = get_timestep_embedding(timesteps, embedding_dim)
-
-        assert emb.shape == (4, embedding_dim)
-        assert torch.isfinite(emb).all()
 
     def test_timestepembedder_with_very_small_timesteps(self):
         """Test TimeStepEmbedder with very small fractional timesteps."""

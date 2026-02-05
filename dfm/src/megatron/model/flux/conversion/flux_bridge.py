@@ -103,8 +103,8 @@ class FluxBridge(MegatronModelBridge):
         # Dictionary maps HF parameter names -> Megatron parameter names
         # Supports wildcard (*) patterns for layer-specific parameters
         param_mappings = {
-            "norm_out.linear.bias": "norm_out.linear.bias",
-            "norm_out.linear.weight": "norm_out.linear.weight",
+            "norm_out.linear.bias": "norm_out.adaLN_modulation.1.bias",
+            "norm_out.linear.weight": "norm_out.adaLN_modulation.1.weight",
             "proj_out.bias": "proj_out.bias",
             "proj_out.weight": "proj_out.weight",
             "time_text_embed.guidance_embedder.linear_1.bias": "guidance_embedding.in_layer.bias",

@@ -59,7 +59,6 @@ from dfm.src.megatron.model.flux.layers import (
     MLPEmbedder,
     TimeStepEmbedder,
     Timesteps,
-    get_timestep_embedding,
     rope,
 )
 
@@ -84,7 +83,6 @@ __all__ = [
     "MLPEmbedder",
     "TimeStepEmbedder",
     "Timesteps",
-    "get_timestep_embedding",
     "rope",
     # Layer specs
     "get_flux_double_transformer_engine_spec",
