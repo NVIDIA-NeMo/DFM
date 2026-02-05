@@ -33,6 +33,12 @@ Components:
 """
 
 from dfm.src.megatron.model.common.normalization import RMSNorm
+from dfm.src.megatron.model.flux.flow_matching.flux_inference_pipeline import (
+    ClipConfig,
+    FlowMatchEulerDiscreteScheduler,
+    FluxInferencePipeline,
+    T5Config,
+)
 from dfm.src.megatron.model.flux.flux_attention import (
     FluxSingleAttention,
     JointSelfAttention,
@@ -47,12 +53,6 @@ from dfm.src.megatron.model.flux.flux_layer_spec import (
     get_flux_single_transformer_engine_spec,
 )
 from dfm.src.megatron.model.flux.flux_model import Flux
-from dfm.src.megatron.model.flux.flux_inference_pipeline import (
-    ClipConfig,
-    FlowMatchEulerDiscreteScheduler,
-    FluxInferencePipeline,
-    T5Config,
-)
 from dfm.src.megatron.model.flux.flux_provider import FluxProvider
 from dfm.src.megatron.model.flux.layers import (
     EmbedND,
