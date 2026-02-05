@@ -141,6 +141,55 @@ You may adjust mock shapes (`image_H`, `image_W`) in the config to simulate diff
 
 ---
 
+### 🔧 Fine-tuning
+
+FLUX fine-tuning allows you to continue training from a pretrained checkpoint with your custom dataset. Fine-tuning typically uses lower learning rates and fewer training iterations compared to pretraining. The training iteration counter is reset to 0, regardless of the checkpoint's saved iteration.
+
+FLUX fine-tuning is driven by `examples/megatron/recipes/flux/finetune_flux.py`, which supports both a YAML config file and CLI overrides, similar to the pretraining script.
+
+#### Fine-tuning script example
+
+The fine-tuning script requires a `--load-checkpoint` argument pointing to your pretrained checkpoint directory. You can point to either:
+- A base checkpoint directory (loads the latest checkpoint)
+- A specific iteration directory (e.g., `iter_0000000`)
+
+```bash
+uv run --group megatron-bridge python -m torch.distributed.run --nproc-per-node $num_gpus \
+  examples/megatron/recipes/flux/finetune_flux.py \
+  --load-checkpoint /opt/pretrained_checkpoints \
+  --config-file examples/megatron/recipes/flux/conf/my_flux.yaml \
+  dataset.path=/opt/finetune_webdataset \
+  train.train_iters=5000 \
+  optimizer.lr=5e-6 \
+  --timestep-sampling logit_normal
+```
+
+You can also override any config values from the command line:
+
+```bash
+uv run --group megatron-bridge python -m torch.distributed.run --nproc-per-node $num_gpus \
+  examples/megatron/recipes/flux/finetune_flux.py \
+  --load-checkpoint /opt/pretrained_checkpoints/iter_0000000 \
+  dataset.path=/opt/finetune_webdataset \
+  train.global_batch_size=8 \
+  train.micro_batch_size=1 \
+  train.train_iters=10000 \
+  optimizer.lr=1e-5 \
+  model.tensor_model_parallel_size=2 \
+  checkpoint.save=/opt/finetuned_checkpoints \
+  --timestep-sampling logit_normal \
+  --guidance-scale 3.5
+```
+
+**Notes**:
+- Fine-tuning always starts from iteration 0, regardless of the checkpoint's saved iteration
+- Optimizer and RNG states are not loaded (fresh optimizer and RNG)
+- Use lower learning rates (typically 1e-5 to 5e-6) compared to pretraining
+- Fewer training iterations are typically needed (e.g., 5,000-10,000 vs 50,000+ for pretraining)
+- If you use `logger.wandb_project` and `logger.wandb_exp_name`, export `WANDB_API_KEY`
+
+---
+
 ### 🎨 Inference
 
 After training, users can run inference with `examples/megatron/recipes/flux/inference_flux.py`. Set `--flux_ckpt` to your trained checkpoint directory. Set `--height` and `--width` to specify image dimensions. Set `--num_inference_steps` (default 10) for number of denoising diffusion steps.
