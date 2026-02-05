@@ -25,7 +25,7 @@ from megatron.core import parallel_state
 from megatron.core.models.common.vision_module.vision_module import VisionModule
 from megatron.core.utils import get_model_config
 
-from dfm.src.megatron.model.flux.flux_pipeline import FlowMatchEulerDiscreteScheduler
+from dfm.src.megatron.model.flux.flux_inference_pipeline import FlowMatchEulerDiscreteScheduler
 
 
 logger = logging.getLogger(__name__)

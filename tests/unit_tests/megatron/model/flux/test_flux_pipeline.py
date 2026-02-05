@@ -16,7 +16,7 @@ import numpy as np
 import pytest
 import torch
 
-from dfm.src.megatron.model.flux.flux_pipeline import FlowMatchEulerDiscreteScheduler, FluxInferencePipeline
+from dfm.src.megatron.model.flux.flux_inference_pipeline import FlowMatchEulerDiscreteScheduler, FluxInferencePipeline
 
 
 pytestmark = [pytest.mark.unit]

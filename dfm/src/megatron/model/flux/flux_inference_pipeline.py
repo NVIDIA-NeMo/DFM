@@ -691,3 +691,4 @@ class FluxInferencePipeline(nn.Module):
     def denormalize(image):
         # pylint: disable=C0116
         return (image / 2 + 0.5).clamp(0, 1)
+

@@ -47,7 +47,7 @@ from dfm.src.megatron.model.flux.flux_layer_spec import (
     get_flux_single_transformer_engine_spec,
 )
 from dfm.src.megatron.model.flux.flux_model import Flux
-from dfm.src.megatron.model.flux.flux_pipeline import (
+from dfm.src.megatron.model.flux.flux_inference_pipeline import (
     ClipConfig,
     FlowMatchEulerDiscreteScheduler,
     FluxInferencePipeline,
