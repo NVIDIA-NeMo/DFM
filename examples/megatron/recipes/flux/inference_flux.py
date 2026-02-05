@@ -26,7 +26,13 @@ def parse_args():
     parser.add_argument("--t5_version", type=str, default="google/t5-v1_1-xxl")
     parser.add_argument("--clip_version", type=str, default="openai/clip-vit-large-patch14")
     parser.add_argument("--do_convert_from_hf", action="store_true", default=False)
-    parser.add_argument("--prompts", type=str, default="A golden retriever holding a sign that says hello world")
+    parser.add_argument(
+        "--prompts",
+        type=str,
+        action="append",
+        help="Prompt(s) to generate images from. Can be specified multiple times for multiple prompts.",
+        required=True,
+    )
     parser.add_argument("--height", type=int, default=1024)
     parser.add_argument("--width", type=int, default=1024)
     parser.add_argument("--num_inference_steps", type=int, default=10)
@@ -64,9 +70,8 @@ def main():
     )
 
     # Generate
-    prompts = [p.strip() for p in args.prompts.split(",")]
     images = pipeline(
-        prompt=prompts,
+        prompt=args.prompts,
         height=args.height,
         width=args.width,
         num_inference_steps=args.num_inference_steps,
