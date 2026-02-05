@@ -1,7 +1,7 @@
 ## 🚀 Megatron FLUX
 
 ### 📋 Overview
-An open-source implementation of [FLUX.1](https://github.com/black-forest-labs/flux) (state-of-the-art text-to-image diffusion models) built on top of [Megatron-Core](https://github.com/NVIDIA/Megatron-LM) and [Megatron-Bridge](https://github.com/NVIDIA-NeMo/Megatron-Bridge) for scalable and efficient training. FLUX combines double (MMDiT-style) and single transformer blocks with flow matching for high-quality image generation. It supports advanced parallelism strategies (data, tensor, sequence, and context parallelism) and optimized kernels (e.g., Transformer Engine fused attention).
+An open-source implementation of [FLUX.1](https://github.com/black-forest-labs/flux) (state-of-the-art text-to-image diffusion models) built on top of [Megatron-Core](https://github.com/NVIDIA/Megatron-LM) and [Megatron-Bridge](https://github.com/NVIDIA-NeMo/Megatron-Bridge) for scalable and efficient training. FLUX combines double (MMDiT-style) and single transformer blocks with flow matching for high-quality image generation. It supports advanced parallelism strategies (data, tensor) and optimized kernels (e.g., Transformer Engine fused attention).
 
 ---
 
@@ -76,7 +76,7 @@ The script exposes flow matching hyperparameters through CLI flags including:
 - `--guidance-scale`: Classifier-free guidance scale for training
 - `--scheduler-steps`: Number of diffusion timesteps
 
-Multiple parallelism techniques including tensor, sequence, and context parallelism are supported and configurable per your hardware.
+Multiple parallelism techniques including tensor are supported and configurable per your hardware.
 
 **Notes**: If you use `logger.wandb_project` and `logger.wandb_exp_name`, export `WANDB_API_KEY`.
 
