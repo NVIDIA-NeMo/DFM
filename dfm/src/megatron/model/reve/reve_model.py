@@ -13,7 +13,6 @@
 # limitations under the License.
 # pylint: disable=C0115,C0116,C0301
 
-import time
 from typing import Dict, Literal, Optional
 
 import torch
