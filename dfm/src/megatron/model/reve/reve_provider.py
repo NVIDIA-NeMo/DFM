@@ -77,6 +77,9 @@ class ReveModelProvider(TransformerConfig, ModelProviderMixin[VisionModule]):
     in_channels: int = 768 # in_channels is the same as latent_dims
     rope_dims: list[int] = field(default_factory=lambda: [64, 64])
     cross_rope_dims: int = 128
+    text_encoder_recompute_granularity: str = None
+    text_encoder_recompute_method: str = None
+    text_encoder_recompute_num_layers: int = 0
 
     def provide(self, pre_process=None, post_process=None, vp_stage=None) -> ReveModel:
         vp_size = self.virtual_pipeline_model_parallel_size
@@ -136,11 +139,16 @@ class ReveFullModelProvider(ReveModelProvider):
     rope_dims: list[int] = field(default_factory=lambda: [64, 64])
     cross_rope_dims: int = 128
 
-
 @dataclass
-class ReveHalfFullModelProvider(ReveFullModelProvider):
-    num_layers: int = 13
-    cross_num_layers: int = 4
+class ReveFullModelProviderDimhead128(ReveFullModelProvider):
+    hidden_size: int = 128*48
+    num_attention_heads: int = 48
+    ffn_hidden_size: int = 4*128*48
+    cross_dims_per_head: int = 128
+    cross_num_heads: int = 48
+    # num_layers: int = 13
+    # cross_num_layers: int = 4
+
 
 @dataclass
 class Reve1BModelProvider(ReveFullModelProvider):

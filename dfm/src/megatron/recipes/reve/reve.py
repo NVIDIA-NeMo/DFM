@@ -22,17 +22,23 @@ from megatron.bridge.training.comm_overlap import CommOverlapConfig
 from megatron.bridge.training.config import (
     CheckpointConfig,
     ConfigContainer,
+    DistributedInitConfig,
     LoggerConfig,
     RNGConfig,
     TokenizerConfig,
     TrainingConfig,
-    DistributedInitConfig,
 )
 from megatron.bridge.training.mixed_precision import MixedPrecisionConfig, get_mixed_precision_config
 from megatron.core.distributed import DistributedDataParallelConfig
 
 from dfm.src.megatron.data.reve.reve_mock_datamodule import ReveMockDataModuleConfig
-from dfm.src.megatron.model.reve.reve_provider import ReveModelProvider, ReveSmallModelProvider, ReveFullModelProvider, ReveHalfFullModelProvider, Reve1BModelProvider
+from dfm.src.megatron.model.reve.reve_provider import (
+    Reve1BModelProvider,
+    ReveFullModelProvider,
+    ReveFullModelProviderDimhead128,
+    ReveModelProvider,
+    ReveSmallModelProvider,
+)
 
 
 def model_config(
@@ -80,8 +86,8 @@ def model_config(
             sequence_parallel=sequence_parallelism,
             seq_length=seq_length,
         )
-    elif model_size == "half_full":
-        return ReveHalfFullModelProvider(
+    elif model_size == "1b":
+        return Reve1BModelProvider(
             tensor_model_parallel_size=tensor_parallelism,
             pipeline_model_parallel_size=pipeline_parallelism,
             pipeline_dtype=pipeline_parallelism_dtype,
@@ -90,8 +96,8 @@ def model_config(
             sequence_parallel=sequence_parallelism,
             seq_length=seq_length,
         )
-    elif model_size == "1b":
-        return Reve1BModelProvider(
+    elif model_size == "full_dimhead128":
+        return ReveFullModelProviderDimhead128(
             tensor_model_parallel_size=tensor_parallelism,
             pipeline_model_parallel_size=pipeline_parallelism,
             pipeline_dtype=pipeline_parallelism_dtype,
@@ -122,8 +128,7 @@ def pretrain_config(
     virtual_pipeline_parallelism: Optional[int] = 1,
     context_parallelism: int = 1,
     sequence_parallelism: bool = False,
-    # DEBUGGING (use FSDP)
-    use_megatron_fsdp: bool = False,
+    use_megatron_fsdp: bool = True,
     use_torch_fsdp2: bool = False,
     # Training hyperparameters
     train_iters: int = 10000,
@@ -198,55 +203,14 @@ def pretrain_config(
     precision_config.grad_reduce_in_fp32 = False
 
     if mock:
-        if model_size == "small":
-            in_channels = 16
-            context_embeddings_dim = 128
-            F_latents=1
-            H_latents=16
-            W_latents=16
-            context_seq_len=256
-            number_packed_samples=1
-        elif model_size == "full" or model_size == "half_full" or model_size == "1b":
-            in_channels = 768
-            context_embeddings_dim = 4096
-
-            # ## config 1
-            # F_latents=1
-            # H_latents=8
-            # W_latents=8
-            # context_seq_len=16
-            # number_packed_samples=2
-
-            # ## config 2
-            # F_latents=1
-            # H_latents=32
-            # W_latents=32
-            # context_seq_len=256
-            # number_packed_samples=8
-
-            ## config 3 (FA3 test)
-            F_latents=1
-            H_latents=16
-            W_latents=16
-            context_seq_len=128
-            number_packed_samples=72
-
-            # ## config 4 (FSDP test)
-            # F_latents=1
-            # H_latents=16
-            # W_latents=16
-            # context_seq_len=128
-            # number_packed_samples=8
-
-            # ## testing config
-            # F_latents=1
-            # H_latents=160
-            # W_latents=160
-            # context_seq_len=128
-            # number_packed_samples=1
-
-        else:
-            assert False, "Invalid model size"
+        ## set up mock data shape
+        in_channels = 768
+        context_embeddings_dim = 4096
+        F_latents=1
+        H_latents=16
+        W_latents=16
+        context_seq_len=128
+        number_packed_samples=4
 
         dataset = ReveMockDataModuleConfig(
             path=None,
@@ -286,18 +250,13 @@ def pretrain_config(
         ddp=DistributedDataParallelConfig(
             check_for_nan_in_grad=True,
             grad_reduce_in_fp32=True,
-            # DEBUGGING (use FSDP)
-            # overlap_grad_reduce=False,
-            # overlap_param_gather=False,
             overlap_grad_reduce=True if use_megatron_fsdp else False,
             overlap_param_gather=True if use_megatron_fsdp else False,
             average_in_collective=True,
             use_distributed_optimizer=True,
-            # DEBUGGING (use FSDP)
             use_megatron_fsdp=use_megatron_fsdp,  # need use_distributed_optimizer=True
             data_parallel_sharding_strategy="optim_grads_params",
         ),
-        # DEBUGGING (use FSDP)
         dist=DistributedInitConfig(use_megatron_fsdp=use_megatron_fsdp, use_torch_fsdp2=use_torch_fsdp2),
         dataset=dataset,
         logger=LoggerConfig(
@@ -310,7 +269,6 @@ def pretrain_config(
             save_interval=2000,
             save=checkpoint_dir,
             load=checkpoint_dir,
-            # DEBUGGING (use FSDP)
             ckpt_format="fsdp_dtensor" if use_megatron_fsdp else "torch_dist",
             fully_parallel_save=True,
         ),

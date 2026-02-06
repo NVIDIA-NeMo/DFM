@@ -28,42 +28,54 @@ from megatron.core.transformer.attention import (
 from megatron.core.transformer.custom_layers.transformer_engine import (
     TEColumnParallelLinear,
     TEDotProductAttention,
-    TENorm,
     TERowParallelLinear,
 )
 from megatron.core.transformer.enums import AttnMaskType
 from megatron.core.transformer.identity_op import IdentityOp
 from megatron.core.transformer.mlp import MLP, MLPSubmodules
-from megatron.core.transformer.module import MegatronModule
 from megatron.core.transformer.spec_utils import ModuleSpec, build_module
 from megatron.core.transformer.transformer_block import TransformerConfig
 from megatron.core.transformer.transformer_config import TransformerConfig
 from megatron.core.transformer.transformer_layer import TransformerLayer, TransformerLayerSubmodules
 from megatron.core.utils import make_viewless_tensor
 
-# to be imported from common
 from dfm.src.megatron.model.common.dit_attention import (
     DiTCrossAttention,
     DiTCrossAttentionSubmodules,
     DiTSelfAttention,
 )
 
-from dfm.src.megatron.model.reve.reve_pytorch.layers import latency_tracker
-import time
 
 @dataclass
 class ReveWithAdaLNSubmodules(TransformerLayerSubmodules):
     full_self_attention: Union[ModuleSpec, type] = IdentityOp
 
+@jit_fuser
+def fused_modulation_apply(lin_output, hidden_states):
+    # This fuses the "scale + 1.0" and the "multiplication"
+    scale = lin_output + 1.0
+    return scale * hidden_states
 
-def l2_normalize(
-    x: torch.Tensor, eps: float = 1e-6
-) -> torch.Tensor:
-    dtype = x.dtype
-    compute_dtype = torch.float32
-    norm = torch.norm(x, p=2, dim=-1, keepdim=True, dtype=compute_dtype)
-    normalized = x / (norm + eps)
-    return normalized.to(dtype)
+@jit_fuser
+def _fused_l2_normalize_kernel(x: torch.Tensor, eps: float):
+    # Perform math in float32 for stability, but let the fuser handle the cast
+    norm = torch.norm(x, p=2, dim=-1, keepdim=True)
+    return x / (norm + eps)
+
+def l2_normalize(x: torch.Tensor, eps: float = 1e-6) -> torch.Tensor:
+    # The fuser handles the input/output movement; we just ensure the result 
+    # matches the expected output dtype.
+    out_dtype = x.dtype
+    return _fused_l2_normalize_kernel(x, eps).to(out_dtype)
+
+@jit_fuser
+def fused_gate_math(backbone, normalized_residual, gate, epsilon: float):
+    # nvfuser excels at fusing this exact type of logic
+    gate = torch.sigmoid(gate)
+    gate = gate * (1.0 - 2.0 * epsilon) + epsilon
+    if gate.ndim == 2:
+        gate = gate.unsqueeze(0)
+    return backbone * gate + (1.0 - gate) * normalized_residual
 
 
 class RMSNorm(nn.Module):
@@ -86,7 +98,8 @@ class Modulation(nn.Module):
     def __init__(self, config: TransformerConfig, dims: int):
         super().__init__()
 
-        # DEBUGGING
+        # modulation does not support sequence parallel, to 
+        # avoid mismatching tensor shapes in subsequent steps
         modulation_config = copy.deepcopy(config)
         modulation_config.sequence_parallel = False
 
@@ -108,7 +121,8 @@ class Modulation(nn.Module):
         self, vec: torch.Tensor
     ) -> torch.Tensor:
         scale, bias = self.lin(nn.functional.silu(vec))
-        return scale + 1.0
+        # we don't add 1.0 here, left to the jit fuser fused_modulation_apply to handle adding 1.0
+        return scale
 
 
 class GateResiduals(nn.Module):
@@ -131,17 +145,15 @@ class GateResiduals(nn.Module):
     ) -> torch.Tensor:
 
         if self.do_modulation:
-            gate = self.modulation(vec) + 2.9
+            # here we add 3.9 instead of 2.9 as in original Reve code because
+            # modulation does not automatically add 1.0 anymore, due to refactoring
+            # to support jit fuser
+            gate = self.modulation(vec) + 3.9
         else:
             gate = self.gate + 3.9
             gate = gate.unsqueeze(0)
-        gate = torch.sigmoid(gate)
-        gate = gate * (1 - 2 * self.epsilon) + self.epsilon
         normalized_residual = self.norm(residual)
-        if gate.ndim == 2:
-            # NOTE: Need to unsqueeze(0) instead of unsqueeze(1) as in original Reve code to broadcast with the sequence
-            gate = gate.unsqueeze(0)  # to broadcast with the sequence
-        return backbone * gate + (1 - gate) * normalized_residual
+        return fused_gate_math(backbone, normalized_residual, gate, self.epsilon)
 
 
 class ReveLayerWithAdaLN(TransformerLayer):
@@ -237,32 +249,16 @@ class ReveLayerWithAdaLN(TransformerLayer):
         **kwargs,
     ):
 
-
-        # DEBUGGING (benchmarking)
-        full_layer_forward_start_time = time.time()
-
         vector_emb = attention_mask
 
         ########################## Self attention #################################
 
-        # DEBUGGING (benchmarking)
-        self_attention_start_time = time.time()
-
-        # DEBUGGING (benchmarking)
-        self_attention_modulation_start_time = time.time()
-
         # Modulation
         if self.do_modulation:
-            scaled_hidden_states = self.mod_self_attention(vector_emb) * hidden_states
+            scaled_hidden_states = fused_modulation_apply(self.mod_self_attention(vector_emb), hidden_states)
         else:
             scaled_hidden_states = hidden_states
 
-        # DEBUGGING (benchmarking)
-        self_attention_modulation_end_time = time.time()
-        latency_tracker.update(f"[DEBUG]             (reve_layer_spec.py) - self attention modulation time: {self_attention_modulation_end_time - self_attention_modulation_start_time} seconds", now=self_attention_modulation_end_time)
-
-        # DEBUGGING (benchmarking)
-        self_attention_core_attention_start_time = time.time()
 
         # Attention
         attention_output, _ = self.full_self_attention(
@@ -272,12 +268,6 @@ class ReveLayerWithAdaLN(TransformerLayer):
             packed_seq_params=None if packed_seq_params is None else packed_seq_params["self_attention"],
         )
 
-        # DEBUGGING (benchmarking)
-        self_attention_core_attention_end_time = time.time()
-        latency_tracker.update(f"[DEBUG]             (reve_layer_spec.py) - self attention core attention time: {self_attention_core_attention_end_time - self_attention_core_attention_start_time} seconds", now=self_attention_core_attention_end_time)
-
-        # DEBUGGING (benchmarking)
-        self_attention_gate_residuals_start_time = time.time()
 
         # Gate residuals
         if self.use_residual:
@@ -285,35 +275,15 @@ class ReveLayerWithAdaLN(TransformerLayer):
         else:
             hidden_states = attention_output
 
-        # DEBUGGING (benchmarking)
-        self_attention_gate_residuals_end_time = time.time()
-        latency_tracker.update(f"[DEBUG]             (reve_layer_spec.py) - self attention gate residuals time: {self_attention_gate_residuals_end_time - self_attention_gate_residuals_start_time} seconds", now=self_attention_gate_residuals_end_time)
-
-        # DEBUGGING (benchmarking)
-        self_attention_end_time = time.time()
-        latency_tracker.update(f"[DEBUG]         (reve_layer_spec.py) - self attention time: {self_attention_end_time - self_attention_start_time} seconds", now=self_attention_end_time)
 
         ########################## Cross attention #################################
 
-        # DEBUGGING (benchmarking)
-        cross_attention_start_time = time.time()
-
         if self.do_cross_attn:
-            # DEBUGGING (benchmarking)
-            cross_attention_modulation_start_time = time.time()
-
             # Modulation
             if self.do_modulation:
-                scaled_hidden_states = self.mod_cross_attention(vector_emb) * hidden_states
+                scaled_hidden_states = fused_modulation_apply(self.mod_cross_attention(vector_emb), hidden_states)
             else:
                 scaled_hidden_states = hidden_states
-
-            # DEBUGGING (benchmarking)
-            cross_attention_modulation_end_time = time.time()
-            latency_tracker.update(f"[DEBUG]             (reve_layer_spec.py) - cross attention modulation time: {cross_attention_modulation_end_time - cross_attention_modulation_start_time} seconds", now=cross_attention_modulation_end_time)
-
-            # DEBUGGING (benchmarking)
-            cross_attention_core_attention_start_time = time.time()
 
             # Attention
             attention_output, _ = self.cross_attention(
@@ -323,67 +293,28 @@ class ReveLayerWithAdaLN(TransformerLayer):
                 packed_seq_params=None if packed_seq_params is None else packed_seq_params["cross_attention"],
             )
 
-            # DEBUGGING (benchmarking)
-            cross_attention_core_attention_end_time = time.time()
-            latency_tracker.update(f"[DEBUG]             (reve_layer_spec.py) - cross attention core attention time: {cross_attention_core_attention_end_time - cross_attention_core_attention_start_time} seconds", now=cross_attention_core_attention_end_time)
-
-            # DEBUGGING (benchmarking)
-            cross_attention_gate_residuals_start_time = time.time()
-
             # Gate residuals
             if self.use_residual:
                 hidden_states = self.gate_residual_cross_attention(hidden_states, attention_output, vector_emb)
             else:
                 hidden_states = attention_output
 
-            # DEBUGGING (benchmarking)
-            cross_attention_gate_residuals_end_time = time.time()
-            latency_tracker.update(f"[DEBUG]             (reve_layer_spec.py) - cross attention gate residuals time: {cross_attention_gate_residuals_end_time - cross_attention_gate_residuals_start_time} seconds", now=cross_attention_gate_residuals_end_time)
-
-        # DEBUGGING (benchmarking)
-        cross_attention_end_time = time.time()
-        latency_tracker.update(f"[DEBUG]         (reve_layer_spec.py) - cross attention time: {cross_attention_end_time - cross_attention_start_time} seconds", now=cross_attention_end_time)
-
         ########################## MLP #################################
-
-        # DEBUGGING (benchmarking)
-        mlp_start_time = time.time()
-
-        # DEBUGGING (benchmarking)
-        mlp_modulation_start_time = time.time()
 
         # Modulation
         if self.do_modulation:
-            scaled_hidden_states = self.mod_mlp(vector_emb) * hidden_states
+            scaled_hidden_states = fused_modulation_apply(self.mod_mlp(vector_emb), hidden_states)
         else:
             scaled_hidden_states = hidden_states
 
-        # DEBUGGING (benchmarking)
-        mlp_modulation_end_time = time.time()
-        latency_tracker.update(f"[DEBUG]             (reve_layer_spec.py) - mlp modulation time: {mlp_modulation_end_time - mlp_modulation_start_time} seconds", now=mlp_modulation_end_time)
-
-        # DEBUGGING (benchmarking)
-        mlp_core_computation_start_time = time.time()
-
         # MLP
         mlp_output, _ = self.mlp(scaled_hidden_states)
-
-        # DEBUGGING (benchmarking)
-        mlp_core_computation_end_time = time.time()
-        latency_tracker.update(f"[DEBUG]             (reve_layer_spec.py) - mlp core computation time: {mlp_core_computation_end_time - mlp_core_computation_start_time} seconds", now=mlp_core_computation_end_time)
-
-        # DEBUGGING (benchmarking)
-        mlp_gate_residuals_start_time = time.time()
 
         # Gate residuals
         if self.use_residual:
             hidden_states = self.gate_residual_mlp(hidden_states, mlp_output, vector_emb)
         else:
             hidden_states = mlp_output
-
-        # DEBUGGING (benchmarking)
-        mlp_gate_residuals_end_time = time.time()
-        latency_tracker.update(f"[DEBUG]             (reve_layer_spec.py) - mlp gate residuals time: {mlp_gate_residuals_end_time - mlp_gate_residuals_start_time} seconds", now=mlp_gate_residuals_end_time)
 
         # Jit compiled function creates 'view' tensor. This tensor
         # potentially gets saved in the MPU checkpoint function context,
@@ -392,14 +323,6 @@ class ReveLayerWithAdaLN(TransformerLayer):
         # p2p_communication), it serves to document the origin of this
         # 'view' tensor.
         output = make_viewless_tensor(inp=hidden_states, requires_grad=hidden_states.requires_grad, keep_graph=True)
-
-        # DEBUGGING (benchmarking)
-        mlp_end_time = time.time()
-        latency_tracker.update(f"[DEBUG]         (reve_layer_spec.py) - mlp time: {mlp_end_time - mlp_start_time} seconds", now=mlp_end_time)
-
-        # DEBUGGING (benchmarking)
-        full_layer_forward_end_time = time.time()
-        latency_tracker.update(f"[DEBUG]     (reve_layer_spec.py) - full layer forward time: {full_layer_forward_end_time - full_layer_forward_start_time} seconds", now=full_layer_forward_end_time)
 
         return output, context
 

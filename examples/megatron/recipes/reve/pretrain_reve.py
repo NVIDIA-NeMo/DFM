@@ -87,7 +87,7 @@ def parse_cli_args() -> Tuple[argparse.Namespace, list[str]]:
         formatter_class=argparse.RawTextHelpFormatter,
     )
     parser.add_argument("--mock", action="store_true", help="Whether to use mock data.")
-    parser.add_argument("--model-size", choices=["small", "half_full", "full", "1b"], default="small", help="Set model size, 'small', 'half_full', 'full', or '1b'.")
+    parser.add_argument("--model-size", choices=["small", "full", "full_dimhead128", "1b"], default="small", help="Set model size, 'small', 'full', 'full_dimhead128', or '1b'.")
     parser.add_argument(
         "--training-mode",
         choices=["pretrain", "finetune"],

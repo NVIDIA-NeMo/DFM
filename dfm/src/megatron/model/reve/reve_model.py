@@ -13,13 +13,11 @@
 # limitations under the License.
 # pylint: disable=C0115,C0116,C0301
 
+import time
 from typing import Dict, Literal, Optional
-import os
 
 import torch
 import torch.nn as nn
-from diffusers.models.embeddings import Timesteps
-from einops import rearrange
 from megatron.core import parallel_state, tensor_parallel
 from megatron.core.dist_checkpointing.mapping import ShardedStateDict
 from megatron.core.models.common.vision_module.vision_module import VisionModule
@@ -35,11 +33,11 @@ from dfm.src.megatron.model.reve.reve_layer_spec import (
 )
 from dfm.src.megatron.model.reve.reve_layer_spec import (
     get_reve_adaln_block_with_transformer_engine_spec as ReveLayerWithAdaLN,
+)
+from dfm.src.megatron.model.reve.reve_layer_spec import (
     get_reve_adaln_text_block_with_transformer_engine_spec as ReveTextLayerWithAdaLN,
 )
 
-from dfm.src.megatron.model.reve.reve_pytorch.layers import latency_tracker
-import time
 
 def cis_embed(
     x: torch.Tensor, dims: int, max_wavelength: float, scale: float
@@ -172,6 +170,7 @@ class RoPEEmbed(nn.Module):
         # Instead of repeat_interleave (which does [f1, f1, f2, f2]),
         # we concatenate the block with itself to get [f1, f2, f1, f2].
         return torch.concat([full_freqs, full_freqs], dim=-1)
+
 
 class CosineEmbed(nn.Module):
     def __init__(self, dims: int, max_wavelength: float, scale: float):
@@ -333,6 +332,9 @@ class ReveModel(VisionModule):
         self.text_config.hidden_size = self.config.cross_model_dims
         self.text_config.num_attention_heads = self.config.cross_num_heads
         self.text_config.num_layers = self.config.cross_num_layers
+        self.text_config.recompute_granularity = self.config.text_encoder_recompute_granularity
+        self.text_config.recompute_method = self.config.text_encoder_recompute_method
+        self.text_config.recompute_num_layers = self.config.text_encoder_recompute_num_layers
         self.text_decoder = TransformerBlock(
             config=self.text_config,
             spec=self.transformer_text_decoder_layer_spec,
@@ -354,27 +356,9 @@ class ReveModel(VisionModule):
         # Final layer
         self.final_layer = nn.Linear(self.config.hidden_size, self.config.latent_dims * self.config.patch_size**2, bias=True)
 
-
-        # # DEBUGGING (match forward pass in reve_pytorch/model.py)
-        # # Loading from "synced_checkpoints/reve_mcore_init.pt"
-        # if os.path.exists("synced_checkpoints/reve_mcore_init.pt"):
-        #      if torch.distributed.get_rank() == 0:
-        #         print(f"Loading weights from synced_checkpoints/reve_mcore_init.pt")
-        #      state_dict = torch.load("synced_checkpoints/reve_mcore_init.pt", map_location="cpu")
-        #      self.load_state_dict(state_dict, strict=True)
-        #      # Convert to bfloat16
-        #      self.to(torch.bfloat16)
-
-        #      # Print model's parameters and their shapes, mean, std
-        #      for name, param in self.named_parameters():
-        #             print(f"{name}: {param.shape}, dtype: {param.dtype}, mean: {param.mean()}, std: {param.std()}")
-        #      # Also print total number of parameters
-        #      total_params = sum(param.numel() for name, param in self.named_parameters())
-        #      print(f"Total Parameters: {total_params}")
-        #     #  print(stop_here)
-
         # DEBUGGING
         if torch.distributed.get_rank() == 0:
+            # Print model's parameters and their shapes, dtype, mean, std
             total_params = 0
             print(f"\n{'='*20} Model Parameters {'='*20}")
             for name, param in self.named_parameters():
@@ -383,6 +367,11 @@ class ReveModel(VisionModule):
             print(f"Total Parameters: {total_params}")
             print(f"{'='*58}\n")
 
+            # Print total parameters in text decoder and decoder respectively
+            text_decoder_params = sum(p.numel() for p in self.text_decoder.parameters())
+            decoder_params = sum(p.numel() for p in self.decoder.parameters())
+            print(f"Total parameters in self.text_decoder: {text_decoder_params}")
+            print(f"Total parameters in self.decoder: {decoder_params}")
 
 
     def _compute_modulation_vector(
@@ -420,91 +409,12 @@ class ReveModel(VisionModule):
         """Forward pass.
         """
 
-        # # DEBUGGING (match forward pass in reve_pytorch/model.py)
-        # # Mock values
-        # device = self.img_in.weight.device
-        # dtype = self.img_in.weight.dtype
-        # number_packed_samples = 2
-        # img_seq_len = 256
-        # text_seq_len = 256
-        # img_token_dim = self.img_in.in_features
-        # txt_token_dim = self.txt_in.in_features
-        # generator = torch.Generator(device=device)
-        # generator.manual_seed(42)
-        # x = torch.randn(
-        #     number_packed_samples,
-        #     img_seq_len,
-        #     img_token_dim,
-        #     dtype=dtype,
-        #     device=device,
-        #     generator=generator,
-        # ).reshape(number_packed_samples * img_seq_len, 1, img_token_dim)
-        # x_position_ids = torch.ones(
-        #     number_packed_samples, img_seq_len, 3, dtype=dtype, device=device
-        # )
-        # timestep = torch.tensor([0.5], dtype=dtype, device=device)
-        # y = torch.randn(
-        #     number_packed_samples, text_seq_len, txt_token_dim, dtype=dtype, device=device, generator=generator,
-        # ).reshape(number_packed_samples * text_seq_len, 1, txt_token_dim)
-        # conditioning_signal = torch.tensor([0.7], dtype=dtype, device=device)
-        # zero = torch.zeros(1, dtype=torch.int32, device=device)
-        # seq_len_q = torch.tensor([img_seq_len] * number_packed_samples, device=device)
-        # cu_seqlens_q = seq_len_q.cumsum(dim=0).to(torch.int32)
-        # cu_seqlens_q = torch.cat((zero, cu_seqlens_q))
-        # seq_len_kv = torch.tensor([text_seq_len] * number_packed_samples, device=device)
-        # cu_seqlens_kv = seq_len_kv.cumsum(dim=0).to(torch.int32)
-        # cu_seqlens_kv = torch.cat((zero, cu_seqlens_kv))
-        # text_packed_seq_params = {
-        #     "self_attention": PackedSeqParams(
-        #         cu_seqlens_q=cu_seqlens_kv,
-        #         cu_seqlens_q_padded=cu_seqlens_kv,
-        #         cu_seqlens_kv=cu_seqlens_kv,
-        #         cu_seqlens_kv_padded=cu_seqlens_kv,
-        #         qkv_format='thd',
-        #     ),
-        # }
-        # packed_seq_params = {
-        #     "self_attention": PackedSeqParams(
-        #         cu_seqlens_q=cu_seqlens_q,
-        #         cu_seqlens_q_padded=cu_seqlens_q,
-        #         cu_seqlens_kv=cu_seqlens_q,
-        #         cu_seqlens_kv_padded=cu_seqlens_q,
-        #         qkv_format='thd',
-        #     ),
-        #     "cross_attention": PackedSeqParams(
-        #         cu_seqlens_q=cu_seqlens_q,
-        #         cu_seqlens_q_padded=cu_seqlens_q,
-        #         cu_seqlens_kv=cu_seqlens_kv,
-        #         cu_seqlens_kv_padded=cu_seqlens_kv,
-        #         qkv_format='thd',
-        #     ),
-        # }
-
-
-
         # DEBUGGING
         if torch.distributed.get_rank() == 0:
             print(f"[DEBUG] (reve_model.py) number_packed_samples: {number_packed_samples}")
             print(f"[DEBUG] (reve_model.py) x.shape: {x.shape}")
-            # print(f"[DEBUG] (reve_model.py) x.mean() - x.std(): {x.mean()} - {x.std()}")
-            # print(f"[DEBUG] (reve_model.py) x_position_ids: {x_position_ids.shape}")
-            # print(f"[DEBUG] (reve_model.py) x_position_ids.mean() - x_position_ids.std(): {x_position_ids.mean()} - {x_position_ids.std()}")
             print(f"[DEBUG] (reve_model.py) y.shape: {y.shape}")
-            # print(f"[DEBUG] (reve_model.py) y.mean() - y.std(): {y.mean()} - {y.std()}")
-            # print(f"[DEBUG] (reve_model.py) text_seq_len: {text_seq_len}")
-            # print(f"[DEBUG] (reve_model.py) timestep: {timestep}")
-            # print(f"[DEBUG] (reve_model.py) conditioning_signal: {conditioning_signal}")
-            # print(f"[DEBUG] (reve_model.py) text_packed_seq_params: {text_packed_seq_params}")
-            # print(f"[DEBUG] (reve_model.py) packed_seq_params: {packed_seq_params}")
-            print(f"[DEBUG] (reve_model.py) --------------------------------")
-
-
-        # DEBUGGING (benchmarking)
-        full_forward_start_time = time.time()
-        latency_tracker.update(f"[DEBUG] (reve_model.py) --------------------------------", now=full_forward_start_time)
-
-        # DEBUGGING (benchmarking)
-        text_processing_start_time = time.time()
+            print("[DEBUG] (reve_model.py) --------------------------------")
 
         ### Text processing
         txt = y
@@ -522,11 +432,6 @@ class ReveModel(VisionModule):
         txt_rope_cis = self.txt_rope_emb.forward_half_split(txt_pos_ids)
         txt_rope_cis = txt_rope_cis.reshape([-1, 1, txt_rope_cis.shape[-1]]) # (number_packed_samples, text_seq_len, hidden_size) -> ((number_packed_samples * text_seq_len), 1, hidden_size)
         txt_rope_cis = txt_rope_cis.unsqueeze(1) # ((number_packed_samples * text_seq_len), 1, hidden_size) -> (number_packed_samples, 1, 1, hidden_size)
-
-        # DEBUGGING (benchmarking)
-        text_decoder_start_time = time.time()
-
-        # DEBUGGING (sequence parallel)
         # split sequence for sequence_parallel
         # TODO: for PP, do we move scatter_to_sequence_parallel_region here or after "x = self.decoder.input_tensor" ???
         if self.config.sequence_parallel:
@@ -544,28 +449,14 @@ class ReveModel(VisionModule):
             rotary_pos_emb=txt_rope_cis,
             packed_seq_params=text_packed_seq_params,
         )
-
         # gather outputs for sequence_parallel
         # Note: in GPT models, because the vocab projection matrix is ColumnParallelLinear, the sequence is
         #   automatically gathered in ColumnParallelLinear forward pass.
         #   However, in Wan models, we need to gather the outputs manually.
         if self.config.sequence_parallel:
             txt = tensor_parallel.gather_from_sequence_parallel_region(txt)
-
-        # DEBUGGING (benchmarking)
-        text_decoder_end_time = time.time()
-        latency_tracker.update(f"[DEBUG] (reve_model.py) - text decoder time: {text_decoder_end_time - text_decoder_start_time} seconds", now=text_decoder_end_time)
-
         txt = self.txt_out(txt)
 
-
-        # DEBUGGING (benchmarking)
-        text_processing_end_time = time.time()
-        latency_tracker.update(f"[DEBUG] (reve_model.py) - text processing time: {text_processing_end_time - text_processing_start_time} seconds", now=text_processing_end_time)
-
-
-        # DEBUGGING (benchmarking)
-        image_processing_start_time = time.time()
 
         ### Image processing
         patched_img, img_ids = x, x_position_ids
@@ -583,14 +474,13 @@ class ReveModel(VisionModule):
         img_rope_cis = self.img_rope_emb.forward_half_split(img_ids)
         img_rope_cis = img_rope_cis.reshape([-1, 1, img_rope_cis.shape[-1]]) # ((number_packed_samples * img_seq_len), 1, hidden_size) -> ((number_packed_samples * img_seq_len), 1, hidden_size)
         img_rope_cis = img_rope_cis.unsqueeze(1) # ((number_packed_samples * img_seq_len), 1, hidden_size) -> (number_packed_samples, 1, 1, hidden_size)
-
-        # DEBUGGING (sequence parallel)
         # split sequence for sequence_parallel
         # TODO: for PP, do we move scatter_to_sequence_parallel_region here or after "x = self.decoder.input_tensor" ???
         if self.config.sequence_parallel:
             patched_img = tensor_parallel.scatter_to_sequence_parallel_region(
                 patched_img
             )  # output: x.shape [s * b // tp_size, hidden_size]
+
 
         ### Timestep and conditioning signal processing
         condition_vector_emb = self._compute_modulation_vector(
@@ -599,8 +489,6 @@ class ReveModel(VisionModule):
             conditioning_signal,
         )
 
-        # DEBUGGING (benchmarking)
-        image_decoder_start_time = time.time()
 
         ### Image decoder
         patched_img = self.decoder(
@@ -611,7 +499,6 @@ class ReveModel(VisionModule):
             rotary_pos_emb=img_rope_cis,
             packed_seq_params=packed_seq_params,
         )
-
         # gather outputs for sequence_parallel
         # Note: in GPT models, because the vocab projection matrix is ColumnParallelLinear, the sequence is
         #   automatically gathered in ColumnParallelLinear forward pass.
@@ -619,21 +506,10 @@ class ReveModel(VisionModule):
         if self.config.sequence_parallel:
             patched_img = tensor_parallel.gather_from_sequence_parallel_region(patched_img)
 
-        # DEBUGGING (benchmarking)
-        image_decoder_end_time = time.time()
-        latency_tracker.update(f"[DEBUG] (reve_model.py) - image decoder time: {image_decoder_end_time - image_decoder_start_time} seconds", now=image_decoder_end_time)
-
-        # DEBUGGING (benchmarking)
-        image_processing_end_time = time.time()
-        latency_tracker.update(f"[DEBUG] (reve_model.py) - image processing time: {image_processing_end_time - image_processing_start_time} seconds", now=image_processing_end_time)
-
 
         ### Final layer
         patched_img = self.final_layer(patched_img)
 
-        # DEBUGGING (benchmarking)
-        full_forward_end_time = time.time()
-        latency_tracker.update(f"[DEBUG] (reve_model.py) - full forward pass time: {full_forward_end_time - full_forward_start_time} seconds", now=full_forward_end_time)
 
         return patched_img
 
@@ -699,6 +575,7 @@ class ReveModel(VisionModule):
                 self._set_embedder_weights_replica_id(param, sharded_state_dict, weight_key)
         return sharded_state_dict
 
+
     def _set_embedder_weights_replica_id(
         self, tensor: Tensor, sharded_state_dict: ShardedStateDict, embedder_weight_key: str
     ) -> None:
@@ -730,4 +607,3 @@ class ReveModel(VisionModule):
             replica_id=replica_id,
             allow_shape_mismatch=False,
         )
-

@@ -175,9 +175,6 @@ class Attention(nn.Module):
             # add a dimension for the multi heads
             mask = mask.unsqueeze(1)
 
-        # DEBUGGING (benchmarking)
-        attention_modulation_start_time = time.time()
-
         input = x
         if self.do_modulation:
             assert vec is not None, "vec should not be None if `do_modulation` is True"
@@ -187,13 +184,6 @@ class Attention(nn.Module):
             x = x * scale
         else:
             assert vec is None, "vec should be None if `do_modulation` is False"
-
-        # DEBUGGING (benchmarking)
-        attention_modulation_end_time = time.time()
-        latency_tracker.update(f"[DEBUG]             (reve_pytorch/layers.py) - attention modulation time: {attention_modulation_end_time - attention_modulation_start_time} seconds", now=attention_modulation_end_time)
-
-        # DEBUGGING (benchmarking)
-        attention_core_attention_start_time = time.time()
 
         q = self.q(x)
         q = self.split_q(q)
@@ -225,16 +215,6 @@ class Attention(nn.Module):
                 "cross_rope_cis should be None when not using RoPE"
             )
 
-        # # DEBUGGING (benchmarking)
-        # # torch.cuda.synchronize()
-        # # sdpa_start_time = time.time()
-        # from torch.backends.cuda import sdp_kernel
-        # start_event = torch.cuda.Event(enable_timing=True)
-        # end_event = torch.cuda.Event(enable_timing=True)
-        # torch.cuda.synchronize() # Clear the deck
-        # start_event.record()
-
-
         # Use PyTorch's scaled_dot_product_attention
         # DEBUGGING (benchmarking)
         # force use of flash attention
@@ -252,31 +232,11 @@ class Attention(nn.Module):
                 scale=self.scale,
             )
 
-        # # DEBUGGING (benchmarking)
-        # # torch.cuda.synchronize()
-        # # sdpa_end_time = time.time()
-        # # print(f"[DEBUG] (layers.py) SDPA time: {sdpa_end_time - sdpa_start_time} seconds")
-        # end_event.record()
-        # torch.cuda.synchronize()
-        # sdpa_time_ms = start_event.elapsed_time(end_event)
-        # print(f"[DEBUG] (layers.py) SDPA time: {sdpa_time_ms} milliseconds")
-
         x = self.combine_heads(x)
         x = self.proj(x)
 
-        # DEBUGGING (benchmarking)
-        attention_core_attention_end_time = time.time()
-        latency_tracker.update(f"[DEBUG]             (reve_pytorch/layers.py) - attention core attention time: {attention_core_attention_end_time - attention_core_attention_start_time} seconds", now=attention_core_attention_end_time)
-
-        # DEBUGGING (benchmarking)
-        attention_gate_residuals_start_time = time.time()
-
         if self.gate_residual is not None:
             x = self.gate_residual(input, x, vec)
-
-        # DEBUGGING (benchmarking)
-        attention_gate_residuals_end_time = time.time()
-        latency_tracker.update(f"[DEBUG]             (reve_pytorch/layers.py) - attention gate residuals time: {attention_gate_residuals_end_time - attention_gate_residuals_start_time} seconds", now=attention_gate_residuals_end_time)
 
         return x
 
@@ -302,9 +262,6 @@ class MLP(nn.Module):
         vec: Float[torch.Tensor, "... dims"] | None,
     ) -> Float[torch.Tensor, "... seq_len dims"]:
 
-        # DEBUGGING (benchmarking)
-        mlp_modulation_start_time = time.time()
-
         input = x
         if self.do_modulation:
             assert vec is not None
@@ -313,29 +270,11 @@ class MLP(nn.Module):
                 scale = scale.unsqueeze(1)  # to broadcast with the sequence
             x = x * scale
 
-        # DEBUGGING (benchmarking)
-        mlp_modulation_end_time = time.time()
-        latency_tracker.update(f"[DEBUG]                 (reve_pytorch/layers.py) - mlp modulation time: {mlp_modulation_end_time - mlp_modulation_start_time} seconds", now=mlp_modulation_end_time)
-
-        # DEBUGGING (benchmarking)
-        mlp_core_computation_start_time = time.time()
-
         x = self.lin1(x)
         x = self.act(x)
         x = self.lin2(x)
 
-        # DEBUGGING (benchmarking)
-        mlp_core_computation_end_time = time.time()
-        latency_tracker.update(f"[DEBUG]                 (reve_pytorch/layers.py) - mlp core computation time: {mlp_core_computation_end_time - mlp_core_computation_start_time} seconds", now=mlp_core_computation_end_time)
-
-        # DEBUGGING (benchmarking)
-        mlp_gate_residuals_start_time = time.time()
-
         x = self.gate_residual(input, x, vec)
-
-        # DEBUGGING (benchmarking)
-        mlp_gate_residuals_end_time = time.time()
-        latency_tracker.update(f"[DEBUG]                 (reve_pytorch/layers.py) - mlp gate residuals time: {mlp_gate_residuals_end_time - mlp_gate_residuals_start_time} seconds", now=mlp_gate_residuals_end_time)
 
         return x
 
@@ -397,12 +336,6 @@ class TransformerBlock(nn.Module):
         | None = None,
     ) -> Float[torch.Tensor, "bs seq_len dims"]:
 
-        # DEBUGGING (benchmarking)
-        full_layer_forward_start_time = time.time()
-
-        # DEBUGGING (benchmarking)
-        self_attention_start_time = time.time()
-
         x = self.self_attn(
             x=x,
             cross=None,
@@ -410,13 +343,6 @@ class TransformerBlock(nn.Module):
             rope_cis=rope_cis,
             mask=mask,
         )
-
-        # DEBUGGING (benchmarking)
-        self_attention_end_time = time.time()
-        latency_tracker.update(f"[DEBUG]         (reve_pytorch/layers.py) - self attention time: {self_attention_end_time - self_attention_start_time} seconds", now=self_attention_end_time)
-
-        # DEBUGGING (benchmarking)
-        cross_attention_start_time = time.time()
 
         if self.do_cross_attn:
             x = self.cross_attn(
@@ -428,22 +354,7 @@ class TransformerBlock(nn.Module):
                 mask=cross_mask,
             )
 
-        # DEBUGGING (benchmarking)
-        cross_attention_end_time = time.time()
-        latency_tracker.update(f"[DEBUG]         (reve_pytorch/layers.py) - cross attention time: {cross_attention_end_time - cross_attention_start_time} seconds", now=cross_attention_end_time)
-
-        # DEBUGGING (benchmarking)
-        mlp_start_time = time.time()
-
         x = self.mlp(x, vec)
-
-        # DEBUGGING (benchmarking)
-        mlp_end_time = time.time()
-        latency_tracker.update(f"[DEBUG]         (reve_pytorch/layers.py) - mlp time: {mlp_end_time - mlp_start_time} seconds", now=mlp_end_time)
-
-        # DEBUGGING (benchmarking)
-        full_layer_forward_end_time = time.time()
-        latency_tracker.update(f"[DEBUG]     (reve_pytorch/layers.py) - full layer forward time: {full_layer_forward_end_time - full_layer_forward_start_time} seconds", now=full_layer_forward_end_time)
 
         return x
 
@@ -630,4 +541,3 @@ class PadToken(nn.Module):
         x = x.where(mask[..., None], -1)
 
         return x, mask
-

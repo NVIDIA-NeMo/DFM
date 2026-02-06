@@ -1,25 +1,25 @@
-import os
-import sys
-import time
 import argparse
 import functools
+import os
+import time
+
 import torch
+import torch.distributed as dist
 import torch.nn as nn
 import torch.optim as optim
-import torch.distributed as dist
+from layers import TransformerBlock
+from model import ReveV2
 from torch.distributed.fsdp import (
     FullyShardedDataParallel as FSDP,
-    ShardingStrategy,
+)
+from torch.distributed.fsdp import (
     MixedPrecision,
-    StateDictType,
+    ShardingStrategy,
 )
 from torch.distributed.fsdp.wrap import (
     transformer_auto_wrap_policy,
 )
 
-from model import ReveV2
-from layers import TransformerBlock
-import time
 
 def get_small_config():
     """Small config for fast testing."""
@@ -40,7 +40,6 @@ def get_small_config():
         "patch_size": 1,
     }
 
-
 def get_1b_config():
     """Half full config."""
     return {
@@ -60,27 +59,6 @@ def get_1b_config():
         "patch_size": 1,
     }
 
-
-def get_half_full_config():
-    """Half full config."""
-    return {
-        "latent_dims": 768,
-        "text_dims": 4096,
-        "dims_per_head": 256,
-        "num_heads": 24,
-        "cross_dims_per_head": 256,
-        "cross_num_heads": 24,
-        "mlp_ratio": 4.0,
-        "num_layers": 13,
-        "cross_num_layers": 4,
-        "rope_dims": [64, 64],
-        "cross_rope_dims": 128,
-        "rope_max_wavelength": 512.0,
-        "attn_scale": 16.0,
-        "patch_size": 1,
-    }
-
-
 def get_full_config():
     """Full production config."""
     return {
@@ -90,6 +68,25 @@ def get_full_config():
         "num_heads": 24,
         "cross_dims_per_head": 256,
         "cross_num_heads": 24,
+        "mlp_ratio": 4.0,
+        "num_layers": 26,
+        "cross_num_layers": 8,
+        "rope_dims": [64, 64],
+        "cross_rope_dims": 128,
+        "rope_max_wavelength": 512.0,
+        "attn_scale": 16.0,
+        "patch_size": 1,
+    }
+
+def get_full_config_dimhead128():
+    """Full production config with dims_per_head = 128."""
+    return {
+        "latent_dims": 768,
+        "text_dims": 4096,
+        "dims_per_head": 128,
+        "num_heads": 48,
+        "cross_dims_per_head": 128,
+        "cross_num_heads": 48,
         "mlp_ratio": 4.0,
         "num_layers": 26,
         "cross_num_layers": 8,
@@ -128,39 +125,12 @@ def mock_train(config):
     text_dims = config["text_dims"]
     patch_size = config["patch_size"]
     
-    # Batch dimensions - local batch size
-    # ## config 1
-    # bs = 2 
-    # num_img_tokens = 64
-    # img_token_dim = latent_dims * (patch_size ** 2)
-    # num_txt_tokens = 16
-    # txt_token_dim = text_dims
-    # ## config 2 (highest runnable)
-    # bs = 1
-    # num_img_tokens = 2304
-    # img_token_dim = latent_dims * (patch_size ** 2)
-    # num_txt_tokens = 256
-    # txt_token_dim = text_dims
-    ## config 3 (highest runnable for TP=8)
-    bs = 72
+    ## set up mock data shape
+    bs = 4
     num_img_tokens = 16*16
     img_token_dim = latent_dims * (patch_size ** 2)
     num_txt_tokens = 128
     txt_token_dim = text_dims
-
-    # ## testing config
-    # bs = 1
-    # num_img_tokens = 160*160
-    # img_token_dim = latent_dims * (patch_size ** 2)
-    # num_txt_tokens = 128
-    # txt_token_dim = text_dims
-
-    # ## testing config 2
-    # bs = 4
-    # num_img_tokens = 32*32
-    # img_token_dim = latent_dims * (patch_size ** 2)
-    # num_txt_tokens = 256
-    # txt_token_dim = text_dims
 
     # Initialize model
     if rank == 0:
@@ -282,27 +252,6 @@ def mock_train(config):
         backward_end = time.time()
         backward_times.append(backward_end - backward_start)
 
-        # # Check optimizer
-        # def check_optimizer_full(optimizer):
-        #     # 1. Get the first parameter
-        #     p = optimizer.param_groups[0]['params'][0]
-        #     print(f"--- Standard Tensors ---")
-        #     print(f"Model Weights:   {p.dtype}")
-        #     print(f"Gradients:       {p.grad.dtype if p.grad is not None else 'None'}")
-            
-        #     # 2. Check the State Dictionary
-        #     if not optimizer.state:
-        #         print("\n[!] Run optimizer.step() first to see states.")
-        #         return
-
-        #     p_state = optimizer.state[p]
-        #     print(f"\n--- Optimizer States ---")
-        #     for key, value in p_state.items():
-        #         # Check if the value is a tensor (states like 'step' are often just ints)
-        #         dtype = value.dtype if torch.is_tensor(value) else type(value)
-        #         print(f"{key:<15}: {dtype}")
-        # check_optimizer_full(optimizer)
-
         # Optimization step
         torch.cuda.synchronize()
         optim_start = time.time()
@@ -326,22 +275,27 @@ def mock_train(config):
     
     cleanup()
 
+
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
     parser.add_argument(
         "--config",
-        choices=["small", "1b", "half_full", "full"],
+        choices=["small", "1b", "full", "full_dimhead128"],
         default="small",
         help="Config size to use",
     )
     args = parser.parse_args()
 
-    config = get_small_config() if args.config == "small" else get_1b_config() if args.config == "1b" else get_half_full_config() if args.config == "half_full" else get_full_config()
-    
-    # Check if run with torchrun
-    if "RANK" not in os.environ:
-        print("Error: This script must be run with torchrun/torch.distributed.launch")
-        print("Usage: torchrun --nproc_per_node=8 mock_train_reve.py --config full")
-        sys.exit(1)
+    # get config
+    if args.config == "small":
+        config = get_small_config()
+    elif args.config == "1b":
+        config = get_1b_config()
+    elif args.config == "full":
+        config = get_full_config()
+    elif args.config == "full_dimhead128":
+        config = get_full_config_dimhead128()
+    else:
+        config = None    
 
     mock_train(config)
