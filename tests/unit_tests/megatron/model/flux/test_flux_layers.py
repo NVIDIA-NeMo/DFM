@@ -224,7 +224,7 @@ class TestTimeStepEmbedder:
         embedder = TimeStepEmbedder(embedding_dim, hidden_dim)
 
         assert isinstance(embedder.time_embedder, MLPEmbedder)
-        assert embedder.time_proj.embedding_dim == embedding_dim
+        assert embedder.time_proj.num_channels == embedding_dim
 
     def test_timestepembedder_forward_shape(self):
         """Test TimeStepEmbedder forward pass output shape."""
