@@ -41,7 +41,7 @@ torchrun \
   --master_port=6000 \
   examples/megatron/recipes/reve/pretrain_reve.py \
   --mock \
-  --model-size full_dimhead128 \
+  --model-size full \
   model.tensor_model_parallel_size=1 \
   model.pipeline_model_parallel_size=1 \
   model.context_parallel_size=1 \

@@ -19,7 +19,7 @@ export NCCL_MNNVL_ENABLE=1
 # Install dependencies (Quietly to avoid encoding issues)
 pip install beartype jaxtyping --quiet --root-user-action=ignore
 
-# --- 4. Execution ---
+# --- 3. Execution ---
 cd $DFM_PATH
 torchrun --nproc_per_node=8 dfm/src/megatron/model/reve/reve_pytorch/mock_train_reve.py \
   --config full
