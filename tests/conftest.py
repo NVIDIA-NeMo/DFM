@@ -15,6 +15,7 @@
 import os
 
 import pytest
+import torch
 
 
 def pytest_addoption(parser):
@@ -50,6 +51,15 @@ def reset_env_vars():
     # After the test, restore the original environment
     os.environ.clear()
     os.environ.update(original_env)
+
+
+@pytest.fixture(autouse=True)
+def check_gpu_requirements(request):
+    """Fixture to skip tests that require GPU when CUDA is not available"""
+    marker = request.node.get_closest_marker("run_only_on")
+    if marker and "gpu" in [arg.lower() for arg in marker.args]:
+        if not torch.cuda.is_available():
+            pytest.skip("Test requires GPU but CUDA is not available")
 
 
 def pytest_configure(config):
