@@ -229,12 +229,12 @@ def build_lr_scheduler(
     # Compute defaults from runtime values
     default_cfg: Dict[str, Any] = {
         "optimizer": optimizer,
-        "lr_warmup_steps": min(1000, total_steps // 10), 
+        "lr_warmup_steps": min(1000, total_steps // 10),
         "lr_decay_steps": total_steps,
         "lr_decay_style": "cosine",
-        "init_lr": base_lr * 0.1,  
+        "init_lr": base_lr * 0.1,
         "max_lr": base_lr,
-        "min_lr": base_lr * 0.01,  
+        "min_lr": base_lr * 0.01,
         "start_wd": base_wd,
         "end_wd": base_wd,
         "wd_incr_steps": total_steps,

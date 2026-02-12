@@ -295,10 +295,7 @@ class WanProcessor(BaseVideoProcessor):
         # This matches the exact behavior in WanPipeline
         prompt_embeds = [u[:v] for u, v in zip(prompt_embeds, seq_lens)]
         prompt_embeds = torch.stack(
-            [
-                torch.cat([u, u.new_zeros(self.MAX_SEQUENCE_LENGTH - u.size(0), u.size(1))])
-                for u in prompt_embeds
-            ],
+            [torch.cat([u, u.new_zeros(self.MAX_SEQUENCE_LENGTH - u.size(0), u.size(1))]) for u in prompt_embeds],
             dim=0,
         )
 
