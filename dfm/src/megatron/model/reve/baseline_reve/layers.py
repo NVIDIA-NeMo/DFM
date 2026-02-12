@@ -255,7 +255,7 @@ class MLP(nn.Module):
         self.gate_residual = GateResiduals(dims, do_modulation)
         self.do_modulation = do_modulation
 
-    @jaxtyped(typechecker=beartype)
+    # @jaxtyped(typechecker=beartype)
     def forward(
         self,
         x: Float[torch.Tensor, "... seq_len dims"],
@@ -310,7 +310,7 @@ class TransformerBlock(nn.Module):
         dims = dims_per_head * num_heads
         self.mlp = MLP(dims=dims, mlp_ratio=mlp_ratio, do_modulation=do_modulation)
 
-    @jaxtyped(typechecker=beartype)
+    # @jaxtyped(typechecker=beartype)
     def forward(
         self,
         x: Float[torch.Tensor, "... seq_len dims"],
@@ -423,7 +423,7 @@ class RoPEEmbed(nn.Module):
         self.cis_embed = cis_embed
         self.scale = scale
 
-    @jaxtyped(typechecker=beartype)
+    # @jaxtyped(typechecker=beartype)
     def forward(
         self, pos_indices: Float[torch.Tensor, "... axis"]
     ) -> tuple[Float[torch.Tensor, "... dims"], Float[torch.Tensor, "... dims"]]:
@@ -443,7 +443,7 @@ class RoPEEmbed(nn.Module):
 
         return torch.concat(all_cos * 2, dim=-1), torch.concat(all_sin * 2, dim=-1)
 
-    @jaxtyped(typechecker=beartype)
+    # @jaxtyped(typechecker=beartype)
     def forward_interleaved(
         self, pos_indices: Float[torch.Tensor, "... axis"]
     ) -> Float[torch.Tensor, "... dims"]:
@@ -494,7 +494,7 @@ class CosineEmbed(nn.Module):
         self.max_wavelength = max_wavelength
         self.scale = scale
 
-    @jaxtyped(typechecker=beartype)
+    # @jaxtyped(typechecker=beartype)
     def forward(self, x: Float[torch.Tensor, "..."]) -> Float[torch.Tensor, "... dims"]:
         cos, sin = cis_embed(x, self.dims // 2, self.max_wavelength, self.scale)
         return torch.concat([cos, sin], dim=-1)
@@ -510,7 +510,7 @@ class MLPEmbed(nn.Module):
         if self.apply_rms_norm:
             self.norm = RMSNorm(out_dims)
 
-    @jaxtyped(typechecker=beartype)
+    # @jaxtyped(typechecker=beartype)
     def forward(
         self, x: Float[torch.Tensor, "... in_dims"]
     ) -> Float[torch.Tensor, "... out_dims"]:
@@ -522,7 +522,7 @@ class MLPEmbed(nn.Module):
 
 
 class PadToken(nn.Module):
-    @jaxtyped(typechecker=beartype)
+    # @jaxtyped(typechecker=beartype)
     def forward(
         self,
         x: Float[torch.Tensor, "bs seq_len dims"],

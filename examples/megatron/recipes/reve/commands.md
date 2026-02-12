@@ -29,10 +29,11 @@ Quick reference for running and configuring DFM Reve vs baseline Reve.
 
 ## Modifying data batch
 
-| Variant       | File | Section |
-|---------------|------|--------|
-| **DFM Reve**  | `./dfm/src/megatron/recipes/reve/reve.py` | `## set up mock data shape` |
-| **Baseline Reve** | `./dfm/src/megatron/model/reve/baseline_reve/mock_train_reve.py` | `## set up mock data shape` |
+| Variant          | CLI settings |
+|------------------|--------------|
+| **DFM Reve**     | `dataset.number_packed_samples`, `dataset.context_seq_len`, `dataset.H_latents`, `dataset.W_latents` |
+| **Baseline Reve** | `bs`, `num_img_tokens`, `num_txt_tokens` |
+
 
 **Note:** For DFM Reve, because we traing with sequence packing, the literal `micro_batch_size` per data-parallel rank is always 1; the actual effective `micro_batch_size` is determined by `number_packed_samples` (number of samples packed in one input sequence). For example, DFM Reve's setup of `micro_batch_size=1, number_packed_samples=8` corresponds to baseline Reve's setup of `bs=8`.
 

@@ -105,17 +105,22 @@ def setup():
 def cleanup():
     dist.destroy_process_group()
 
-def mock_train(config):
+def mock_train(config, micro_batch_size=8, num_img_tokens=256, num_txt_tokens=128, grad_accumulation=1):
     setup()
     
     rank = dist.get_rank()
     local_rank = int(os.environ["LOCAL_RANK"])
     world_size = dist.get_world_size()
     device = torch.device(f"cuda:{local_rank}")
-    
+    global_batch_size = micro_batch_size * world_size * grad_accumulation
+
     if rank == 0:
         print(f"Using world size: {world_size}")
-        print(f"Running on device: {device}")
+        print(f"micro_batch_size: {micro_batch_size}")
+        print(f"grad_accumulation: {grad_accumulation}")
+        print(f"num_img_tokens: {num_img_tokens}")
+        print(f"num_txt_tokens: {num_txt_tokens}")
+        print(f"global_batch_size: {global_batch_size}")
 
     # Set random seed for reproducibility
     torch.manual_seed(42)
@@ -125,11 +130,8 @@ def mock_train(config):
     text_dims = config["text_dims"]
     patch_size = config["patch_size"]
     
-    ## set up mock data shape
-    bs = 8
-    num_img_tokens = 16*16
+    ## set up mock data shape (micro_batch_size, num_img_tokens, num_txt_tokens from CLI)
     img_token_dim = latent_dims * (patch_size ** 2)
-    num_txt_tokens = 128
     txt_token_dim = text_dims
 
     # Initialize model
@@ -181,6 +183,15 @@ def mock_train(config):
     if rank == 0:
         print("FSDP wrapping done.", flush=True)
 
+    # torch.compile for faster training (PyTorch 2.x).
+    # Use mode="default" with FSDP: mode="reduce-overhead" uses CUDA graphs and can produce
+    # "The CUDA Graph is empty" when capture runs on a different device/stream than FSDP's work.
+    if rank == 0:
+        print("Applying torch.compile with mode=default (FSDP-friendly)...", flush=True)
+    # model = torch.compile(model, mode="default")
+    if rank == 0:
+        print("torch.compile applied.", flush=True)
+
     # Optimizer
     if rank == 0:
         print("Initializing optimizer...", flush=True)
@@ -204,75 +215,79 @@ def mock_train(config):
     if rank == 0:
         print("Barrier passed. Entering loop.", flush=True)
     
-    num_steps = 20000
+    num_steps = 100
     for step in range(1, num_steps + 1):
         torch.cuda.synchronize()
         step_start = time.time()
         
         optimizer.zero_grad()
+        step_loss = 0.0
 
-        torch.manual_seed(42 + rank + step)
-        
-        x = torch.randn(bs, num_img_tokens, img_token_dim, device=device).to(torch.bfloat16)
-        x_position_ids = torch.rand(bs, num_img_tokens, 3, device=device).to(torch.bfloat16)
-        timestep = torch.randint(0, 1000, (bs,), device=device) # Integer
-        y = torch.randn(bs, num_txt_tokens, txt_token_dim, device=device).to(torch.bfloat16)
-        
-        y_mask = torch.ones(bs, num_txt_tokens, dtype=torch.bool, device=device)
-        y_mask[:, -2:] = False
-        
-        conditioning_signal = torch.randn(bs, device=device).to(torch.bfloat16)
-        
-        target = torch.randn_like(x)
+        for acc_step in range(grad_accumulation):
+            torch.manual_seed(42 + rank + step * grad_accumulation + acc_step)
 
-        # Forward pass
-        torch.cuda.synchronize()
-        forward_start = time.time()
-        with torch.autocast(device_type="cuda", dtype=torch.bfloat16):
-            output = model(
-                x=x,
-                x_position_ids=x_position_ids,
-                timestep=timestep,
-                y=y,
-                y_mask=y_mask,
-                conditioning_signal=conditioning_signal
-            )
+            x = torch.randn(micro_batch_size, num_img_tokens, img_token_dim, device=device).to(torch.bfloat16)
+            x_position_ids = torch.rand(micro_batch_size, num_img_tokens, 3, device=device).to(torch.bfloat16)
+            timestep = torch.randint(0, 1000, (micro_batch_size,), device=device) # Integer
+            y = torch.randn(micro_batch_size, num_txt_tokens, txt_token_dim, device=device).to(torch.bfloat16)
 
-        # Compute loss
-        loss = criterion(output, target)
-        torch.cuda.synchronize()
-        forward_end = time.time()
-        forward_times.append(forward_end - forward_start)
-        
-        # Backward pass
-        torch.cuda.synchronize()
-        backward_start = time.time()
-        loss.backward()
-        torch.cuda.synchronize()
-        backward_end = time.time()
-        backward_times.append(backward_end - backward_start)
+            y_mask = torch.ones(micro_batch_size, num_txt_tokens, dtype=torch.bool, device=device)
+            y_mask[:, -2:] = False
 
-        # Optimization step
+            conditioning_signal = torch.randn(micro_batch_size, device=device).to(torch.bfloat16)
+
+            target = torch.randn_like(x)
+
+            # Forward pass
+            torch.cuda.synchronize()
+            forward_start = time.time()
+            with torch.autocast(device_type="cuda", dtype=torch.bfloat16):
+                output = model(
+                    x=x,
+                    x_position_ids=x_position_ids,
+                    timestep=timestep,
+                    y=y,
+                    y_mask=y_mask,
+                    conditioning_signal=conditioning_signal
+                )
+
+            # Compute loss (scale by 1/grad_accumulation for correct gradient accumulation)
+            loss = criterion(output, target) / grad_accumulation
+            step_loss += loss.detach() * grad_accumulation
+            torch.cuda.synchronize()
+            forward_end = time.time()
+            forward_times.append(forward_end - forward_start)
+
+            # Backward pass
+            torch.cuda.synchronize()
+            backward_start = time.time()
+            loss.backward()
+            torch.cuda.synchronize()
+            backward_end = time.time()
+            backward_times.append(backward_end - backward_start)
+
+        # Optimization step (once per logical step)
         torch.cuda.synchronize()
         optim_start = time.time()
         optimizer.step()
         torch.cuda.synchronize()
         optim_end = time.time()
         optimizer_times.append(optim_end - optim_start)
-        
+
         step_end = time.time()
         step_times.append(step_end - step_start)
+        avg_loss = step_loss.item() / grad_accumulation
 
         if step % 10 == 0 and rank == 0:
             avg_step_time = sum(step_times[-10:]) / 10
-            avg_fwd_time = sum(forward_times[-10:]) / 10
-            avg_bwd_time = sum(backward_times[-10:]) / 10
+            avg_fwd_time = sum(forward_times[-10 * grad_accumulation:]) / (10 * grad_accumulation)
+            avg_bwd_time = sum(backward_times[-10 * grad_accumulation:]) / (10 * grad_accumulation)
             avg_opt_time = sum(optimizer_times[-10:]) / 10
-            print(f"Step {step}/{num_steps} | Loss: {loss.item():.6f} | Avg Step Time (last 10): {avg_step_time:.4f}s | Fwd: {avg_fwd_time:.4f}s | Bwd: {avg_bwd_time:.4f}s | Opt: {avg_opt_time:.4f}s")
+            print(f"Step {step}/{num_steps} | Loss: {avg_loss:.6f} | Avg Step Time (last 10): {avg_step_time:.4f}s | Fwd: {avg_fwd_time:.4f}s | Bwd: {avg_bwd_time:.4f}s | Opt: {avg_opt_time:.4f}s")
 
     if rank == 0:
         print(f"Training finished. Overall Average Step Time: {sum(step_times) / len(step_times):.4f}s")
-    
+        print("\n"*10)
     cleanup()
 
 
@@ -283,6 +298,30 @@ if __name__ == "__main__":
         choices=["small", "1b", "full", "full_dimhead128"],
         default="small",
         help="Config size to use",
+    )
+    parser.add_argument(
+        "--micro_batch_size",
+        type=int,
+        default=8,
+        help="Batch size for mock training",
+    )
+    parser.add_argument(
+        "--num_img_tokens",
+        type=int,
+        default=256,
+        help="Number of image tokens per sample (e.g. 256 for 16x16)",
+    )
+    parser.add_argument(
+        "--num_txt_tokens",
+        type=int,
+        default=128,
+        help="Number of text tokens per sample",
+    )
+    parser.add_argument(
+        "--grad_accumulation",
+        type=int,
+        default=1,
+        help="Gradient accumulation steps (effective global batch = micro_batch_size * world_size * grad_accumulation)",
     )
     args = parser.parse_args()
 
@@ -298,4 +337,10 @@ if __name__ == "__main__":
     else:
         config = None    
 
-    mock_train(config)
+    mock_train(
+        config,
+        micro_batch_size=args.micro_batch_size,
+        num_img_tokens=args.num_img_tokens,
+        num_txt_tokens=args.num_txt_tokens,
+        grad_accumulation=args.grad_accumulation,
+    )

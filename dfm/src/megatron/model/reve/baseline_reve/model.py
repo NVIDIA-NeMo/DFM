@@ -98,16 +98,17 @@ class ReveV2(nn.Module):
 
         # DEBUGGING
         # Print model's parameters and their shapes
-        total_params = 0
-        print(f"\n{'='*20} ReveV2 Model Parameters {'='*20}")
-        for name, param in self.named_parameters():
-            print(f"{name}: {tuple(param.shape)}")
-            total_params += param.numel()
-        print(f"Total Parameters: {total_params}")
-        print(f"{'='*58}\n")
+        if torch.distributed.get_rank() == 0:
+            total_params = 0
+            print(f"\n{'='*20} ReveV2 Model Parameters {'='*20}")
+            for name, param in self.named_parameters():
+                print(f"{name}: {tuple(param.shape)}")
+                total_params += param.numel()
+            print(f"Total Parameters: {total_params}")
+            print(f"{'='*58}\n")
 
 
-    @jaxtyped(typechecker=beartype)
+    # @jaxtyped(typechecker=beartype)
     def _encode_text(
         self,
         y: Float[torch.Tensor, "bs num_tokens token_dim"],
@@ -156,7 +157,7 @@ class ReveV2(nn.Module):
 
         return vector_emb
 
-    @jaxtyped(typechecker=beartype)
+    # @jaxtyped(typechecker=beartype)
     def forward(
         self,
         x: Float[torch.Tensor, "bs num_img_tokens img_token_dim"],
@@ -167,11 +168,14 @@ class ReveV2(nn.Module):
         conditioning_signal: Float[torch.Tensor, " bs"],
     ) -> Float[torch.Tensor, "bs num_img_tokens img_token_dim"]:
 
-        # DEBUGGING
-        if torch.distributed.get_rank() == 0:
-            print(f"[DEBUG] (baseline_reve/model.py) x.shape: {x.shape}")
-            print(f"[DEBUG] (baseline_reve/model.py) y.shape: {y.shape}")
+        # DEBUGGING (run once per training process)
+        if torch.distributed.get_rank() == 0 and not getattr(
+            self, "_debug_forward_printed", False
+        ):
+            print(f"[DEBUG] (baseline_reve/model.py) x.shape - on one data parallel rank: {x.shape}")
+            print(f"[DEBUG] (baseline_reve/model.py) y.shape - on one data parallel rank: {y.shape}")
             print(f"[DEBUG] (baseline_reve/model.py) --------------------------------")
+            self._debug_forward_printed = True
 
         txt, txt_mask = self._encode_text(y, y_mask)
 

@@ -131,7 +131,7 @@ def pretrain_config(
     use_megatron_fsdp: bool = True,
     use_torch_fsdp2: bool = False,
     # Training hyperparameters
-    train_iters: int = 10000,
+    train_iters: int = 100,
     global_batch_size: int = 4,
     micro_batch_size: int = 1,
     lr: float = 0.9e-4,
@@ -207,9 +207,9 @@ def pretrain_config(
         in_channels = 768
         context_embeddings_dim = 4096
         F_latents=1
-        H_latents=16
-        W_latents=16
-        context_seq_len=128
+        H_latents=64
+        W_latents=64
+        context_seq_len=256
         number_packed_samples=4
 
         dataset = ReveMockDataModuleConfig(

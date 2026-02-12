@@ -408,12 +408,15 @@ class ReveModel(VisionModule):
         """Forward pass.
         """
 
-        # DEBUGGING
-        if torch.distributed.get_rank() == 0:
-            print(f"[DEBUG] (reve_model.py) number_packed_samples: {number_packed_samples}")
-            print(f"[DEBUG] (reve_model.py) x.shape: {x.shape}")
-            print(f"[DEBUG] (reve_model.py) y.shape: {y.shape}")
+        # DEBUGGING (run once per training process)
+        if torch.distributed.get_rank() == 0 and not getattr(
+            self, "_debug_forward_printed", False
+        ):
+            print(f"[DEBUG] (reve_model.py) number_packed_samples - on one data parallel rank: {number_packed_samples}")
+            print(f"[DEBUG] (reve_model.py) x.shape - on one data parallel rank: {x.shape}")
+            print(f"[DEBUG] (reve_model.py) y.shape - on one data parallel rank: {y.shape}")
             print("[DEBUG] (reve_model.py) --------------------------------")
+            self._debug_forward_printed = True
 
         ### Text processing
         txt = y
@@ -568,10 +571,11 @@ class ReveModel(VisionModule):
         """
         sharded_state_dict = super().sharded_state_dict(prefix, sharded_offsets, metadata)
 
-        for module in ["t_embedder"]:
-            for param_name, param in getattr(self, module).named_parameters():
-                weight_key = f"{prefix}{module}.{param_name}"
-                self._set_embedder_weights_replica_id(param, sharded_state_dict, weight_key)
+        # # DEBUGGING (ignore checkpoint saving for now)
+        # for module in ["t_embedder"]:
+        #     for param_name, param in getattr(self, module).named_parameters():
+        #         weight_key = f"{prefix}{module}.{param_name}"
+        #         self._set_embedder_weights_replica_id(param, sharded_state_dict, weight_key)
         return sharded_state_dict
 
 
