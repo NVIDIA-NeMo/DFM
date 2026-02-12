@@ -142,7 +142,7 @@ class BaseModelProcessor(ABC):
             text_encodings: Dict of text embeddings from encode_text()
             metadata: Dict containing:
                 - original_resolution: Tuple[int, int]
-                - crop_resolution: Tuple[int, int]
+                - bucket_resolution: Tuple[int, int]
                 - crop_offset: Tuple[int, int]
                 - prompt: str
                 - image_path: str

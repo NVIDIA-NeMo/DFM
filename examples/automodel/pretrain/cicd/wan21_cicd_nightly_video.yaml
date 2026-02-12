@@ -40,6 +40,11 @@ optim:
     weight_decay: 0.1
     betas: [0.9, 0.95]
 
+lr_scheduler:
+  lr_decay_style: cosine
+  lr_warmup_steps: 0
+  min_lr: 1e-6
+
 fsdp:
   tp_size: 1
   cp_size: 1
