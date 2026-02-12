@@ -20,7 +20,6 @@ Wan2.1 and HunyuanVideo.
 """
 
 from abc import abstractmethod
-from pathlib import Path
 from typing import Any, Dict, List, Optional, Tuple
 
 import numpy as np

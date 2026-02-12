@@ -32,6 +32,7 @@ from PIL import Image
 from .base_video import BaseVideoProcessor
 from .registry import ProcessorRegistry
 
+
 logger = logging.getLogger(__name__)
 
 

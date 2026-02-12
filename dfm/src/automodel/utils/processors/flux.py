@@ -30,6 +30,7 @@ from torch import autocast
 from .base import BaseModelProcessor
 from .registry import ProcessorRegistry
 
+
 logger = logging.getLogger(__name__)
 
 
