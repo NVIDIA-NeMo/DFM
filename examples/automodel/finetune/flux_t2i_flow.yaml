@@ -26,11 +26,10 @@ fsdp:
   activation_checkpointing: false
   cpu_offload: false
 
-#these hyperparameters are good for finetuning
 flow_matching:
   adapter_type: "flux"
   adapter_kwargs:
-    #keeping original guidance scale of 3.5, but need to be 1 for pretraining
+    #Critical: use 3.5 guidance scale for finetuning
     guidance_scale: 3.5
     use_guidance_embeds: true
   timestep_sampling: "logit_normal"
