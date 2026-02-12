@@ -174,7 +174,9 @@ class FluxAdapter(ModelAdapter):
         # The pipeline provides timesteps in [0, num_train_timesteps]
         timesteps = context.timesteps.to(dtype) / 1000.0
 
-        guidance = torch.full((batch_size,), 3.5, device=device, dtype=torch.float32)
+        # TODO: guidance scale is different across pretraining and finetuning, we need pass it as a hyperparamters.
+        # needs verify by Pranav
+        guidance = torch.full((batch_size,), self.guidance_scale, device=device, dtype=torch.float32)
 
         inputs = {
             "hidden_states": packed_latents,
