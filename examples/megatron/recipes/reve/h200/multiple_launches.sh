@@ -12,7 +12,7 @@ srun --jobid <job_id> -N 1 --ntasks-per-node=1 \
   --container-mounts=/lustre:/lustre \
   --export=ALL,MY_MASTER_ADDR="$M_ADDR" \
   bash -c '
-    cd /home/huvu/codes/dfm_customers/DFM_reve_optim
+    cd /home/scratch.svc_compute_arch/huvu/codes/dfm_customers/DFM_reve_optim
 
     MBS=16 NUM_IMG_TOKENS=256 NUM_TXT_TOKENS=128 GRAD_ACCUMULATION=1 \
       bash ./examples/megatron/recipes/reve/h200/launch_h200_nodes_baseline.sh
@@ -27,7 +27,7 @@ srun --jobid <job_id> -N 1 --ntasks-per-node=1 \
   --container-mounts=/lustre:/lustre \
   --export=ALL,MY_MASTER_ADDR="$M_ADDR" \
   bash  -c '
-    cd /home/huvu/codes/dfm_customers/DFM_reve_optim
+    cd /home/scratch.svc_compute_arch/huvu/codes/dfm_customers/DFM_reve_optim
 
     NUMBER_PACKED_SAMPLES=16 GBS=8 CONTEXT_SEQ_LEN=128 H_LATENTS=16 W_LATENTS=16 \
       bash ./examples/megatron/recipes/reve/h200/launch_h200_nodes.sh
