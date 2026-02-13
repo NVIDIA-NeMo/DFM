@@ -10,6 +10,7 @@ DFM_PATH=/home/scratch.svc_compute_arch/huvu/codes/dfm_customers/DFM_reve_optim
 MBRIDGE_PATH=/home/scratch.svc_compute_arch/huvu/codes/dfm_customers/Megatron-Bridge_latest # the same commit as the one in EOS
 MLM_PATH=/home/scratch.svc_compute_arch/huvu/codes/dfm_customers/megatron-lm_latest # the same commit as the one in EOS
 export PYTHONPATH="${DFM_PATH}/.:${MBRIDGE_PATH}/src/.:${MLM_PATH}/.:/opt/NeMo-Framework-Launcher/launcher_scripts"
+export HF_HOME=/home/scratch.svc_compute_arch/huvu/data/hf_home
 
 # GB200 High-Speed Fabric Optimizations
 export NVTE_FUSED_ATTN=1
@@ -26,6 +27,8 @@ CONTEXT_SEQ_LEN=${CONTEXT_SEQ_LEN:-256}
 H_LATENTS=${H_LATENTS:-64}
 W_LATENTS=${W_LATENTS:-64}
 RECOMPUTE_NUM_LAYERS=${RECOMPUTE_NUM_LAYERS:-0}
+# => img_seq_len = H_LATENTS * W_LATENTS
+# => total_batch_size = NUMBER_PACKED_SAMPLES * GBS
 
 # --- 4. Distributed Setup (Injected from Host) ---
 # We use MY_MASTER_ADDR which we will pass in the srun command

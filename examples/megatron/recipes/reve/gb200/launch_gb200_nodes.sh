@@ -26,6 +26,8 @@ CONTEXT_SEQ_LEN=${CONTEXT_SEQ_LEN:-256}
 H_LATENTS=${H_LATENTS:-64}
 W_LATENTS=${W_LATENTS:-64}
 RECOMPUTE_NUM_LAYERS=${RECOMPUTE_NUM_LAYERS:-0}
+# => img_seq_len = H_LATENTS * W_LATENTS
+# => total_batch_size = NUMBER_PACKED_SAMPLES * GBS
 
 # --- 4. Distributed Setup (Injected from Host) ---
 # We use MY_MASTER_ADDR which we will pass in the srun command

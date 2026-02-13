@@ -45,7 +45,7 @@ srun --jobid 4679313 -N 1 --ntasks-per-node=1 \
   '
 
 # DFM Reve
-srun --jobid 4679314 -N 1 --ntasks-per-node=1 \
+srun --jobid 4679313 -N 1 --ntasks-per-node=1 \
   --container-image="${CONT}" \
   --container-mounts=/lustre:/lustre \
   --export=ALL,MY_MASTER_ADDR="$M_ADDR" \
