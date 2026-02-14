@@ -16,7 +16,11 @@ optim:
     weight_decay: 0.01
     betas: [0.9, 0.999]
 
-#adjust dp_size to the total number of GPUs
+lr_scheduler:
+  lr_decay_style: cosine
+  lr_warmup_steps: 0
+  min_lr: 1e-6
+
 fsdp:
   dp_size: 32
   tp_size: 1
