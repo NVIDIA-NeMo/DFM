@@ -2,7 +2,7 @@ model:
   tensor_model_parallel_size: 1
   sequence_parallel: false
   pipeline_model_parallel_size: 1
-  context_parallel_size: 4
+  context_parallel_size: 2
   crossattn_emb_size: 5120
   hidden_size: 5120
   ffn_hidden_size: 13824
@@ -31,3 +31,13 @@ dataset:
 
 logger:
   log_interval: 1
+
+ddp:
+  use_megatron_fsdp: true
+  data_parallel_sharding_strategy: "optim_grads_params"
+
+dist:
+  use_megatron_fsdp: true
+
+checkpoint:
+  ckpt_format: "fsdp_dtensor"
