@@ -141,7 +141,7 @@ NVTE_FUSED_ATTN=1 torchrun --nproc_per_node=8 examples/megatron/recipes/wan/pret
 ### Using mock data (optional, for debugging)
 
 - Using `--mock` argument.
-- Adjust `video_size` (F_latents, H_latents, W_latents) and `number_packed_samples` of `WanMockDataModuleConfig` in `wan.py`. Total `seq_len = F * H * W * number_packed_samples`.
+- Adjust `video_size` (F_latents, H_latents, W_latents) and `number_packed_samples` of `WanMockDataModuleConfig` in `wan.py`. Total `seq_len = (F_latents // patch_temporal) * (H_latents // patch_temporal) * (W_latents // patch_temporal) * number_packed_samples`.
 
 ### Reproducing performance recipes
 
