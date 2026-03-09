@@ -3642,6 +3642,7 @@ dependencies = [
     { name = "kernels" },
     { name = "megatron-energon" },
     { name = "opencv-python-headless" },
+    { name = "sentencepiece" },
 ]
 
 [package.dev-dependencies]
@@ -3704,6 +3705,7 @@ requires-dist = [
     { name = "kernels" },
     { name = "megatron-energon" },
     { name = "opencv-python-headless", specifier = "==4.10.0.84" },
+    { name = "sentencepiece" },
 ]
 
 [package.metadata.requires-dev]

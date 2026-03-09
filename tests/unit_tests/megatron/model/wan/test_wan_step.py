@@ -27,13 +27,15 @@ class _DummyIter:
 @pytest.mark.skipif(not torch.cuda.is_available(), reason="wan_data_step moves tensors to CUDA")
 def test_wan_data_step_builds_packed_seq_params_cuda_guarded():
     # Construct minimal batch with required seq_len fields
+    # S=8, B=2
     batch = {
         "seq_len_q": torch.tensor([3, 5], dtype=torch.int32),
         "seq_len_q_padded": torch.tensor([4, 6], dtype=torch.int32),
         "seq_len_kv": torch.tensor([2, 7], dtype=torch.int32),
         "seq_len_kv_padded": torch.tensor([2, 8], dtype=torch.int32),
         # include a tensor field to exercise device transfer
-        "video_latents": torch.randn(8, 1, 4, dtype=torch.float32),
+        # shape: [S, B, H, D]
+        "video_latents": torch.randn(8, 2, 4, 16, dtype=torch.float32),
     }
     it = iter(_DummyIter(batch).iterable)
     qkv_format = "sbhd"
@@ -49,6 +51,8 @@ def test_wan_data_step_builds_packed_seq_params_cuda_guarded():
         assert hasattr(p, "cu_seqlens_kv_padded")
     # spot-check CUDA device after move
     assert out["video_latents"].is_cuda
+    # Verify transpose from (S, B, H, D) -> (B, S, H, D)
+    assert out["video_latents"].shape == (2, 8, 4, 16)
 
 
 def test_wan_forward_step_loss_partial_creation():

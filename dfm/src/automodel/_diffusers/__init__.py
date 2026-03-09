@@ -12,9 +12,10 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-from .auto_diffusion_pipeline import NeMoAutoDiffusionPipeline
+from .auto_diffusion_pipeline import NeMoAutoDiffusionPipeline, PipelineSpec
 
 
 __all__ = [
     "NeMoAutoDiffusionPipeline",
+    "PipelineSpec",
 ]

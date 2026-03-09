@@ -20,12 +20,11 @@ from typing import Iterable
 import torch
 from megatron.bridge.training.losses import masked_next_token_loss
 from megatron.bridge.training.state import GlobalState
-from megatron.core import parallel_state
 from megatron.core.models.common.vision_module.vision_module import VisionModule
 from megatron.core.packed_seq_params import PackedSeqParams
 from megatron.core.utils import get_model_config
 
-from dfm.src.megatron.model.wan.flow_matching.flow_pipeline import FlowPipeline
+from dfm.src.megatron.model.wan.flow_matching.flow_matching_pipeline_wan import WanAdapter, WanFlowMatchingPipeline
 
 
 logger = logging.getLogger(__name__)
@@ -67,6 +66,9 @@ def wan_data_step(qkv_format, dataloader_iter):
             ),
         }
 
+    # tranpose from "sbhd" to "bshd" to be compatible with flow matching pipeline
+    batch["video_latents"] = batch["video_latents"].transpose(0, 1)
+
     return batch
 
 
@@ -82,7 +84,16 @@ class WanForwardStep:
         sigma_min: float = 0.0,  # Default: no clamping (pretrain)
         sigma_max: float = 1.0,  # Default: no clamping (pretrain)
     ):
-        self.diffusion_pipeline = FlowPipeline()
+        self.diffusion_pipeline = WanFlowMatchingPipeline(
+            model_adapter=WanAdapter(),
+            timestep_sampling=timestep_sampling,
+            logit_mean=logit_mean,
+            logit_std=logit_std,
+            flow_shift=flow_shift,
+            mix_uniform_ratio=mix_uniform_ratio,
+            sigma_min=sigma_min,
+            sigma_max=sigma_max,
+        )
         self.use_sigma_noise = use_sigma_noise
         self.timestep_sampling = timestep_sampling
         self.logit_mean = logit_mean
@@ -115,23 +126,12 @@ class WanForwardStep:
 
         # run diffusion training step
         with straggler_timer:
-            if parallel_state.is_pipeline_last_stage():
-                output_batch, loss, split_loss_mask = self.diffusion_pipeline.training_step(
-                    model,
-                    batch,
-                    use_sigma_noise=self.use_sigma_noise,
-                    timestep_sampling=self.timestep_sampling,
-                    logit_mean=self.logit_mean,
-                    logit_std=self.logit_std,
-                    flow_shift=self.flow_shift,
-                    mix_uniform_ratio=self.mix_uniform_ratio,
-                    sigma_min=self.sigma_min,
-                    sigma_max=self.sigma_max,
-                )
-                output_tensor = torch.mean(loss, dim=-1)
-                batch["loss_mask"] = split_loss_mask
-            else:
-                output_tensor = self.diffusion_pipeline.training_step(model, batch)
+            weighted_loss, average_weighted_loss, loss_mask, metrics = self.diffusion_pipeline.step(
+                model,
+                batch,
+            )
+            output_tensor = torch.mean(weighted_loss, dim=-1)
+            batch["loss_mask"] = loss_mask
 
         # TODO: do we need to gather output with sequence or context parallelism here
         #       especially when we have pipeline parallelism

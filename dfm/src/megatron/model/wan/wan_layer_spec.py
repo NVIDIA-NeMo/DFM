@@ -186,6 +186,7 @@ class WanLayerWithAdaLN(TransformerLayer):
         sequence_len_offset=None,
         inference_context=None,
         rotary_pos_cos_sin=None,
+        **kwargs,
     ):
         # the timestep embedding is stored in attention_mask argument
         timestep_emb = attention_mask
