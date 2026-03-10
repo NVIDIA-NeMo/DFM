@@ -59,7 +59,7 @@ The performance data includes:
 
 | Model | #-GPUs | GBS | MBS | Sequence Length | FSDP | TP | SP | PP | CP | VP | EP | Model TFLOP / sec / GPU |
 |-------|--------|-----|-----|-----------------|------|----|----|----|----|----|----|-------------------------|
-|Wan 2.1 14B|32|64|1|37440|1|1|0|1|2|0|0|813.43|
+|Wan 2.1 14B|32|64|1|37440|1|1|0|1|2|0|0|804.02|
 
 #### System: DGX-H100
 
