@@ -138,7 +138,7 @@ runs:
         docker pull nemoci.azurecr.io/${{ inputs.image }}:${{ github.run_id }}
 
     - name: Checkout repository
-      uses: actions/checkout@v2
+      uses: actions/checkout@v6
       with:
         path: DFM
         submodules: recursive
@@ -246,7 +246,7 @@ runs:
         exit $EXIT_CODE
 
     - name: Upload artifacts
-      uses: actions/upload-artifact@v4
+      uses: actions/upload-artifact@v6
       if: ${{ steps.check.outputs.coverage_report != 'none' }}
       with:
         name: ${{ steps.check.outputs.coverage_report }}
