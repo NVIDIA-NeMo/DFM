@@ -18,7 +18,7 @@ import torch
 
 class Wan3DRopeEmbeddings(torch.nn.Module):
     """
-    Wan 3D RoPE embeddings implementation.
+    Wan 3D RoPE embeddings implementation. Change for Testing.
     Implements Wan's 3D RoPE embeddings for Mcore Attention based on Wan's implementation at https://github.com/Wan-Video/Wan2.1/blob/main/wan/modules/model.py.
     """
 
