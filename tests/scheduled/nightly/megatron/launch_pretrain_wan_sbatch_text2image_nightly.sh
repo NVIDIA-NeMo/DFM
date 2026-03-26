@@ -1,0 +1,55 @@
+#!/bin/bash
+
+# Slurm parameters (parsed by run_example.sh)
+NUM_NODES=1
+TIME=00:30:00
+
+# Training parameters
+EXP_NAME=wan_1.3B_pretrain_text2image_cicd_3000vids_nightly_example
+PROJECT=wan
+MBS=1
+GBS=8
+LR=5e-5
+WARMUP_ITERS=1000
+CHECKPOINT_DIR=${CHECKPOINT_BASE_DIR}/${EXP_NAME}
+# set this PRETRAIN_CHECKPOINT_DIR to CHECKPOINT_DIR to train from scratch
+PRETRAIN_CHECKPOINT_DIR=${PRETRAIN_CHECKPOINT_DIR:-${CHECKPOINT_DIR}}
+TRAIN_ITERS=${TRAIN_ITERS:-100}
+
+NVTE_FUSED_ATTN=1 torchrun \
+  --nnodes=${NUM_NODES} \
+  --nproc_per_node=8 \
+  --rdzv-backend=c10d \
+  --rdzv-endpoint=${MASTER_ADDR}:${RDZV_PORT} \
+  --rdzv-id=${SLURM_JOB_ID} \
+  --rdzv-conf=timeout=6000 \
+  examples/megatron/recipes/wan/pretrain_wan.py \
+  --training-mode pretrain \
+  model.tensor_model_parallel_size=1 \
+  model.pipeline_model_parallel_size=1 \
+  model.context_parallel_size=1 \
+  model.sequence_parallel=false \
+  model.qkv_format=thd \
+  dataset.path="${DATASET_BASE_DIR}/OpenVid-1M/OpenVidHD/OpenVidHD_part_1_3000vids_text2image_wds" \
+  dataset.packing_buffer_size=150 \
+  dataset.num_workers=10 \
+  checkpoint.save=${CHECKPOINT_DIR} \
+  checkpoint.load=${PRETRAIN_CHECKPOINT_DIR} \
+  checkpoint.load_optim=true \
+  checkpoint.save_interval=100 \
+  optimizer.lr=${LR} \
+  optimizer.min_lr=${LR} \
+  optimizer.weight_decay=0.1 \
+  optimizer.adam_beta2=0.95 \
+  optimizer.clip_grad=2.0 \
+  train.eval_iters=0 \
+  train.train_iters=${TRAIN_ITERS} \
+  scheduler.lr_decay_style=constant \
+  scheduler.lr_warmup_iters=${WARMUP_ITERS} \
+  model.seq_length=12480 \
+  dataset.seq_length=12480 \
+  train.global_batch_size=${GBS} \
+  train.micro_batch_size=${MBS} \
+  dataset.global_batch_size=${GBS} \
+  dataset.micro_batch_size=${MBS} \
+  logger.log_interval=1
