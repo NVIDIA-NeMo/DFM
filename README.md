@@ -1,6 +1,6 @@
 <div align="center">
 
-# NeMo DFM: Diffusion Foundation Models
+# NeMo DFM: Diffusion Foundation Models (Archived)
 
 
 <!-- We are still using Mbridge CICD NeMo. @pablo can we get our own? and the same for star gazer-->
@@ -14,6 +14,11 @@
 [Documentation](https://github.com/NVIDIA-NeMo/DFM/tree/main/docs) | [Supported Models](#supported-models) | [Examples](https://github.com/NVIDIA-NeMo/DFM/tree/main/examples) | [Contributing](https://github.com/NVIDIA-NeMo/DFM/tree/main/CONTRIBUTING.md)
 
 </div>
+
+## Archive Notice
+This repo is being archived. 
+- For diffusion model training using megatron, please refer to [NeMo Megatron-Bridge](https://github.com/NVIDIA-NeMo/Megatron-Bridge)
+- For diffusion model training using pytorch, please refer to [NeMo AutoModel](https://github.com/NVIDIA-NeMo/Automodel)
 
 ## Overview
 
