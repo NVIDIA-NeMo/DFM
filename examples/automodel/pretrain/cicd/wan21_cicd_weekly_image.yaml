@@ -1,0 +1,62 @@
+seed: 42
+
+wandb:
+  project: wan-t2v-cicd-weekly-pretrain
+  mode: online
+  name: WAN21_WEEKLY_VERIFY
+
+dist_env:
+  backend: nccl
+  timeout_minutes: 30
+
+model:
+  pretrained_model_name_or_path: Wan-AI/Wan2.1-T2V-1.3B-Diffusers
+  mode: pretrain
+
+step_scheduler:
+  global_batch_size: 80
+  local_batch_size: 10
+  ckpt_every_steps: 500
+  num_epochs: 40
+  log_every: 1
+
+data:
+  dataloader:
+    _target_: dfm.src.automodel.datasets.build_dataloader
+    meta_folder: /lustre/fsw/portfolios/coreai/users/linnanw/CICD/Wan21/weekly/image
+    num_workers: 10
+    device: cpu
+
+optim:
+  learning_rate: 5e-5
+  clip_grad: 2.0
+  optimizer:
+    weight_decay: 0.1
+    betas: [0.9, 0.95]
+
+fsdp:
+  tp_size: 1
+  cp_size: 1
+  pp_size: 1
+  dp_replicate_size: 1
+  dp_size: none
+
+flow_matching:
+  adapter_type: "simple"
+  adapter_kwargs: {}
+  use_sigma_noise: true
+  timestep_sampling: logit_normal
+  logit_mean: 0.0
+  logit_std: 1.5
+  flow_shift: 2.5
+  mix_uniform_ratio: 0.2
+  sigma_min: 0.0
+  sigma_max: 1.0
+
+
+checkpoint:
+  enabled: true
+  checkpoint_dir: /opt/DFM/wan21_fsdp_weekly_image/
+  model_save_format: torch_save
+  save_consolidated: false
+  restore_from: null
