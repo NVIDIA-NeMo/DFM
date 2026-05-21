@@ -43,6 +43,8 @@ def cache_video(tensor, save_file=None, fps=30, suffix=".mp4", nrow=8, normalize
     for _ in range(retry):
         try:
             # preprocess
+            if not tensor.is_floating_point():
+                tensor = tensor.float()
             tensor = tensor.clamp(min(value_range), max(value_range))
             tensor = torch.stack(
                 [
