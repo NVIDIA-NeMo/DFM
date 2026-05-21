@@ -82,7 +82,7 @@ Done
 
 ### 🐳 Build Container
 
-Please follow the instructions in the [container](https://github.com/NVIDIA-NeMo/DFM#-built-your-own-container) section of the main README.
+Please follow the instructions in the [container](https://github.com/NVIDIA-NeMo/DFM#build-your-own-container) section of the main README.
 
 ---
 
@@ -106,12 +106,12 @@ The model architecture can be customized through parameters such as `num_layers`
 First, copy the example config file and update it with your own settings:
 
 ```bash
-cp examples/megatron/recipes/dit/conf/dit_pretrain_example.yaml examples/megatron/recipes/dit/conf/my_config.yaml
+cp examples/megatron/recipes/dit/conf/dit_pretrain.yaml examples/megatron/recipes/dit/conf/my_config.yaml
 # Edit my_config.yaml to set:
 # - model.vae_cache_folder: Path to VAE cache folder
 # - dataset.path: Path to your dataset folder
 # - checkpoint.save and checkpoint.load: Path to checkpoint folder
-# - train.global_batch_size: Set to match be divisible by NUM_GPUs
+# - train.global_batch_size: Set to be divisible by NUM_GPUs
 # - logger.wandb_exp_name: Your experiment name
 ```
 
